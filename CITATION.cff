@@ -1,0 +1,49 @@
+abstract: 'FIBE represents a simple fishery model. Fish that reproduce and fisher
+  with different fishing styles that fish as their main source of income. The aim
+  of the model is to reflect the different fishing behaviours as described and observed
+  in the (Swedish) Baltic Sea fishery and explore the consequences of different approximations
+  of human/fisher behaviour in under different environmental and managerial scenarios.
+
+
+  The overarching aim is to advance the incorporation and understanding of human behaviour
+  (diversity) in fisheries research and management. In particular focusing on insights
+  from social (fishery) science of fisher behaviour.'
+authors:
+- affiliation: Stockholm Resilience Center, Stockholm University
+  email: nwijermans@gmail.com
+  family-names: Wijermans
+  given-names: Nanda
+  orcid: https://orcid.org/0000-0003-4636-315X
+- affiliation: Stockholm Resilience Centre, Stockholm University
+  email: maja.schlueter@su.se
+  family-names: "Schl\xFCter"
+  given-names: Maja
+  orcid: https://orcid.org/0000-0002-7780-1039
+- email: kirill.orach@su.se
+  family-names: Orach
+  given-names: Kirill
+  orcid: https://orcid.org/0000-0001-6255-2335
+- affiliation: Stockholm University
+  email: wijnand.boonstra@su.se
+  family-names: Boonstra
+  given-names: Wijnand
+- affiliation: Swedish University of Agricultural Sciences
+  email: jonas.sundberg@slu.se
+  family-names: Hentati-Sundberg
+  given-names: Jonas
+cff-version: 1.2.0
+date-released: '2020-04-20'
+doi: 10.25937/xzxh-7667
+keywords:
+- ABM
+- agent-based social simulation
+- fishery
+- human behaviour
+- NetLogo
+- social-ecological
+license: CC-BY-4.0
+message: If you use this software, please cite it using the metadata from this file.
+title: FIBE - FIsher BEhaviour model
+type: software
+url: https://doi.org/10.25937/xzxh-7667
+version: 1.0.0

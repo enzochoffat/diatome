@@ -1,0 +1,2929 @@
+<?xml version="1.0" encoding="utf-8"?>
+<model version="NetLogo 7.0.2" snapToGrid="true">
+  <code><![CDATA[;;; @author Nanda Wijermans
+;;; @email nanda.wijermans@su.se
+;;; @version 1.0
+
+extensions [array csv]
+
+__includes["init.nls" "utils.nls"]
+
+breed [fishers fisher]
+
+globals [
+  end-of-sim
+  number-of-fishers
+  fishingAtA fishingAtB fishingAtC fishingAtD
+  MAXXABC MAXXD MAXYA MAXYB MAXYCD  ; max coordinates of each region
+  MINXABC MINXD MINYA MINYB MINYCD  ; min coordinates of each region
+
+  LOW MEDIUM HIGH MEDIUM-HIGH  LOW-MEDIUM ; constants used to indicate levels
+  LOW-COST-EXISTANCE MEDIUM-COST-EXISTANCE HIGH-COST-EXISTANCE ; different costs for a fisher (firm) to exist
+  LOW-COST-ACTIVITY  MEDIUM-COST-ACTIVITY  HIGH-COST-ACTIVITY  ; different cost connected to go fishing, e.g. hiring people, time spend on the job - wage, etc   ;TODO is this still used
+  LOW-COST-TRAVEL MEDIUM-COST-TRAVEL MEDIUM-COST-TRAVEL-BIGVESSEL HIGH-COST-TRAVEL ; different costs for traveling to the different regions
+  cost-travelB2C cost-travelB2D cost-travelC2D                 ; cost when travelling from one region to the other
+  CARRYING-CAPACITY LOW-CARCAP MEDIUM-CARCAP HIGH-CARCAP       ; carrrying capacity of the fish stock at a patch.
+
+  ;constants and variables for the MSY benchmark
+  CARCAP-A CARCAP-B CARCAP-C CARCAP-D
+  CATCHABIL-AR CATCHABIL-CO CATCHABIL-TR ; constants use to indicate the different gear-based catch-abilities for the fishing styles archipelago (AR), coastal (CO) and offshore trawlers (TR)
+
+  MSY-STOCK-A MSY-STOCK-B MSY-STOCK-C MSY-STOCK-D              ;optimal stock in the baseline scenario - optimal management
+  opt-catch-A opt-catch-B opt-catch-C opt-catch-D              ;catch in the baseline scenario - optimal management
+  opt-timeOut-A opt-timeOut-B opt-timeOut-C opt-timeOut-D      ;optimal time out for all fishers in a years time
+
+  IS-A-CROWD            ; minumum number of fishers that is consdired a group - i.e. to be able to have effect on going where 'most' fisher go
+  A B C D NULL          ; region labels for the patches indicating the type of sea and cod stock that is targeted when fisher fish there
+  WEEK MONTH MONTH-IN-DAYS SEASON HALFYEAR YEAR ; constant for the number of tick for a week, month and season
+
+  regionA regionB regionC regionD land ; agentset of the patches belonging to each region
+  archipelagos coastals trawlers  ; agentset of the agents belonging to each fisher type
+  hotspots hotspotCentresA hotspotCentresB hotspotCentresC hotspotCentresD ; patchset of hotspot centres
+  medHighDensSpotsA medHighDensSpotsB medHighDensSpotsC medHighDensSpotsD ;patchset of the medium and high dense patches
+  lowDensSpotsA lowDensSpotsB lowDensSpotsC lowDensSpotsD ; ;patchset of the low dense patches
+
+  badWeather            ; boolean to indicate it is bad weather (archipelago and coastal cannot go out)
+
+  hotSpotsVisible       ; variable that avoids unnecesary updating the layout
+  fishDensVisible       ; variable that avoids unnecesary updating the layout
+
+  ;Outcome variablen
+  runnr
+  output-file-name
+
+  ;FIBE 1.0 response variables
+  numFishers numFishing
+  stock stockA stockB stockC stockD                                                                   ; Ecological response variables: all and regional
+  accumCatchYearly accumCatchA accumCatchB accumCatchC accumCatchD catchBtickly
+  accumProfitYearly
+  fisherSatisfactionMean fisherSatisfactionSD
+  giniCatch giniProfit
+
+  ;; variables indicating the underlying reasons for not fishing
+  notFishing
+  numLayingLow numThinkFishIsScarce numSatisfied numLowCapital
+  numFishersWgoodSpot percFishersWgoodSpot numExpectNoProfit numWantToBeHome
+
+  meanTimesFishing
+  sdTimesFishing sumTimesFishing maxTimesFishing minTimesFishing medianTimesFishing       ; Social response variables: all
+
+  numFishingTrawls meanCatchTrawls sdCatchTrawls meanCapitalTrawls sumCapitalTrawls giniTrawls        ; Social (incl economical) response variables: Offshore trawler fisher
+  numFishingCoastls meanCatchCoastls sdCatchCoastls meanCapitalCoastls sumCapitalCoastls giniCoastls  ; Social (incl economical) response variables: Coastal fisher
+  ]
+
+patches-own [
+  region                ; indicates which of the 4 region this patch belongs to. Sea 1: A = close, B = medium far, C= far away; Sea 2: D = far away but other sea/fish stock/rules or NULL
+  density               ; indicates how much fish (relative to the fish stock in this region) populates this patch
+  fish-stock            ; indicates the number of fish on this patch
+  growth-rate           ; the rate of growth on this patch
+  regenAmount           ; amount the stock has grown this tick
+  patch-stock-after-regrowth  ; presents the stocksize before fishing directly after regrowth
+  patch-carrying-capacity     ; the amount of fish that can live/sustain here
+]
+
+fishers-own [
+ myStyle              ; represents the style the fisher is displaying (depending on the simulation this remains constant or is changeable over time), in the initialisation it supports setup, during the simulation it characterised the settings (label not driver)
+ satisfaction         ; represents how satisfied a fisher is at a current time
+ goodSpot-threshold   ; threshold for the agents with a satisficing seleciton procedure to assess whehte a fishing spot is satisfactory based on the stock there
+ f_capital            ; amount of money the fisher (household/company)? holds
+ prev-capital         ; capital of last time step
+ profit memory_profit accumulatedProfit accumProfitThisYear ; amount of profit - this tick, memory of...
+ lowCatchCnt          ; amount of ticks in the year with a low catch, used to assess whether the fisher thinks there is not enough fish, it is getting scarce
+ catch accumulatedCatch accumCatchThisYear memory-catch memoryCatchTick;amount of fish caught - this tick, over all ticks, memory of...
+ memory-catchA memory-catchB memory-catchC memory-catchD ; region dependend memory of catches
+ growth-perception    ; list used to asses the perception of growth based on the the memory of catches
+ expected-catchA expected-catchB expected-catchC expected-catchD ; expected catches
+ thinkFishIsScarce    ; bool to indicate whether the fisher thinks the fish is scarce
+
+ regionPref           ; expectation based region preference of the agents
+ memory-goodSpotsA memory-goodSpotsB memory-goodSpotsC memory-goodSpotsD ; knowledge of good spots to fish in region A,B,C,D
+ memory-fishAtSpot    ; memory of the amount of fish on locations
+ memory-visitedSpots  ; memory of the actual location of fishing corresponding with memory-fishAtSpot
+ ffinding-knowledge   ; skill level in ability to find fish [0,1]
+ catch-ability        ; number of fish that one can maximally fish based on gear the efficiency of actually catching fish [0,5000]?? to calibrate
+ cost-equipment       ; cost of gear {low,medium,high} is directly connected to catchability
+ cost-travel          ; fishing in different sea regions {a,b,c,d} cost (includes the vessel, fuel, fishing on the spot)
+ cost-existance       ; {l,m,h} cost for the fisher to maintain its existance as fisher (company cost rent, interest, etc) and as a person (household/subsistence cost)
+ cost                 ; total costs of the agents
+ technology           ; boolean indicating the fisher has technology (e.g. radar) to scan for fish in its vinicity , i.e. enables to find fish
+ collegues            ; boolean indicating the fisher has collegues with whom it exchanges information, e.g. where to find fish
+ partner              ; boolean indicating the fisher has a partner it can rely on for income
+
+ willFish             ; boolean indicating the decision of a fisher to go fishing or not
+ atHome               ; boolean indicating a fihsing is at home
+ layLow               ; boolean indicating the way a fisher does not fish (layLow = reducing cost, otherwise just a break)
+ cntWentFishing       ; counter for the amount of ticks during a run in which the agent went out to fish, i.e. willFish is true
+ cntWentFishingPeriod ;  counter for the amount of ticks during last period in which the agent went out to fish, i.e. willFish is true
+ notAtSeaThreshold    ; number of ticks the agent can be abstain from being at sea - only for the agents that value being a fisher {week, month, season}
+ notAtSeaCnt          ; number of ticks the agent was not at sea in a row
+ movedToday           ; boolean indicating that the fisher already decided where to go today
+
+ profit-thresh        ; threshold of profit a fishing trip should be before an trawler even decides to go out (higher than the costs of going out)
+ gonefishing          ; I am still at sea and consider to stay another day
+ myLastFishSpot       ; indicates the spot where fisher fished last time
+ atSea                ; boolean indicating that the fisher is at sea   (use to indicate time effects, fishers do not move literally back and forth to land)
+ atSeaCnt             ; counter to check that fishers are not at sea longer that 2 days - based on emprical knowledge that vessels do not allow to cool/store fish for longer
+ hitGoodSpotCnt       ; counter when the fisher hits one of the hotspots (medium & high dense fish areas)
+ goodSpotToday        ; boolean whether one found a good spot today
+
+ storingcapacity      ; amount of fish an agent can store onboard before returning to port
+ fish-onboard         ; amount of fish currently stored on the vessel
+ jumped               ; indicates that a fisher on a multi-day trip moved from the spot he was
+
+ homeTime-satisfaction growth-satisfaction ; satisfaction levels of the agent based on being home vs having an income
+ expectNoProfit wannaBeHome ; indicators reason for not fishing
+
+ ]
+
+;;;;;;;;;;;;;; GO PROCEDURES - RUNNING THE SIMULATION ;;;;;;;;;;;;;;
+
+;; The main process of the simulation that triggers
+;; the fishers to decide and may fish every tick, the fish reproduces on a yearly base
+to go
+
+  set badWeather getWeather
+  let yearTick ((ticks mod YEAR) < 1)
+  set catchBtickly 0
+
+  ifelse (yearTick)
+    [ ask patches with [region != NULL] [ update-stock ]
+      if any? fishers [
+        ask fishers [ set lowCatchCnt 0 ]
+        go-tickly
+      ]
+      update-response-vars-periodicly
+  ]
+
+  [ set yearTick false
+    if ((ticks mod YEAR) = 1) [ reset-counters ] ;first day of the year
+    go-tickly ]
+
+  update-layout
+  if ticks >= end-of-sim [ stop ]
+  tick
+end
+
+;; Triggers all the functions and actions that should be executed every simulation day/tick
+to go-tickly
+  if not(ecologyOnly) [
+    ask fishers [
+      set movedToday false
+      decide-fishOrNot ]
+    ask fishers with [ willfish = true and gonefishing = true ] [ decide-fishSpot ] ;first those that are already at sea decide where to go (multi-day - trawlers)
+    ask fishers with [ willfish = true and not atSea ] [ decide-fishSpot ] ;then the others
+
+    ask fishers [
+      execute-decision
+      ;show (sentence "accumulated cata (B C D): "accumCatchB " " accumCatchC " " accumCatchD)
+      update-memory
+      update-satisfaction ]
+  ]
+  update-response-vars-tickly
+end
+
+;;;;;; Resource functions
+
+
+;; Updates the fish-stock at a patch by mimicking the regrowth/reproduction of fish given the particular characteristics of that site and species
+to update-stock
+  set regenAmount round(fish-stock * growth-rate * (1 - (fish-stock / PATCH-CARRYING-CAPACITY)))
+  set fish-stock fish-stock + regenAmount
+  set patch-stock-after-regrowth fish-stock
+end
+
+;;;;;; Agent functions
+
+;; The agents decision model is based interface selected decision models
+to decide-fishOrNot
+  if myStyle = "archipelago" [ satisfice-lifestyle ]          ;bounded rational with satisfising as selection process - values maintaining being at sea, being selfreliant, close to home
+  if myStyle = "coastal" [ optimise-lifestyle-and-growth ]    ;bounded rational with optimising as selection process - values monetary growth, being at sea, being selfreliant, close to home
+  if myStyle = "trawler" [ optimise-growth ]                  ;bounded rational with optimising as selection process- values monetary growth
+end
+
+; Makes the agents execute the decision made
+; Fishers that go fishing fish
+; they all affect/set their cost and income
+to execute-decision
+  ifelse (willFish = true) [
+    set atHome false
+    display
+    ;show (word "I AM fishing!")
+    go-fish
+    set myLastFishSpot patch-here
+  ]
+  [ ; Not fishing!
+    set atHome true
+    if ([ region ] of patch-here !=  NULL) [ move-to one-of land ]
+    set cost-existance getMyExistCost myStyle
+    ifelse (laylow) [ ; reduce cost or alternative income
+      ifelse partner
+      [ set cost-existance 0.5 * cost-existance ]  ;If one has a partner one can reduce cost by depending on the other and spending less
+      [ set cost-existance 0.25 * cost-existance ]] ;Without a partner one can reduce cost by spending less
+    [ ; do-nothing  - mainly for the trawler and coastal
+      set gonefishing false
+      set jumped false ]
+
+    set cost cost-existance
+    set catch 0
+    set fish-onboard 0
+  ]
+
+  ifelse (gonefishing = true) ;will not return to land
+    [ set profit 0 - cost
+      set atSeaCnt atSeaCnt + 1 ]
+    [ set profit fish-onboard * fish-price - cost       ; TODO replace cost, also separate getting profit when landing - differentatie between fisher that go back to the harbour and those doing a multitr
+      set fish-onboard 0
+      set atSea false
+      set atSeaCnt atSeaCnt + 1
+    ]
+
+  ;show (word "today I caught: " catch " and I earned: " profit)
+  set accumulatedProfit accumulatedProfit + profit
+  set accumProfitThisYear accumProfitThisYear + profit
+  set prev-capital f_capital
+  set f_capital f_capital + profit
+  ;show (sentence "capital: " f_capital)
+end
+
+;########## DECIDE WHETHER TO GO FISH ###########
+
+;; The choice to fish or not is driven by the need to fish (i.e. subsistence - breaking even in cost)
+to satisfice-lifestyle
+  let lastcatchIndex min (list (length memoryCatchTick) 5); length of the memory of catches or a week
+  let catch-last-week sum (sublist memoryCatchTick 0 lastcatchIndex)
+  ;show (sentence "satisfice-lifestyle: last 5 catches " (sublist memoryCatchTick 0 lastcatchIndex) " = last weeks catch = " catch-last-week)
+  let cost-ideal-week (7 * cost-existance + 5 * cost-travel + 5 * cost-equipment)
+
+  let doneEnough (catch-last-week * fish-price) >= cost-ideal-week ; fisher has done enough this week
+  ifelse (doneEnough = true)
+  [ set satisfaction 1
+    ;show (sentence "Satisfice-lifestyle: doneEnough= " doneEnough)
+  ]
+  [ set satisfaction (catch-last-week * fish-price) / cost-ideal-week ]
+  set thinkFishIsScarce lowCatchCnt > 0.75 * memory-spatial-length  ; when the amount of catches resemble the amount of good places in mind, the agent tried all spots and will decide that there is not enough fish anymore
+  ;if thinkFishIsScarce [ show (sentence "Satisice-lifestyle - I think fish is scarce :" thinkFishIsScarce " - low catch count: " lowCatchCnt) ]
+  ;show (sentence "profit-last-week: " (catch-last-week * fish-price))
+  ifelse (badWeather) [
+    set willFish false
+    ;show ("Satisfice-lifestyle: Will not fish, bad weather")
+    ;laylow will stay what it was last time
+    set notAtSeaCnt notAtSeaCnt + 1
+  ]
+  [ ifelse (thinkFishIsScarce)
+    [ set willFish false ; layLow - reduce costs!
+      set layLow true;
+      set notAtSeaCnt notAtSeaCnt + 1
+      ;show (sentence "Satisfice-lifestyle: Will not fish but am not satisfied but fish is scarce")
+    ]
+    [ ifelse (not (doneEnough) or f_capital < 0)
+      [ set willFish true
+        set layLow false
+        set notAtSeaCnt 0 ]
+      [ set willFish false
+        set layLow false;
+        set notAtSeaCnt notAtSeaCnt + 1 ]]
+  ]
+end
+
+;; Deciding to fish or not is a tradeoff between spending time at home and being a fisher with a growing capital/fishing enterprise
+to optimise-lifestyle-and-growth
+
+  ifelse (badWeather) [ set willFish false ]
+  [
+    let expected-cost NULL
+    let expected-income NULL
+    let expected-catch catch-ability
+
+    ifelse (not beginning-season and ticks > WEEK) [
+      set-catch-expectation-and-regionPref
+      set expected-catch max (list expected-catchA expected-catchB)
+      ;show (sentence "region-pref=" regionPref " after just calculating my catch expectations A("round(expected-catchA)") B("round(expected-catchB)")")
+    ][ ifelse (random 2 > 0)
+      [ set regionPref A ]
+      [ set regionPref B ]
+    ]
+    set expected-income (expected-catch * fish-price)
+    set expected-cost (cost-equipment + cost-existance + (getTravelCost regionPref myStyle))
+    let expected-profit-stay 0 - cost-existance
+    let expected-profit-go expected-income - expected-cost
+    ;Up to this point behaviour is the same as the trawler - optimise growth
+
+    set wannaBeHome false
+    set expectNoProfit false
+    ifelse (expected-profit-go > expected-profit-stay) [
+      ifelse (homeTime-satisfaction < home-satisf-threshold and homeTime-satisfaction < growth-satisfaction) [
+        ;show (sentence "not fishing because I want to spend time at home. " precision homeTime-satisfaction 2 " > sat-growth" precision growth-satisfaction 2 ) ; growth-satis >= homeTime-satis
+        set wannaBeHome true
+        set willFish false]
+      [ set willFish true
+        ;show (sentence "go fishing, not satisfied on my growth - satHome = " precision homeTime-satisfaction 2 " <= sat-growth" precision growth-satisfaction 2)
+      ]
+    ]
+      [ ;show "not fishing because is is not profitable"
+        set expectNoProfit true
+        set willFish false ]
+  ]
+
+  ifelse (willFish = false) [
+    set notAtSeaCnt notAtSeaCnt + 1]
+  [ set notAtSeaCnt 0 ]
+end
+
+;; Fisher decides to go fishing or not, or whether it will continue to fish (multiday trip, stay longer at sea)
+;; A fisher goes fishing when it expects to have most monetary benefit from going (profit fishing > profit not-fishing, implying that it expects to be able to catch fish in right amount, if the fish population is considered too low the fisher doesnot go out
+;; Continuing to fish follows the same reasoning, but the decision is about staying longer at sea (less travel cost) and
+;; the consequence of not filling its vessel last tick. We thus 'artifically' move this choice to this tick but correct for the profit in retrospect.
+to optimise-growth
+  let expected-cost NULL
+  let expected-income NULL
+  let expected-catch catch-ability
+
+  ifelse not(goneFishing) [   ;not at sea
+    ifelse (not beginning-season and ticks > WEEK) [
+      set-catch-expectation-and-regionPref  ; TODO add some influence of the last years (e.g. bad year/trend in a particular region, don't go their)
+      set expected-catch max (list expected-catchB expected-catchC expected-catchD)
+      ;show (sentence "not at sea: region-pref=" regionPref " after just calculating my catch expectations B("expected-catchB") C("expected-catchC") D("expected-catchD")")
+    ][
+      let rnd random 3
+      if rnd = 0 [ set regionPref B ]
+      if rnd = 1 [ set regionPref C ]
+      if rnd = 2 [ set regionPref D ]
+    ]
+    set expected-income (expected-catch * fish-price)
+    set expected-cost (cost-equipment + cost-existance + (getTravelCost regionPref myStyle))
+  ]
+
+  [ ; gonefishing = TRUE, i.e. consideration multi-day trip
+    let fishWish storingcapacity - fish-onboard
+    let fishVicinity [ fish-stock ] of patch-here
+    ask patches in-radius 1 [ set fishVicinity fish-stock + fishVicinity ]
+    let expected-travel-cost 0
+    let currentRegion [region] of patch-here
+    set-catch-expectation-and-regionPref  ; TODO add some influence of the last years
+    ;show (sentence "at sea: region-pref=" region-pref " after just calculating my catch expectations B("expected-catchB") C("expected-catchC") D("expected-catchD")")
+
+    ifelse (fishVicinity >= fishWish)
+    [ set expected-catch fishWish
+      set regionPref currentRegion ]
+    [ ; not enough fish nearby, experience based expectations
+      ifelse max(list expected-catchB expected-catchB expected-catchD) < fishWish  ; catch-expectation is lower that the fishWish - catch what you can with minimal travelling - stayin your region
+      [ set expected-catch fishVicinity
+        set expected-travel-cost (getTravelCost currentRegion mystyle) / 8
+        set regionPref currentRegion
+        ]
+      [ ;expected catch > fishWish
+        set expected-catch fishWish
+        if (currentRegion = B) [ set expected-travel-cost get-exp-travelcost B C D expected-catchB expected-catchC expected-catchD fishWish ]
+        if (currentRegion = C) [ set expected-travel-cost get-exp-travelcost C B D expected-catchC expected-catchB expected-catchD fishWish ]
+        if (currentRegion = D) [ set expected-travel-cost get-exp-travelcost D B C expected-catchD expected-catchB expected-catchC fishWish ]
+      ]]
+    set expected-cost (cost-equipment + cost-existance + expected-travel-cost)                      ; cost to stay at sea and fish at or close to current position)
+    set expected-income (expected-catch * fish-price)
+  ]
+
+  let expected-profit-stay 0 - cost-existance
+  let expected-profit-go expected-income - expected-cost
+
+  ;show (sentence "expected profit-stay"  expected-profit-stay " expected profit go: " expected-profit-go)
+  ifelse (expected-profit-go > expected-profit-stay)  ; could results in continuing to fish without having a profit but having less debts
+  [ set willFish true
+    set expectNoProfit false ]
+  [ set willFish false
+    set expectNoProfit true
+    set movedToday false
+    if gonefishing [ land-fish ]]
+end
+
+
+;########## DECIDE WHERE TO GO FISH ###########
+
+;; The fisher decides where to go fishing
+;; If still at sea (goneFishing) it checks whether the current spot is allows for filling the vessel
+;; If not at sea OR in need for a good fishing spot a fisher may decide for a spot based on its knowledge (goodSpots memory) or what other fishers do
+;; depending on the attributes of a fisher (colleagues y/n and # fishers at a certain spot)
+to decide-fishSpot
+  ;when having/sensitive to collegues AND probability towards following others (sensitive to amount of fishers at one spot)
+  let fishingSpot patch MAXXD MINYA
+  let stayPut false
+
+  ; Decide where to fish (multi-day trippers, fisher is already at sea)
+  if (gonefishing) [
+    if technology [
+      let currentspot patch-here
+      uphill fish-stock
+      if [ region ] of patch-here != [ region ] of currentspot [
+        move-to currentspot ]]
+    if ([ fish-stock ] of patch-here < (storingcapacity - fish-onboard)) [
+      set stayPut true
+  ]]
+
+  ; Decide where to fish (all)
+  if (not stayPut) [
+    set jumped true
+
+    ifelse (not(socialInfluence = "none") and collegues and random 11 < 8) ; most of the time follow social norm
+      [ ifelse socialInfluence = "descriptiveNorm"
+        [ set fishingSpot get-fishSpot-descriptive-norm ]
+        [ set fishingSpot get-fishSpot-expertise ]
+        if fishingSpot = patch MAXXD MINYA [
+          set fishingSpot get-fishSpot-knowledge regionPref
+    ]]
+    [ ;show "in fishing spot now"
+      set fishingSpot get-fishSpot-knowledge regionPref
+      if (fishingSpot = nobody) [ print "a. fishingspot is a nobody" ]
+    ]
+
+    ifelse (fishingSpot = nobody) [
+      print "b. fishingspot is a nobody"
+      move-to one-of regionA ]
+    [ move-to fishingSpot ]
+
+    if technology [
+      let currentspot patch-here
+      uphill fish-stock        ; fisher moves to the patch with the heighest fish stock
+      if ([ region ] of patch-here != [ region ] of currentspot) ; unless this is a patch from a different region then it remains where it was
+        [ move-to currentspot ]
+    ]
+  ]
+  set atSea true
+  set movedToday true
+end
+
+
+;; decide on fishspot (gridcell) based purely on memory of good spots
+;; if no idea a random spot is chosen in the region the fisher fished last
+;; @param prefReg Preferred region
+;; @report A fish spot
+to-report get-fishSpot-knowledge [ prefReg ]
+  ;show (sentence "in get-fishSpot-knowledge now! prefReg = " prefReg)
+  let fishSpot patch 0 0
+  let mem-goodSpots memory-goodSpotsA
+  ;if (prefReg = A) [ set mem-goodSpots memory-goodSpotsA ]
+  if (prefReg = B) [ set mem-goodSpots memory-goodSpotsB ]
+  if (prefReg = C) [ set mem-goodSpots memory-goodSpotsC ]
+  if (prefReg = D) [ set mem-goodSpots memory-goodSpotsD ]
+
+  ifelse (any? mem-goodSpots)
+  [ set fishSpot one-of mem-goodSpots
+    let rgn [ region ] of fishSpot
+    if (rgn != prefReg ) [ show "Syst.err - get-fishpot-knowledge-from my memory: returning a fishspot that is not of my preference" ]
+    if (rgn = NULL ) [ show "Syst.err returning land as fishSpot, which is part of my memory! really bad" ]]
+  [ set fishSpot one-of patches with [ region = prefReg ]
+    ifelse (fishSpot = nobody)
+    [ show (sentence "Syst.err: 2 the patch is not a fishing patch " fishSpot " get-fishSpot-knowledge prefReg was" prefReg ) ]
+    [ let rgn [ region ] of fishSpot
+      if (rgn != prefReg ) [ show "Syst.err - get-fishpot-knowledge-random from my prefRegion: returning a fishspot that is not of my preference" ]
+      if (rgn = NULL) [ show "returning land as fishSpot, have no memory of good spots" ]]]
+
+  if (random 2 > 0) [
+    ask fishSpot [
+      let rgnFs [ region ] of fishSpot
+      let tmp one-of neighbors with [ region = rgnFs ]
+      ifelse (tmp = nobody)
+      [ show (sentence "Syst.err: 3 no neighbor of within my region - this is incorrect there are always neighbors within my region - TO FIX: " tmp ) ]
+      [ set fishSpot tmp ]
+  ]]
+  let rgn [ region ] of fishSpot
+  if (rgn = NULL ) [ show "returning land as fishSpot" ]
+
+  if (rgn != prefReg) [
+    show ("returning a fishspot that is not in my preferred region")]
+  report fishSpot
+end
+
+;; Reports a fish spot of one to the other fishers that is considered to have most knowledge
+;; @report A fish spot
+to-report get-fishSpot-expertise
+  let fisherSet trawlers
+  let myKnowledge ffinding-knowledge
+  let myRegPref regionPref
+  let othersPrefForRgn false
+  if (mystyle = "coastals") [ set fisherSet coastals ]
+  let expertsOut fisherSet with [ movedToday = true and ffinding-knowledge >= myKnowledge ] ; consider someone expert when having the same or better knowledge as oneself
+  let expertsAtPrefRegion expertsOut with [ region = myRegPref ]
+  let spot patch MAXXD MINYA
+  ifelse (any? expertsAtPrefRegion)
+    [ set spot [ patch-here ] of (one-of expertsAtPrefRegion)]
+  [ set spot get-fishSpot-knowledge myRegPref ]
+
+    let rgn [ region ] of spot
+  report spot
+end
+
+;; Report whethr someone wants to be at a given spot
+;; @param spot A given spot
+;; @report Yes or No (Boolean)
+to-report doesAnyoneWantToBeHere [ spot ]
+  let rgn [ region ] of spot
+  let prefs [regionPref] of turtles-on spot
+  ifelse not (empty? prefs) [
+    if (rgn = A) [ report member? A prefs ]
+    if (rgn = B) [ report member? B prefs ]
+    if (rgn = C) [ report member? C prefs ]
+    if (rgn = D) [ report member? D prefs ]
+  ] [ report true ]
+end
+
+
+;; reports a fish spot where most fishers are in the region of interest following norm of what everybody does (descriptive norm)
+;; @report A fish spot
+to-report get-fishSpot-descriptive-norm
+
+  if ( myStyle = "trawler") [
+    let numAtB count (turtles-on regionB) with [ myStyle = "trawler" ]
+    let numAtC count turtles-on regionC
+    let numAtD count turtles-on regionD
+
+    if (numAtB > numAtC and numAtC > numAtD) [ report fishspot-with-most-fishers regionB ]
+    if (numAtB > numAtC and numAtC < numAtD) [ report fishspot-with-most-fishers regionD ]
+    if (numAtB < numAtC and numAtC > numAtD) [ report fishspot-with-most-fishers regionC ]
+    if (numAtB < numAtC and numAtC < numAtD) [ report fishspot-with-most-fishers regionD ]
+
+    if (numAtB = numAtC and numAtB = numAtD) [ report fishspot-with-most-fishers (patch-set regionB regionC regionD)]
+    if (numAtB = numAtC) [ report fishspot-with-most-fishers (patch-set regionB regionC) ]
+    if (numAtB = numAtD) [ report fishspot-with-most-fishers (patch-set regionB regionD) ]
+    if (numAtC = numAtD) [ report fishspot-with-most-fishers(patch-set regionC regionD) ]
+    show "Syst.err in get-fishSpot-descriptive-norm: comparing number of turtles on regions has a case that is not accounted for - FIX IT!"
+  ]
+  if (myStyle = "coastal") [
+    let numAtA count (turtles-on regionA) with [ myStyle = "coastal" ]
+    let numAtB count (turtles-on regionB) with [ myStyle = "coastal" ]
+    if (numAtA > numAtB) [ report fishspot-with-most-fishers regionA ]
+    ifelse (numAtA < numAtB)
+    [ report fishspot-with-most-fishers regionB ]
+    [ report fishspot-with-most-fishers (patch-set regionA regionB) ]
+  ]
+  show "Syst.err in get-fishSpot-descriptive-norm: called for an agent that isn't a trawler or coastal - FIX IT!"
+  report patch MAXXD MINYA
+end
+
+;; returns a fishspot in a particular region with the most fishers
+;; this spot must at least have IS-A-CROWD (2) fishers
+;; @param region-patches Set of patches in a certain region
+;; @report A fish spot
+to-report fishspot-with-most-fishers [ region-patches ]
+  let maxSpot patch MAXXD MINYA
+  let maxClose 0
+  ask turtles-on region-patches [
+    let rgn [ region ] of patch-here
+    let nrClose (count turtles-here with [ movedToday = true ] ) + (count (turtles-on neighbors with [ region = rgn ]) with [ movedToday = true ])     ; NOTE: this reach needs to be aligned with the reach of scanning due to technology - what scope a fisher can 'see' the fish density
+    if (nrClose > maxClose) [
+      set maxClose nrClose
+      set maxSpot patch-here
+    ]
+  ]
+
+  let fishSpot patch MAXXD MINYA
+  if (maxClose >= IS-A-CROWD) [ set fishSpot maxSpot ]
+
+  if (fishSpot = nobody) [
+    ;print (sentence "Syst.err in fishspot-with-most-fisher results in a fish spot that is a nobody")
+    set fishSpot patch MAXXD MINYA
+  ]
+  report fishSpot
+end
+
+;########## BEHAVE - ACTION EXECUTION ###########
+
+;;The fisher executes its behavioural decision: goes fishing for as long as the effort indicates
+;;as a consequence the fisher has some catch and related profit and the cod-stock is reduced.
+;;Archelago and trawler catch fish on 1 patch, the coastal spreads over multiple patches
+to go-fish
+  let fstock [ fish-stock ] of patch-here
+  ;show (sentence "go-fish: fishstock " fstock)
+  let currentRegion [ region ] of patch-here
+
+  ifelse (mystyle = "coastal") [  ;fishes with nets - bigger reach (catch over 2 patches)
+    let otherPatch one-of neighbors with [ region = currentRegion ]
+    let fstock2 [ fish-stock ] of otherPatch
+    let ctch round(0.5 * catch-ability)
+    let resCtch catch-ability - ctch
+    ifelse ((fstock < ctch) xor (fstock2 < resCtch)) [  ;one of the two stocks is not sufficient to reach catchability
+      if (fstock < ctch) [
+        set ctch fstock
+        set resCtch min(list (catch-ability - ctch) fstock2 ) ]
+      if (fstock2 < resCtch) [
+        set resCtch fstock2
+        set ctch min (list (catch-ability - resCtch) fstock) ]
+    ][ ;there is either plenty of fish OR not enough - the catch will be equally distributed over the two or just takes what is left
+      if (fstock < ctch) [ set ctch fstock ]
+      if (fstock2 < resCtch) [ set resCtch fstock2 ]
+    ]
+    ask patch-here [ set fish-stock fstock - ctch ]    ; catch half of catchability or what is left on this patch
+    ask otherPatch [ set fish-stock fstock2 - resCtch ]; idem
+    set catch ctch + resCtch
+  ]
+  [ ; not coastals
+    set catch min list catch-ability fstock
+    let newstock fstock - catch
+    ask patch-here [ set fish-stock newstock ]
+  ]
+
+  ifelse (myStyle = "trawler")[
+    let space-remaining storingcapacity - fish-onboard
+    set catch min list catch space-remaining
+    set fish-onboard fish-onboard + catch ]
+  [ set fish-onboard catch ] ; myStyle = archipelago or coastal
+
+  ;set the costs
+  ifelse ( myStyle = "archipelago") [
+    set cost-existance LOW-COST-EXISTANCE  ; TODO think of a way to not describe this 'label' dependent
+    set cost-travel getTravelCost currentRegion myStyle ]
+  [ ifelse ( myStyle = "coastal") [
+    set cost-existance MEDIUM-COST-EXISTANCE  ; TODO think of a way to not describe this 'label' dependent
+    set cost-travel getTravelCost currentRegion myStyle]
+  [ if ( myStyle = "trawler") [
+      ifelse (gonefishing = false)
+      [ set cost-travel getTravelCost currentRegion myStyle ]
+      [ if jumped = true
+        [ set cost-travel (getTravelCost currentRegion myStyle) / 2
+          set jumped false ]]
+      ifelse ((storingcapacity = fish-onboard) or gonefishing = true) ; (atSeaCnt > 1)
+      [ set gonefishing false ]  ;fished all I can carry OR already went on a multi-day trip
+      [ set gonefishing true ]   ;didn't fish as much as I can carry
+  ]]]
+
+  reduce-stock currentRegion catch
+  set cost cost-existance + cost-equipment + cost-travel
+  set cntWentFishing cntWentFishing + 1
+  set cntWentFishingPeriod cntWentFishingPeriod + 1
+
+  ;response variables
+  ;show (word "catch: " catch "; catch-ability: " catch-ability "; fstock: " fstock "; fish-onboard" fish-onboard)
+  set accumulatedCatch accumulatedCatch + catch
+  set accumCatchThisYear accumCatchThisYear + catch
+
+  let dens [ density ] of patch-here
+  ifelse (dens = MEDIUM or dens = HIGH) [
+    set goodSpotToday 1
+    set hitGoodSpotCnt hitGoodSpotCnt + 1 ]
+  [ set goodSpotToday 0 ]
+
+end
+
+;function that 'corrects' for the fishers that considered to do a multi-day trip
+; but didn't go for it afterall, making that the catch hasn't been landed last tick and will be immediately
+; be processes - sold (profit calculation and memory of profit updated).
+to land-fish
+  set profit fish-onboard * fish-price - cost
+  set fish-onboard 0
+  set f_capital f_capital + fish-onboard * fish-price ;the cost have already been added to the f_capital
+  set memory_profit fput profit memory_profit
+  if (length memory_profit > memory-time-length)
+    [ set memory_profit but-last memory_profit ]
+  set gonefishing false
+  set atSea false
+end
+
+
+;########## UPDATE ###########
+
+to reduce-stock [ regionx catchx ]
+  if (regionx = A)[
+    ;show (sentence "new codStock ="  stockA "(stockA) -"  catch "(catch)")
+    set stockA max (list 0 (stockA - catchx))
+    set accumCatchA accumCatchA + catchx
+    set accumCatchA accumCatchA + catchx ]
+  if (regionx = B)[
+    set stockB max (list 0 (stockB - catchx))
+    set accumCatchB accumCatchB + catchx
+    set catchBtickly catchBtickly + catchx
+    set accumCatchB accumCatchB + catchx ]
+  if (regionx = C)[
+    set stockC  max (list 0 (stockC - catchx))
+    set accumCatchC accumCatchC + catchx
+    set accumCatchC accumCatchC + catchx ]
+  if (regionx = D)[
+    set stockD  max (list 0 (stockD - catchx))
+    set accumCatchD accumCatchD + catchx
+    set accumCatchD accumCatchD + catchx ]
+end
+
+;; Returns the region based travel cost
+;; In case the fuel-subsidy scenario is active (>0) the travel costs are reduced by that percentage in ALL regions.
+;; @param regionX Region
+;; @param style Fishing style of the agent
+;; @report Costs for travelling
+to-report getTravelCost [ regionx style ]
+  ifelse (fuel-subsidy > 0)
+  [ ifelse (regionx = A)
+    [ report LOW-COST-TRAVEL - (fuel-subsidy * LOW-COST-TRAVEL) ]
+    [ ifelse (regionx = B)
+      [ ifelse (style = "coastal")
+        [ report MEDIUM-COST-TRAVEL - (fuel-subsidy * MEDIUM-COST-TRAVEL) ]
+        [ report MEDIUM-COST-TRAVEL-BIGVESSEL - (fuel-subsidy * MEDIUM-COST-TRAVEL-BIGVESSEL) ]]   ;trawler
+      [ ifelse (regionx = C)
+        [ report HIGH-COST-TRAVEL - (fuel-subsidy * HIGH-COST-TRAVEL) ]
+        [ ifelse (regionx = D)
+          [ report HIGH-COST-TRAVEL - (fuel-subsidy * HIGH-COST-TRAVEL) ]
+          [ show (sentence "Syst.err: in getTravelCost, the travel cost are called for a non sea patch in region: " regionX " SOLVE IT!" )
+            report 0 ]
+    ]]]]
+
+  [ ;show "fuel subsidy = 0 "
+    ifelse (regionx = A)
+      [ report LOW-COST-TRAVEL ]
+      [ ifelse (regionx = B)
+        [ ifelse (style = "coastal")
+          [ report MEDIUM-COST-TRAVEL ]
+          [ report MEDIUM-COST-TRAVEL-BIGVESSEL ]]
+        [ ifelse (regionx = C)
+          [ report HIGH-COST-TRAVEL ]
+          [ ifelse (regionx = D)
+            [ report HIGH-COST-TRAVEL ]
+            [ show (sentence "Syst.err: in getTravelCost, the travel cost are called for a non sea patch in region: " regionX " SOLVE IT!" )
+              report 0 ]
+          ]]]]
+end
+
+;; Updates the satisfaction levels for coastal and trawler
+;; Trawler satisfaction is based on the need to grow (profit)
+;; Coastal based on the need to grow (profit) and to be home
+;; Archipelago is updated in (satisfice-lifestyle), as this is satisfaction based
+to update-satisfaction
+
+if (myStyle = "coastal" OR myStyle = "trawler") [
+  if ( f_capital < 0 ) [ set growth-satisfaction 0 ]
+  let growth-indicator mean(modes growth-perception)   ; 0 contant profit, -1 negative profit, 1 growth
+  ;show (sentence"update-satisfaction: growth-perception:" growth-indicator)
+  ifelse (growth-indicator > 0 ) [   ; growth = max catch here, growth in that sense is not possible
+    set growth-satisfaction growth-satisfaction + 0.1
+    if (growth-satisfaction > 1) [ set growth-satisfaction 1 ]]
+  [ ifelse (growth-indicator = 0) [
+      set growth-satisfaction growth-satisfaction - 0.1 ]  ; constant profit
+    [ set growth-satisfaction growth-satisfaction - 0.2 ]  ; opposite of growth
+    if (growth-satisfaction < 0) [ set growth-satisfaction 0 ]]
+
+  set satisfaction growth-satisfaction
+
+  if (myStyle = "coastal") [
+    ifelse (atHome = true) [
+      set homeTime-satisfaction homeTime-satisfaction + 0.5
+      if (homeTime-satisfaction > 1) [ set homeTime-satisfaction 1 ]]
+    [ set homeTime-satisfaction homeTime-satisfaction - 0.1  ;in 10 days completely dissatisfied
+      if (homeTime-satisfaction < 0) [ set homeTime-satisfaction 0 ]]
+  set satisfaction (growth-satisfaction + homeTime-satisfaction) / 2
+  ]
+]
+end
+
+;; Update the memory using the FIFO principle (first in, first out)
+;; Keeps track of the profits of the last 'memory-of-profits' time steps
+to update-memory
+  let indicator 0
+  if (prev-capital > f_capital)[ set indicator -1 ]
+  if (prev-capital < f_capital)[ set indicator 1 ]
+
+  set growth-perception fput indicator growth-perception
+
+  set memory_profit fput profit memory_profit
+  if length memory_profit > memory-time-length
+    [ set memory_profit but-last memory_profit
+      set growth-perception but-last growth-perception]
+
+  set memoryCatchTick fput catch memoryCatchTick
+
+  if (willfish) [   ; only update the memory of catches and goodSpots if you went fishing
+    let rgn [ region ] of patch-here
+    set memory-catch fput catch memory-catch
+    ifelse (catch < catch-ability)
+    [ set lowCatchCnt lowCatchCnt + 1 ]
+    [ set lowCatchCnt max(list (lowCatchCnt - 1) 0) ]
+
+    if (rgn = A) [ set memory-catchA fput catch memory-catchA ]
+    if (rgn = B) [ set memory-catchB fput catch memory-catchB ]
+    if (rgn = C) [ set memory-catchC fput catch memory-catchC ]
+    if (rgn = D) [ set memory-catchD fput catch memory-catchD ]
+
+    if length memoryCatchTick >= memory-time-length [ set memoryCatchTick but-last memoryCatchTick ]
+    if length memory-catch >= memory-time-length [ set memory-catch but-last memory-catch ]
+    if length memory-catchA >= memory-time-length [ set memory-catchA but-last memory-catchA ]
+    if length memory-catchB >= memory-time-length [ set memory-catchB but-last memory-catchB ]
+    if length memory-catchC >= memory-time-length [ set memory-catchC but-last memory-catchC ]
+    if length memory-catchD >= memory-time-length [ set memory-catchD but-last memory-catchD ]
+    ;show (word "memory_catch" memory_catch)
+
+    update-memory-goodSpots
+  ]
+end
+
+;; updates the memory of goodSpots based on the catch
+;; bad catch at spotX -> remove from memory
+;; good catch at spotX -> if not in memory - add it and shuffle it
+to update-memory-goodSpots
+  let fishSpot patch-here
+  let rgn [ region ] of fishSpot
+  let fsX [ pxcor ] of fishSpot
+  let fsY [ pycor ] of fishSpot
+  let memory-goodSpots memory-goodSpotsA
+  if (region = B) [ set memory-goodSpots memory-goodSpotsB ]
+  if (region = C) [ set memory-goodSpots memory-goodSpotsC ]
+  if (region = D) [ set memory-goodSpots memory-goodSpotsD ]
+
+  ifelse (member? fishSpot memory-goodSpots) [
+    if (catch < catch-ability) [   ;bad catch
+      set memory-goodSpots memory-goodSpots with [ pxcor != fsX and pycor != fsY ]  ; remove the fishspot
+        ;show (sentence "removing patch " fishSpot " from memory")
+      ]];]
+
+  [ if (catch > (catch-ability - 1)) [
+    set memory-goodSpots (patch-set fishSpot memory-goodSpots)
+    if (rgn = nobody) [
+     show (sentence "adding a nobody " fishSpot " from region " rgn " to memory") ]]
+   ]
+
+  if (region = A) [ set memory-goodSpotsA memory-goodSpots ]
+  if (region = B) [ set memory-goodSpotsB memory-goodSpots ]
+  if (region = C) [ set memory-goodSpotsC memory-goodSpots ]
+  if (region = D) [ set memory-goodSpotsD memory-goodSpots ]
+end
+
+;; Function calculates GINI of the catch or profit of the fishers, a measure of inequality of a distribution (Gini,1912),
+;; 0 = equality; 1 + maximal inequality
+;; Ratio of the areas on the Lorenz curve diagram (proportion of total S (e.g. income) corresponding the cumulative S of the x% of the population.
+;; adapted the implementation at https://subversion.american.edu/aisaac/notes/netlogo-intro.xhtml#plotting-gini-coefficient-and-lorenz-curve
+to-report calc-GINI [ accumVal agentSet ]
+  if (not any? agentSet) [ report 0 ]
+  let numAgents count agentSet
+  let cumsum-sorted-catch 0
+  ifelse (accumVal = "profit") [
+    set cumsum-sorted-catch partial-sums sort [ accumulatedProfit ] of agentSet ]
+   [ ;(accumVal = "catch")
+     set cumsum-sorted-catch partial-sums sort [ accumulatedCatch ] of agentSet ]
+
+  ;print (word "cumsum-sorted-catch: " cumsum-sorted-catch)
+  let total-catch last cumsum-sorted-catch
+  let normalized-catch n-values numAgents [ 0 ]
+  ifelse (total-catch > 0 ) [
+    set normalized-catch map [ [x] -> x / total-catch] cumsum-sorted-catch
+    ;print (word "normalized-catch: " normalized-catch)
+    let gaps n-values numAgents [ [x] -> (((x + 1) / numAgents) - item x normalized-catch)]
+    report (2 * sum gaps / numAgents)                                  ;Gini = A/(A+B) = 2*A
+    ;print (word "gaps: " gaps " gini: " precision gini 2)
+  ][ report 0 ]   ;the rare case that there was no extraction before and in the following round there will also be no extraction
+  ;print gini
+end
+
+;; Updates the output variables every tick
+to update-response-vars-tickly
+
+  set runnr behaviorspace-run-number
+  set stockA sum [ fish-stock ] of regionA
+  set stockB sum [ fish-stock ] of regionB
+  set stockC sum [ fish-stock ] of regionC
+  set stockD sum [ fish-stock ] of regionD
+  set stock stockA + stockB + stockC + stockD
+
+  if (not(ecologyOnly) and any? turtles) [
+    let fishingFishers fishers with [ willFish = true ]
+    set numFishing count fishingFishers
+    set notFishing count fishers - numFishing
+
+    ; underlying reasons for not fishing archipelago
+    if (archipelago-fisher > 0 ) [
+      set numLayingLow count fishers with [ layLow = true]
+      set numThinkFishIsScarce count fishers with [ thinkFishIsScarce = TRUE and willFish = false ]
+      set numSatisfied count fishers with [ willFish = false and satisfaction = 1 ]
+      set numLowCapital count fishers with [ willFish = false and f_capital <= 0 ] ;this is not a real reason, it is more eventhough they have no/negative capital they do not go out.
+    ]
+    ; underlying reasons for not fishing coastals - bad weather, expects no profit, want to spend time at home
+    if (coastal-fisher > 0 ) [
+     set numExpectNoProfit count fishers with [ willFish = false and expectNoProfit = true ]
+     set numWantToBeHome count fishers with [ willFish = false and wannaBeHome = true ]
+    ]
+    ; underlying reasons for not fishing coastals - bad weather, expects no profit, want to spend time at home
+    if (offshore-trawler-fisher > 0 ) [
+      set numExpectNoProfit count fishers with [ willFish = false and expectNoProfit = true ]
+    ]
+
+    set accumProfitYearly sum [ accumProfitThisYear ] of fishers
+    set accumCatchYearly sum [ accumCatchThisYear ] of fishers
+
+    set fishingAtA 0
+    set fishingAtB 0
+    set fishingAtC 0
+    set fishingAtD 0
+    ask fishers with [ willfish = true ] [
+    let rgn [ region ] of patch-here
+    if (rgn = A) [ set fishingAtA fishingAtA + 1 ]
+    if (rgn = B) [ set fishingAtB fishingAtB + 1 ]
+    if (rgn = C) [ set fishingAtC fishingAtC + 1 ]
+    if (rgn = D) [ set fishingAtD fishingAtD + 1 ]
+  ]
+    set numFishersWgoodSpot sum [ goodSpotToday ] of fishers with [ willFish = true ]
+    ifelse (numFishing = 0) [
+      set percFishersWgoodSpot 0
+    ]
+    [ set percFishersWgoodSpot numFishersWgoodSpot / numFishing ]
+  ]
+  ifelse any? fishers
+  [ set fisherSatisfactionMean mean [ satisfaction] of fishers
+    if (count fishers > 1) [
+      set fisherSatisfactionSD standard-deviation [ satisfaction] of fishers]]
+  [ set fisherSatisfactionMean 0 ]
+end
+
+;; Updates the output variables every year
+to update-response-vars-periodicly
+  ;agent variables
+  if not(ecologyOnly) and (any? fishers) [
+    if ticks > 0 [
+    set meanTimesFishing mean [ cntWentFishingPeriod ] of fishers
+    set numFishers count fishers
+
+    ask fishers [
+      ;show (sentence "cntWentFishingPeriod: " cntWentFishingPeriod)
+      set cntWentFishingPeriod 0
+    ]
+      set giniCatch calc-GINI "catch" fishers
+      set giniProfit calc-GINI "profit" fishers
+
+   ;print (sentence "responsevar (halfyear:" (ticks / HALFYEAR) "): stock-C " stockC " catch-indiv " meanMeanCatch " totalCatch " accumCatch " timesFishing " meanTimesFishing)
+  ]]
+
+end]]></code>
+  <widgets>
+    <view x="195" wrappingAllowedX="false" y="55" frameRate="10.0" minPycor="0" height="340" showTickCounter="true" patchSize="6.0" fontSize="10" wrappingAllowedY="false" width="304" tickCounterLabel="ticks" maxPycor="55" updateMode="1" maxPxcor="49" minPxcor="0"></view>
+    <button x="10" y="10" height="40" disableUntilTicks="false" forever="false" kind="Observer" width="55">setup</button>
+    <button x="68" y="10" height="40" disableUntilTicks="false" forever="true" kind="Observer" width="55">go</button>
+    <button x="125" y="10" height="40" disableUntilTicks="false" forever="false" kind="Observer" width="55" display="go once">go</button>
+    <slider x="10" step="1" y="229" max="100" width="175" display="offshore-trawler-fisher" height="50" min="0" direction="Horizontal" default="0.0" variable="offshore-trawler-fisher"></slider>
+    <plot x="530" autoPlotX="true" yMax="1130000.0" autoPlotY="true" y="45" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="245" display="Stock in region C &amp; D">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="stockC" color="-13345367" legend="true">
+        <setup></setup>
+        <update><![CDATA[if (ticks > 0) [ plot stockC ]]]></update>
+      </pen>
+      <pen interval="1.0" mode="0" display="stockD" color="-14835848" legend="true">
+        <setup></setup>
+        <update><![CDATA[if (ticks > 0) [ plot stockD ]]]></update>
+      </pen>
+      <pen interval="1.0" mode="0" display="MSY" color="-2674135" legend="true">
+        <setup></setup>
+        <update><![CDATA[if (ticks > 0) [ plot MSY-STOCK-C ]]]></update>
+      </pen>
+    </plot>
+    <note x="15" y="540" backgroundDark="0" fontSize="16" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Environment</note>
+    <note x="210" y="767" backgroundDark="0" fontSize="11" width="109" markdown="false" height="19" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Monetary</note>
+    <note x="205" y="372" backgroundDark="0" fontSize="14" width="15" markdown="false" height="18" textColorDark="-1" textColorLight="-1" backgroundLight="0">A</note>
+    <note x="25" y="807" backgroundDark="0" fontSize="13" width="27" markdown="false" height="18" textColorDark="-1" textColorLight="-1" backgroundLight="0">B</note>
+    <note x="205" y="232" backgroundDark="0" fontSize="14" width="15" markdown="false" height="18" textColorDark="-1" textColorLight="-1" backgroundLight="0">C</note>
+    <note x="355" y="232" backgroundDark="0" fontSize="14" width="15" markdown="false" height="18" textColorDark="-1" textColorLight="-1" backgroundLight="0">D</note>
+    <note x="14" y="634" backgroundDark="0" fontSize="11" width="137" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Initial stocksize</note>
+    <note x="15" y="726" backgroundDark="0" fontSize="11" width="118" markdown="false" height="19" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Reproduction-rate</note>
+    <switch x="290" y="10" height="40" on="true" variable="showHotSpots" width="130" display="showHotSpots"></switch>
+    <note x="205" y="327" backgroundDark="0" fontSize="14" width="15" markdown="false" height="18" textColorDark="-1" textColorLight="-1" backgroundLight="0">B</note>
+    <note x="15" y="381" backgroundDark="0" fontSize="15" width="105" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Scenarios</note>
+    <slider x="200" step="1" y="458" max="200" width="165" display="memory-spatial-length" height="50" min="0" direction="Horizontal" default="20.0" variable="memory-spatial-length"></slider>
+    <plot x="848" autoPlotX="true" yMax="0.0" autoPlotY="true" y="489" xMin="0.0" height="243" legend="true" xMax="0.0" yMin="0.0" width="260" display="decision to go fish">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="# out to fish" color="-9276814" legend="true">
+        <setup></setup>
+        <update>plot count turtles with [ willFish = true ]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="# archips fishing" color="-13840069" legend="true">
+        <setup></setup>
+        <update>plot count archipelagos with [ willFish = true ]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="# trawlers fishing" color="-5825686" legend="true">
+        <setup></setup>
+        <update>plot count trawlers with [ willFish = true ]</update>
+      </pen>
+    </plot>
+    <switch x="5" y="897" height="40" on="false" variable="ecologyOnly" width="135" display="ecologyOnly"></switch>
+    <note x="320" y="435" backgroundDark="0" fontSize="11" width="50" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Memory</note>
+    <slider x="10" step="5" y="174" max="100" width="175" display="coastal-fisher" height="50" min="0" direction="Horizontal" default="45.0" variable="coastal-fisher"></slider>
+    <plot x="530" autoPlotX="true" yMax="110500.0" autoPlotY="true" y="463" xMin="0.0" height="191" legend="true" xMax="10.0" yMin="0.0" width="245" display="Stock in Region A">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="stockA" color="-11221820" legend="true">
+        <setup></setup>
+        <update><![CDATA[if (ticks > 0) [ plot stockA ]]]></update>
+      </pen>
+      <pen interval="1.0" mode="0" display="MSY" color="-2674135" legend="true">
+        <setup></setup>
+        <update><![CDATA[if (ticks > 0) [ plot MSY-STOCK-A ]]]></update>
+      </pen>
+    </plot>
+    <monitor x="530" precision="17" y="659" height="60" fontSize="11" width="100" display="# out fishing">count turtles with [ willFish = true ]</monitor>
+    <monitor x="638" precision="17" y="659" height="60" fontSize="11" width="100" display="# not fishing">count turtles with [ willFish = false ]</monitor>
+    <slider x="10" step="0.05" y="411" max="1" width="175" display="fuel-subsidy" height="50" min="0" direction="Horizontal" default="0.0" variable="fuel-subsidy"></slider>
+    <switch x="5" y="944" height="40" on="false" variable="fisherAtMaxCatch" width="170" display="fisherAtMaxCatch"></switch>
+    <chooser x="10" y="657" height="60" variable="init-stock-size" current="2" width="155" display="init-stock-size">
+      <choice type="string" value="random"></choice>
+      <choice type="string" value="carryingCap"></choice>
+      <choice type="string" value="halfCarryingCap"></choice>
+      <choice type="string" value="quartCarryingCap"></choice>
+    </chooser>
+    <monitor x="743" precision="17" y="659" height="60" fontSize="11" width="100" display="alreadyAtSea">count fishers with [ goneFishing = true ]</monitor>
+    <slider x="10" step="0.1" y="750" max="1" width="155" display="repr4All" height="50" min="0" direction="Horizontal" default="1.0" variable="repr4All"></slider>
+    <chooser x="11" y="569" height="60" variable="spatial-representation" current="1" width="153" display="spatial-representation">
+      <choice type="string" value="baseline-no-hotspots"></choice>
+      <choice type="string" value="hotspots-60-40-0"></choice>
+    </chooser>
+    <slider x="200" step="7" y="515" max="375" width="165" display="memory-time-length" height="50" min="1" direction="Horizontal" default="365.0" variable="memory-time-length"></slider>
+    <slider x="212" step="0.5" y="791" max="10" width="150" display="fish-price" height="50" min="1" direction="Horizontal" default="1.0" variable="fish-price"></slider>
+    <chooser x="10" y="286" height="60" variable="socialInfluence" current="2" width="175" display="socialInfluence">
+      <choice type="string" value="none"></choice>
+      <choice type="string" value="descriptiveNorm"></choice>
+      <choice type="string" value="expertise"></choice>
+    </chooser>
+    <monitor x="848" precision="17" y="737" height="60" fontSize="11" width="100" display="badWeather?">badWeather</monitor>
+    <slider x="10" step="0.1" y="468" max="1" width="175" display="bad-weather-probability" height="50" min="0" direction="Horizontal" default="0.1" variable="bad-weather-probability"></slider>
+    <note x="200" y="420" backgroundDark="0" fontSize="17" width="150" markdown="false" height="21" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Fisher agents</note>
+    <plot x="530" autoPlotX="true" yMax="220840.0" autoPlotY="true" y="267" xMin="0.0" height="191" legend="true" xMax="10.0" yMin="0.0" width="245" display="Stock in region B">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="stockB" color="-13791810" legend="true">
+        <setup></setup>
+        <update><![CDATA[if (ticks > 0) [ plot stockB ]]]></update>
+      </pen>
+      <pen interval="1.0" mode="0" display="MSY" color="-2674135" legend="true">
+        <setup></setup>
+        <update>plot MSY-STOCK-B</update>
+      </pen>
+    </plot>
+    <switch x="195" y="10" height="40" on="true" variable="layout" width="90" display="layout"></switch>
+    <slider x="10" step="1" y="62" max="50" width="172" display="end-of-sim-in-years" height="50" min="0" direction="Horizontal" default="25.0" variable="end-of-sim-in-years"></slider>
+    <slider x="10" step="1" y="119" max="250" width="177" display="archipelago-fisher" height="50" min="0" direction="Horizontal" default="0.0" variable="archipelago-fisher"></slider>
+    <monitor x="1058" precision="17" y="737" height="60" fontSize="11" width="100" display="meanCatch">precision (mean [ catch ] of fishers) 2</monitor>
+    <monitor x="953" precision="17" y="802" height="60" fontSize="11" width="100" display="goodSpotHitters">numFishersWgoodSpot</monitor>
+    <monitor x="1058" precision="17" y="802" height="60" fontSize="11" width="137" display="goodSpotHittersPerc">precision percFishersWgoodSpot 2</monitor>
+    <monitor x="953" precision="17" y="737" height="60" fontSize="11" width="100" display="catchBtickly">catchBtickly</monitor>
+    <plot x="780" autoPlotX="true" yMax="1.0" autoPlotY="true" y="45" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="260" display="Profit (mean per year)">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="archipelagos" color="-13840069" legend="true">
+        <setup></setup>
+        <update>if any? archipelagos [ plot mean [ accumProfitThisYear ] of archipelagos]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="coastals" color="-1184463" legend="true">
+        <setup></setup>
+        <update>if any? coastals [ plot mean [ accumProfitThisYear ] of coastals ]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="trawlers" color="-5825686" legend="true">
+        <setup></setup>
+        <update>if any? trawlers [ plot mean [ accumProfitThisYear ] of trawlers ]</update>
+      </pen>
+      <pen interval="1.0" mode="2" display="Zero-line" color="-3026479" legend="false">
+        <setup></setup>
+        <update>plot 0</update>
+      </pen>
+    </plot>
+    <plot x="1045" autoPlotX="true" yMax="1.0" autoPlotY="true" y="45" xMin="0.0" height="217" legend="true" xMax="1.0" yMin="0.0" width="245" display="Satisfaction fishers">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="archipelago" color="-13840069" legend="true">
+        <setup></setup>
+        <update>if any? archipelagos [ plot mean [ satisfaction ] of archipelagos]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="coastals" color="-1184463" legend="true">
+        <setup></setup>
+        <update>if any? coastals [ plot mean [ satisfaction ] of coastals]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="trawlers" color="-5825686" legend="true">
+        <setup></setup>
+        <update>if any? trawlers [ plot mean [ satisfaction ] of trawlers]</update>
+      </pen>
+    </plot>
+    <slider x="200" step="0.1" y="630" max="1" width="165" display="home-satisf-threshold" height="50" min="0" direction="Horizontal" default="0.5" variable="home-satisf-threshold"></slider>
+    <note x="320" y="607" backgroundDark="0" fontSize="11" width="60" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Coastals</note>
+    <plot x="780" autoPlotX="true" yMax="10.0" autoPlotY="true" y="267" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="260" display="Catch (accumulated per year)">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="archipelagos" color="-13840069" legend="true">
+        <setup></setup>
+        <update>if any? archipelagos [ plot sum [ accumCatchThisYear ] of archipelagos]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="coastals" color="-1184463" legend="true">
+        <setup></setup>
+        <update>if any? coastals [ plot sum [ accumCatchThisYear ] of coastals]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="trawlers" color="-5825686" legend="true">
+        <setup></setup>
+        <update>if any? trawlers [ plot sum [ accumCatchThisYear ] of trawlers]</update>
+      </pen>
+      <pen interval="1.0" mode="2" display="total" color="-7500403" legend="false">
+        <setup></setup>
+        <update>plot accumCatchYearly</update>
+      </pen>
+    </plot>
+    <monitor x="530" precision="17" y="724" height="60" fontSize="11" width="100" display="num fishers">count fishers</monitor>
+    <note x="10" y="872" backgroundDark="0" fontSize="14" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Sensitivity controls</note>
+    <monitor x="638" precision="17" y="724" height="60" fontSize="11" width="115" display="accumCatchYearly">accumCatchYearly</monitor>
+    <monitor x="758" precision="17" y="802" height="60" fontSize="11" width="122">accumProfitYearly</monitor>
+    <plot x="1113" autoPlotX="true" yMax="10.0" autoPlotY="true" y="267" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="245" display="Profit (accumulated per year)">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="2" display="trawlers" color="-5825686" legend="true">
+        <setup></setup>
+        <update>if any? trawlers [ plot sum [ accumProfitThisYear ] of trawlers]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="archipelago" color="-13840069" legend="true">
+        <setup></setup>
+        <update>if any? archipelagos [ plot sum [ accumProfitThisYear ] of archipelagos ]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="coastal" color="-1184463" legend="true">
+        <setup></setup>
+        <update>if any? coastals [ plot sum [ accumProfitThisYear ] of coastals]</update>
+      </pen>
+      <pen interval="1.0" mode="2" display="total" color="-7500403" legend="true">
+        <setup></setup>
+        <update>plot accumProfitYearly</update>
+      </pen>
+    </plot>
+    <plot x="1168" autoPlotX="true" yMax="30.0" autoPlotY="true" y="489" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="245" display="Not fishing reasons">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="#scarity" color="-2674135" legend="true">
+        <setup></setup>
+        <update>plot numThinkFishIsScarce</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="#doneEnough" color="-955883" legend="true">
+        <setup></setup>
+        <update>plot numSatisfied</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="#lowCap" color="-6459832" legend="true">
+        <setup></setup>
+        <update>plot numLowCapital</update>
+      </pen>
+    </plot>
+    <slider x="10" step="0.1" y="991" max="1" width="172" display="sd-carcap" height="50" min="0" direction="Horizontal" default="0.0" variable="sd-carcap"></slider>
+  </widgets>
+  <info>## WHAT IS IT?
+
+(a general understanding of what the model is trying to show or explain)
+
+FIBE represents a simple fishery model. Fish that reproduce and fisher with different fishing styles that fish as their main source of income. The aim of the model is to reflect the different fishing behaviours as described and observed in the (Swedish) Baltic Sea fishery and explore the consequences of different approximations of human/fisher behaviour in under different environmental and managerial scenarios.
+
+The overarching aim is to advance the incorporation and understanding of human behaviour (diversity) in fisheries research and management. In particular focusing on insights from social (fishery) science of fisher behaviour.
+
+## HOW IT WORKS
+
+(what rules the agents use to create the overall behavior of the model)
+Depending on the fishing style the fisher agents represent they fish differently given their motivation and fishing practise:
+
+  * A **trawler** fisher agent only goes fishing if it expects an economic return. This means that the expected catch should at least cover the operating costs for the trawler fisher agent to decide to go out and fish. At sea, it bases its catch expectation on the fish it can perceive nearby (e.g. using sonar technology in the real-world). 
+
+  * A **coastal** fisher agent decides to go fishing when the trade-off between expected profit and time not spent at home is not too big. This means that if a coastal fisher agent has satisfied its preference for staying home and expects a profit, it will go out fishing. Coastal fisher agents stay at home when staying home preference is not satisfied or they expect no profit. 
+
+  * An **archipelago** fisher agent goes out fishing when it needs to, i.e. when it has not caught enough in the previous week or in the situation of having negative capital. In addition, if the archipelago fisher thinks the fish is scarce, it can decide against fishing and instead reduce living expenses. 
+
+
+## HOW TO USE IT
+
+(how to use the model, including a description of each of the items in the Interface tab)
+Set the basics:
+
+  * end-of-sim-in-years: for the duration of the simulation. _Default = 25_ (in years, a tick is a day) 
+  * Number of agents:
+    * archipelago-fisher: for the archipelago agents.
+    * coastal-fisher: for the coastal agents.
+    * offshore-trawler-fisher: for the trawler agents 
+
+Environment settings:
+
+  * spatial-representation: to indicates whether the fish are equally distributed or resided in er density hotspots. _Default = hotspots_
+  * init-stock-size: To indicate the initial stocksize Set it to a quarter, half or full carrying capacity. _Default = half carrying capacity_.
+  * repr4All: to set the reproduction rate of the fish._Default = 1_.
+
+
+Fisher agent settings:
+
+  * socialInfluence:affects the way the trawler and coastal select where to fish, based on social information. _Default = expertise_
+  * home-satisf-threshold = Satisfaction threshold for the coastal agents. _Default = 0.5_
+  * memory-time-length: memory over time. _Default = 365_
+  * memory-spatial-length: spatial memory. _Default = 20_
+
+Scenario settings
+
+  * fuel-subsidy: whether (0) and height of a fuel subsity.
+  * bad-weather-probability: probability that there is bad weather, this affects the archipelago and coastal agents. _Default =  0.1_
+
+
+## THINGS TO NOTICE
+(suggested things for the user to notice while running the model)
+
+
+
+## THINGS TO TRY
+
+(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+
+## EXTENDING THE MODEL
+
+(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+
+## NETLOGO FEATURES
+
+(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+
+## RELATED MODELS
+
+(models in the NetLogo Models Library and elsewhere which are of related interest)
+
+## CREDITS AND REFERENCES
+
+(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)</info>
+  <turtleShapes>
+    <shape name="default" rotatable="true" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="5"></point>
+        <point x="40" y="250"></point>
+        <point x="150" y="205"></point>
+        <point x="260" y="250"></point>
+      </polygon>
+    </shape>
+    <shape name="airplane" rotatable="true" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="0"></point>
+        <point x="135" y="15"></point>
+        <point x="120" y="60"></point>
+        <point x="120" y="105"></point>
+        <point x="15" y="165"></point>
+        <point x="15" y="195"></point>
+        <point x="120" y="180"></point>
+        <point x="135" y="240"></point>
+        <point x="105" y="270"></point>
+        <point x="120" y="285"></point>
+        <point x="150" y="270"></point>
+        <point x="180" y="285"></point>
+        <point x="210" y="270"></point>
+        <point x="165" y="240"></point>
+        <point x="180" y="180"></point>
+        <point x="285" y="195"></point>
+        <point x="285" y="165"></point>
+        <point x="180" y="105"></point>
+        <point x="180" y="60"></point>
+        <point x="165" y="15"></point>
+      </polygon>
+    </shape>
+    <shape name="arrow" rotatable="true" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="0"></point>
+        <point x="0" y="150"></point>
+        <point x="105" y="150"></point>
+        <point x="105" y="293"></point>
+        <point x="195" y="293"></point>
+        <point x="195" y="150"></point>
+        <point x="300" y="150"></point>
+      </polygon>
+    </shape>
+    <shape name="boat" rotatable="false" editableColorIndex="0">
+      <polygon color="-1" filled="true" marked="false">
+        <point x="63" y="162"></point>
+        <point x="90" y="207"></point>
+        <point x="223" y="207"></point>
+        <point x="290" y="162"></point>
+      </polygon>
+      <rectangle endX="157" startY="32" marked="false" color="-1653716737" endY="162" startX="150" filled="true"></rectangle>
+      <polygon color="878553599" filled="true" marked="false">
+        <point x="150" y="34"></point>
+        <point x="131" y="49"></point>
+        <point x="145" y="47"></point>
+        <point x="147" y="48"></point>
+        <point x="149" y="49"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="158" y="33"></point>
+        <point x="230" y="157"></point>
+        <point x="182" y="150"></point>
+        <point x="169" y="151"></point>
+        <point x="157" y="156"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="149" y="55"></point>
+        <point x="88" y="143"></point>
+        <point x="103" y="139"></point>
+        <point x="111" y="136"></point>
+        <point x="117" y="139"></point>
+        <point x="126" y="145"></point>
+        <point x="130" y="147"></point>
+        <point x="139" y="147"></point>
+        <point x="146" y="146"></point>
+        <point x="149" y="55"></point>
+      </polygon>
+    </shape>
+    <shape name="boat 2" rotatable="false" editableColorIndex="0">
+      <polygon color="-1" filled="true" marked="false">
+        <point x="63" y="162"></point>
+        <point x="90" y="207"></point>
+        <point x="223" y="207"></point>
+        <point x="290" y="162"></point>
+      </polygon>
+      <rectangle endX="157" startY="32" marked="false" color="-1653716737" endY="162" startX="150" filled="true"></rectangle>
+      <polygon color="878553599" filled="true" marked="false">
+        <point x="150" y="34"></point>
+        <point x="131" y="49"></point>
+        <point x="145" y="47"></point>
+        <point x="147" y="48"></point>
+        <point x="149" y="49"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="157" y="54"></point>
+        <point x="175" y="79"></point>
+        <point x="174" y="96"></point>
+        <point x="185" y="102"></point>
+        <point x="178" y="112"></point>
+        <point x="194" y="124"></point>
+        <point x="196" y="131"></point>
+        <point x="190" y="139"></point>
+        <point x="192" y="146"></point>
+        <point x="211" y="151"></point>
+        <point x="216" y="154"></point>
+        <point x="157" y="154"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="74"></point>
+        <point x="146" y="91"></point>
+        <point x="139" y="99"></point>
+        <point x="143" y="114"></point>
+        <point x="141" y="123"></point>
+        <point x="137" y="126"></point>
+        <point x="131" y="129"></point>
+        <point x="132" y="139"></point>
+        <point x="142" y="136"></point>
+        <point x="126" y="142"></point>
+        <point x="119" y="147"></point>
+        <point x="148" y="147"></point>
+      </polygon>
+    </shape>
+    <shape name="boat 3" rotatable="false" editableColorIndex="0">
+      <polygon color="-1" filled="true" marked="false">
+        <point x="63" y="162"></point>
+        <point x="90" y="207"></point>
+        <point x="223" y="207"></point>
+        <point x="290" y="162"></point>
+      </polygon>
+      <rectangle endX="157" startY="32" marked="false" color="-1653716737" endY="162" startX="150" filled="true"></rectangle>
+      <polygon color="878553599" filled="true" marked="false">
+        <point x="150" y="34"></point>
+        <point x="131" y="49"></point>
+        <point x="145" y="47"></point>
+        <point x="147" y="48"></point>
+        <point x="149" y="49"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="158" y="37"></point>
+        <point x="172" y="45"></point>
+        <point x="188" y="59"></point>
+        <point x="202" y="79"></point>
+        <point x="217" y="109"></point>
+        <point x="220" y="130"></point>
+        <point x="218" y="147"></point>
+        <point x="204" y="156"></point>
+        <point x="158" y="156"></point>
+        <point x="161" y="142"></point>
+        <point x="170" y="123"></point>
+        <point x="170" y="102"></point>
+        <point x="169" y="88"></point>
+        <point x="165" y="62"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="149" y="66"></point>
+        <point x="142" y="78"></point>
+        <point x="139" y="96"></point>
+        <point x="141" y="111"></point>
+        <point x="146" y="139"></point>
+        <point x="148" y="147"></point>
+        <point x="110" y="147"></point>
+        <point x="113" y="131"></point>
+        <point x="118" y="106"></point>
+        <point x="126" y="71"></point>
+      </polygon>
+    </shape>
+    <shape name="boat top" rotatable="true" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="1"></point>
+        <point x="137" y="18"></point>
+        <point x="123" y="46"></point>
+        <point x="110" y="87"></point>
+        <point x="102" y="150"></point>
+        <point x="106" y="208"></point>
+        <point x="114" y="258"></point>
+        <point x="123" y="286"></point>
+        <point x="175" y="287"></point>
+        <point x="183" y="258"></point>
+        <point x="193" y="209"></point>
+        <point x="198" y="150"></point>
+        <point x="191" y="87"></point>
+        <point x="178" y="46"></point>
+        <point x="163" y="17"></point>
+      </polygon>
+      <rectangle endX="170" startY="92" marked="false" color="255" endY="178" startX="129" filled="false"></rectangle>
+      <rectangle endX="180" startY="63" marked="false" color="255" endY="93" startX="120" filled="false"></rectangle>
+      <rectangle endX="165" startY="89" marked="true" color="-1920102913" endY="165" startX="133" filled="true"></rectangle>
+      <polygon color="1422181631" filled="true" marked="false">
+        <point x="150" y="60"></point>
+        <point x="105" y="105"></point>
+        <point x="150" y="90"></point>
+        <point x="195" y="105"></point>
+      </polygon>
+      <polygon color="255" filled="false" marked="false">
+        <point x="150" y="60"></point>
+        <point x="105" y="105"></point>
+        <point x="150" y="90"></point>
+        <point x="195" y="105"></point>
+      </polygon>
+      <rectangle endX="165" startY="178" marked="false" color="255" endY="262" startX="135" filled="false"></rectangle>
+      <polygon color="255" filled="false" marked="false">
+        <point x="134" y="262"></point>
+        <point x="144" y="286"></point>
+        <point x="158" y="286"></point>
+        <point x="166" y="262"></point>
+      </polygon>
+      <line endX="171" startY="149" marked="false" color="255" endY="149" startX="129"></line>
+      <line endX="188" startY="262" marked="false" color="255" endY="252" startX="166"></line>
+      <line endX="112" startY="262" marked="false" color="255" endY="252" startX="134"></line>
+      <line endX="149" startY="2" marked="false" color="255" endY="62" startX="150"></line>
+    </shape>
+    <shape name="box" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="285"></point>
+        <point x="285" y="225"></point>
+        <point x="285" y="75"></point>
+        <point x="150" y="135"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="135"></point>
+        <point x="15" y="75"></point>
+        <point x="150" y="15"></point>
+        <point x="285" y="75"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="15" y="75"></point>
+        <point x="15" y="225"></point>
+        <point x="150" y="285"></point>
+        <point x="150" y="135"></point>
+      </polygon>
+      <line endX="150" startY="285" marked="false" color="255" endY="135" startX="150"></line>
+      <line endX="15" startY="135" marked="false" color="255" endY="75" startX="150"></line>
+      <line endX="285" startY="135" marked="false" color="255" endY="75" startX="150"></line>
+    </shape>
+    <shape name="bug" rotatable="true" editableColorIndex="0">
+      <circle x="96" y="182" marked="true" color="-1920102913" diameter="108" filled="true"></circle>
+      <circle x="110" y="127" marked="true" color="-1920102913" diameter="80" filled="true"></circle>
+      <circle x="110" y="75" marked="true" color="-1920102913" diameter="80" filled="true"></circle>
+      <line endX="80" startY="100" marked="true" color="-1920102913" endY="30" startX="150"></line>
+      <line endX="220" startY="100" marked="true" color="-1920102913" endY="30" startX="150"></line>
+    </shape>
+    <shape name="butterfly" rotatable="true" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="165"></point>
+        <point x="209" y="199"></point>
+        <point x="225" y="225"></point>
+        <point x="225" y="255"></point>
+        <point x="195" y="270"></point>
+        <point x="165" y="255"></point>
+        <point x="150" y="240"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="165"></point>
+        <point x="89" y="198"></point>
+        <point x="75" y="225"></point>
+        <point x="75" y="255"></point>
+        <point x="105" y="270"></point>
+        <point x="135" y="255"></point>
+        <point x="150" y="240"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="139" y="148"></point>
+        <point x="100" y="105"></point>
+        <point x="55" y="90"></point>
+        <point x="25" y="90"></point>
+        <point x="10" y="105"></point>
+        <point x="10" y="135"></point>
+        <point x="25" y="180"></point>
+        <point x="40" y="195"></point>
+        <point x="85" y="194"></point>
+        <point x="139" y="163"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="162" y="150"></point>
+        <point x="200" y="105"></point>
+        <point x="245" y="90"></point>
+        <point x="275" y="90"></point>
+        <point x="290" y="105"></point>
+        <point x="290" y="135"></point>
+        <point x="275" y="180"></point>
+        <point x="260" y="195"></point>
+        <point x="215" y="195"></point>
+        <point x="162" y="165"></point>
+      </polygon>
+      <polygon color="255" filled="true" marked="false">
+        <point x="150" y="255"></point>
+        <point x="135" y="225"></point>
+        <point x="120" y="150"></point>
+        <point x="135" y="120"></point>
+        <point x="150" y="105"></point>
+        <point x="165" y="120"></point>
+        <point x="180" y="150"></point>
+        <point x="165" y="225"></point>
+      </polygon>
+      <circle x="135" y="90" marked="false" color="255" diameter="30" filled="true"></circle>
+      <line endX="195" startY="105" marked="false" color="255" endY="60" startX="150"></line>
+      <line endX="105" startY="105" marked="false" color="255" endY="60" startX="150"></line>
+    </shape>
+    <shape name="car" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="300" y="180"></point>
+        <point x="279" y="164"></point>
+        <point x="261" y="144"></point>
+        <point x="240" y="135"></point>
+        <point x="226" y="132"></point>
+        <point x="213" y="106"></point>
+        <point x="203" y="84"></point>
+        <point x="185" y="63"></point>
+        <point x="159" y="50"></point>
+        <point x="135" y="50"></point>
+        <point x="75" y="60"></point>
+        <point x="0" y="150"></point>
+        <point x="0" y="165"></point>
+        <point x="0" y="225"></point>
+        <point x="300" y="225"></point>
+        <point x="300" y="180"></point>
+      </polygon>
+      <circle x="180" y="180" marked="false" color="255" diameter="90" filled="true"></circle>
+      <circle x="30" y="180" marked="false" color="255" diameter="90" filled="true"></circle>
+      <polygon color="255" filled="true" marked="false">
+        <point x="162" y="80"></point>
+        <point x="132" y="78"></point>
+        <point x="134" y="135"></point>
+        <point x="209" y="135"></point>
+        <point x="194" y="105"></point>
+        <point x="189" y="96"></point>
+        <point x="180" y="89"></point>
+      </polygon>
+      <circle x="47" y="195" marked="true" color="-1920102913" diameter="58" filled="true"></circle>
+      <circle x="195" y="195" marked="true" color="-1920102913" diameter="58" filled="true"></circle>
+    </shape>
+    <shape name="circle" rotatable="false" editableColorIndex="0">
+      <circle x="0" y="0" marked="true" color="-1920102913" diameter="300" filled="true"></circle>
+    </shape>
+    <shape name="circle 2" rotatable="false" editableColorIndex="0">
+      <circle x="0" y="0" marked="true" color="-1920102913" diameter="300" filled="true"></circle>
+      <circle x="30" y="30" marked="false" color="255" diameter="240" filled="true"></circle>
+    </shape>
+    <shape name="cow" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="200" y="193"></point>
+        <point x="197" y="249"></point>
+        <point x="179" y="249"></point>
+        <point x="177" y="196"></point>
+        <point x="166" y="187"></point>
+        <point x="140" y="189"></point>
+        <point x="93" y="191"></point>
+        <point x="78" y="179"></point>
+        <point x="72" y="211"></point>
+        <point x="49" y="209"></point>
+        <point x="48" y="181"></point>
+        <point x="37" y="149"></point>
+        <point x="25" y="120"></point>
+        <point x="25" y="89"></point>
+        <point x="45" y="72"></point>
+        <point x="103" y="84"></point>
+        <point x="179" y="75"></point>
+        <point x="198" y="76"></point>
+        <point x="252" y="64"></point>
+        <point x="272" y="81"></point>
+        <point x="293" y="103"></point>
+        <point x="285" y="121"></point>
+        <point x="255" y="121"></point>
+        <point x="242" y="118"></point>
+        <point x="224" y="167"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="73" y="210"></point>
+        <point x="86" y="251"></point>
+        <point x="62" y="249"></point>
+        <point x="48" y="208"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="25" y="114"></point>
+        <point x="16" y="195"></point>
+        <point x="9" y="204"></point>
+        <point x="23" y="213"></point>
+        <point x="25" y="200"></point>
+        <point x="39" y="123"></point>
+      </polygon>
+    </shape>
+    <shape name="cylinder" rotatable="false" editableColorIndex="0">
+      <circle x="0" y="0" marked="true" color="-1920102913" diameter="300" filled="true"></circle>
+    </shape>
+    <shape name="dot" rotatable="false" editableColorIndex="0">
+      <circle x="90" y="90" marked="true" color="-1920102913" diameter="120" filled="true"></circle>
+    </shape>
+    <shape name="face happy" rotatable="false" editableColorIndex="0">
+      <circle x="8" y="8" marked="true" color="-1920102913" diameter="285" filled="true"></circle>
+      <circle x="60" y="75" marked="false" color="255" diameter="60" filled="true"></circle>
+      <circle x="180" y="75" marked="false" color="255" diameter="60" filled="true"></circle>
+      <polygon color="255" filled="true" marked="false">
+        <point x="150" y="255"></point>
+        <point x="90" y="239"></point>
+        <point x="62" y="213"></point>
+        <point x="47" y="191"></point>
+        <point x="67" y="179"></point>
+        <point x="90" y="203"></point>
+        <point x="109" y="218"></point>
+        <point x="150" y="225"></point>
+        <point x="192" y="218"></point>
+        <point x="210" y="203"></point>
+        <point x="227" y="181"></point>
+        <point x="251" y="194"></point>
+        <point x="236" y="217"></point>
+        <point x="212" y="240"></point>
+      </polygon>
+    </shape>
+    <shape name="face neutral" rotatable="false" editableColorIndex="0">
+      <circle x="8" y="7" marked="true" color="-1920102913" diameter="285" filled="true"></circle>
+      <circle x="60" y="75" marked="false" color="255" diameter="60" filled="true"></circle>
+      <circle x="180" y="75" marked="false" color="255" diameter="60" filled="true"></circle>
+      <rectangle endX="240" startY="195" marked="false" color="255" endY="225" startX="60" filled="true"></rectangle>
+    </shape>
+    <shape name="face sad" rotatable="false" editableColorIndex="0">
+      <circle x="8" y="8" marked="true" color="-1920102913" diameter="285" filled="true"></circle>
+      <circle x="60" y="75" marked="false" color="255" diameter="60" filled="true"></circle>
+      <circle x="180" y="75" marked="false" color="255" diameter="60" filled="true"></circle>
+      <polygon color="255" filled="true" marked="false">
+        <point x="150" y="168"></point>
+        <point x="90" y="184"></point>
+        <point x="62" y="210"></point>
+        <point x="47" y="232"></point>
+        <point x="67" y="244"></point>
+        <point x="90" y="220"></point>
+        <point x="109" y="205"></point>
+        <point x="150" y="198"></point>
+        <point x="192" y="205"></point>
+        <point x="210" y="220"></point>
+        <point x="227" y="242"></point>
+        <point x="251" y="229"></point>
+        <point x="236" y="206"></point>
+        <point x="212" y="183"></point>
+      </polygon>
+    </shape>
+    <shape name="fish" rotatable="false" editableColorIndex="0">
+      <polygon color="-1" filled="true" marked="false">
+        <point x="44" y="131"></point>
+        <point x="21" y="87"></point>
+        <point x="15" y="86"></point>
+        <point x="0" y="120"></point>
+        <point x="15" y="150"></point>
+        <point x="0" y="180"></point>
+        <point x="13" y="214"></point>
+        <point x="20" y="212"></point>
+        <point x="45" y="166"></point>
+      </polygon>
+      <polygon color="-1" filled="true" marked="false">
+        <point x="135" y="195"></point>
+        <point x="119" y="235"></point>
+        <point x="95" y="218"></point>
+        <point x="76" y="210"></point>
+        <point x="46" y="204"></point>
+        <point x="60" y="165"></point>
+      </polygon>
+      <polygon color="-1" filled="true" marked="false">
+        <point x="75" y="45"></point>
+        <point x="83" y="77"></point>
+        <point x="71" y="103"></point>
+        <point x="86" y="114"></point>
+        <point x="166" y="78"></point>
+        <point x="135" y="60"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="30" y="136"></point>
+        <point x="151" y="77"></point>
+        <point x="226" y="81"></point>
+        <point x="280" y="119"></point>
+        <point x="292" y="146"></point>
+        <point x="292" y="160"></point>
+        <point x="287" y="170"></point>
+        <point x="270" y="195"></point>
+        <point x="195" y="210"></point>
+        <point x="151" y="212"></point>
+        <point x="30" y="166"></point>
+      </polygon>
+      <circle x="215" y="106" marked="false" color="255" diameter="30" filled="true"></circle>
+    </shape>
+    <shape name="fish 3" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="137" y="105"></point>
+        <point x="124" y="83"></point>
+        <point x="103" y="76"></point>
+        <point x="77" y="75"></point>
+        <point x="53" y="104"></point>
+        <point x="47" y="136"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="226" y="194"></point>
+        <point x="223" y="229"></point>
+        <point x="207" y="243"></point>
+        <point x="178" y="237"></point>
+        <point x="169" y="203"></point>
+        <point x="167" y="175"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="137" y="195"></point>
+        <point x="124" y="217"></point>
+        <point x="103" y="224"></point>
+        <point x="77" y="225"></point>
+        <point x="53" y="196"></point>
+        <point x="47" y="164"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="40" y="123"></point>
+        <point x="32" y="109"></point>
+        <point x="16" y="108"></point>
+        <point x="0" y="130"></point>
+        <point x="0" y="151"></point>
+        <point x="7" y="182"></point>
+        <point x="23" y="190"></point>
+        <point x="40" y="179"></point>
+        <point x="47" y="145"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="45" y="120"></point>
+        <point x="90" y="105"></point>
+        <point x="195" y="90"></point>
+        <point x="275" y="120"></point>
+        <point x="294" y="152"></point>
+        <point x="285" y="165"></point>
+        <point x="293" y="171"></point>
+        <point x="270" y="195"></point>
+        <point x="210" y="210"></point>
+        <point x="150" y="210"></point>
+        <point x="45" y="180"></point>
+      </polygon>
+      <circle x="244" y="128" marked="false" color="-303222273" diameter="26" filled="true"></circle>
+      <circle x="248" y="135" marked="false" color="255" diameter="14" filled="true"></circle>
+      <line endX="133" startY="121" marked="false" color="255" endY="96" startX="48"></line>
+      <line endX="133" startY="179" marked="false" color="255" endY="204" startX="48"></line>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="241" y="106"></point>
+        <point x="241" y="77"></point>
+        <point x="217" y="71"></point>
+        <point x="190" y="75"></point>
+        <point x="167" y="99"></point>
+        <point x="182" y="125"></point>
+      </polygon>
+      <line endX="158" startY="102" marked="false" color="255" endY="95" startX="226"></line>
+      <line endX="225" startY="208" marked="false" color="255" endY="205" startX="171"></line>
+      <polygon color="-1" filled="true" marked="false">
+        <point x="252" y="111"></point>
+        <point x="232" y="103"></point>
+        <point x="213" y="132"></point>
+        <point x="210" y="165"></point>
+        <point x="223" y="193"></point>
+        <point x="229" y="204"></point>
+        <point x="247" y="201"></point>
+        <point x="237" y="170"></point>
+        <point x="236" y="137"></point>
+      </polygon>
+      <polygon color="-1" filled="true" marked="false">
+        <point x="135" y="98"></point>
+        <point x="140" y="137"></point>
+        <point x="135" y="204"></point>
+        <point x="154" y="210"></point>
+        <point x="167" y="209"></point>
+        <point x="170" y="176"></point>
+        <point x="160" y="156"></point>
+        <point x="163" y="126"></point>
+        <point x="171" y="117"></point>
+        <point x="156" y="96"></point>
+      </polygon>
+      <polygon color="255" filled="true" marked="false">
+        <point x="192" y="117"></point>
+        <point x="171" y="118"></point>
+        <point x="162" y="126"></point>
+        <point x="158" y="148"></point>
+        <point x="160" y="165"></point>
+        <point x="168" y="175"></point>
+        <point x="188" y="183"></point>
+        <point x="211" y="186"></point>
+        <point x="217" y="185"></point>
+        <point x="206" y="181"></point>
+        <point x="172" y="171"></point>
+        <point x="164" y="156"></point>
+        <point x="166" y="133"></point>
+        <point x="174" y="121"></point>
+      </polygon>
+      <polygon color="-1" filled="true" marked="false">
+        <point x="40" y="121"></point>
+        <point x="46" y="147"></point>
+        <point x="42" y="163"></point>
+        <point x="37" y="179"></point>
+        <point x="56" y="178"></point>
+        <point x="65" y="159"></point>
+        <point x="67" y="128"></point>
+        <point x="59" y="116"></point>
+      </polygon>
+    </shape>
+    <shape name="flag" rotatable="false" editableColorIndex="0">
+      <rectangle endX="75" startY="15" marked="true" color="-1920102913" endY="300" startX="60" filled="true"></rectangle>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="90" y="150"></point>
+        <point x="270" y="90"></point>
+        <point x="90" y="30"></point>
+      </polygon>
+      <line endX="90" startY="135" marked="true" color="-1920102913" endY="135" startX="75"></line>
+      <line endX="90" startY="45" marked="true" color="-1920102913" endY="45" startX="75"></line>
+    </shape>
+    <shape name="flower" rotatable="false" editableColorIndex="0">
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="135" y="120"></point>
+        <point x="165" y="165"></point>
+        <point x="180" y="210"></point>
+        <point x="180" y="240"></point>
+        <point x="150" y="300"></point>
+        <point x="165" y="300"></point>
+        <point x="195" y="240"></point>
+        <point x="195" y="195"></point>
+        <point x="165" y="135"></point>
+      </polygon>
+      <circle x="85" y="132" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="130" y="147" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="192" y="85" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="85" y="40" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="177" y="40" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="177" y="132" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="70" y="85" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="130" y="25" marked="true" color="-1920102913" diameter="38" filled="true"></circle>
+      <circle x="96" y="51" marked="true" color="-1920102913" diameter="108" filled="true"></circle>
+      <circle x="113" y="68" marked="false" color="255" diameter="74" filled="true"></circle>
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="189" y="233"></point>
+        <point x="219" y="188"></point>
+        <point x="249" y="173"></point>
+        <point x="279" y="188"></point>
+        <point x="234" y="218"></point>
+      </polygon>
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="180" y="255"></point>
+        <point x="150" y="210"></point>
+        <point x="105" y="210"></point>
+        <point x="75" y="240"></point>
+        <point x="135" y="240"></point>
+      </polygon>
+    </shape>
+    <shape name="house" rotatable="false" editableColorIndex="0">
+      <rectangle endX="255" startY="120" marked="true" color="-1920102913" endY="285" startX="45" filled="true"></rectangle>
+      <rectangle endX="180" startY="210" marked="false" color="255" endY="285" startX="120" filled="true"></rectangle>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="15" y="120"></point>
+        <point x="150" y="15"></point>
+        <point x="285" y="120"></point>
+      </polygon>
+      <line endX="270" startY="120" marked="false" color="255" endY="120" startX="30"></line>
+    </shape>
+    <shape name="leaf" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="210"></point>
+        <point x="135" y="195"></point>
+        <point x="120" y="210"></point>
+        <point x="60" y="210"></point>
+        <point x="30" y="195"></point>
+        <point x="60" y="180"></point>
+        <point x="60" y="165"></point>
+        <point x="15" y="135"></point>
+        <point x="30" y="120"></point>
+        <point x="15" y="105"></point>
+        <point x="40" y="104"></point>
+        <point x="45" y="90"></point>
+        <point x="60" y="90"></point>
+        <point x="90" y="105"></point>
+        <point x="105" y="120"></point>
+        <point x="120" y="120"></point>
+        <point x="105" y="60"></point>
+        <point x="120" y="60"></point>
+        <point x="135" y="30"></point>
+        <point x="150" y="15"></point>
+        <point x="165" y="30"></point>
+        <point x="180" y="60"></point>
+        <point x="195" y="60"></point>
+        <point x="180" y="120"></point>
+        <point x="195" y="120"></point>
+        <point x="210" y="105"></point>
+        <point x="240" y="90"></point>
+        <point x="255" y="90"></point>
+        <point x="263" y="104"></point>
+        <point x="285" y="105"></point>
+        <point x="270" y="120"></point>
+        <point x="285" y="135"></point>
+        <point x="240" y="165"></point>
+        <point x="240" y="180"></point>
+        <point x="270" y="195"></point>
+        <point x="240" y="210"></point>
+        <point x="180" y="210"></point>
+        <point x="165" y="195"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="135" y="195"></point>
+        <point x="135" y="240"></point>
+        <point x="120" y="255"></point>
+        <point x="105" y="255"></point>
+        <point x="105" y="285"></point>
+        <point x="135" y="285"></point>
+        <point x="165" y="240"></point>
+        <point x="165" y="195"></point>
+      </polygon>
+    </shape>
+    <shape name="line" rotatable="true" editableColorIndex="0">
+      <line endX="150" startY="0" marked="true" color="-1920102913" endY="300" startX="150"></line>
+    </shape>
+    <shape name="line half" rotatable="true" editableColorIndex="0">
+      <line endX="150" startY="0" marked="true" color="-1920102913" endY="150" startX="150"></line>
+    </shape>
+    <shape name="pentagon" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="15"></point>
+        <point x="15" y="120"></point>
+        <point x="60" y="285"></point>
+        <point x="240" y="285"></point>
+        <point x="285" y="120"></point>
+      </polygon>
+    </shape>
+    <shape name="person" rotatable="false" editableColorIndex="0">
+      <circle x="110" y="5" marked="true" color="-1920102913" diameter="80" filled="true"></circle>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="105" y="90"></point>
+        <point x="120" y="195"></point>
+        <point x="90" y="285"></point>
+        <point x="105" y="300"></point>
+        <point x="135" y="300"></point>
+        <point x="150" y="225"></point>
+        <point x="165" y="300"></point>
+        <point x="195" y="300"></point>
+        <point x="210" y="285"></point>
+        <point x="180" y="195"></point>
+        <point x="195" y="90"></point>
+      </polygon>
+      <rectangle endX="172" startY="79" marked="true" color="-1920102913" endY="94" startX="127" filled="true"></rectangle>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="195" y="90"></point>
+        <point x="240" y="150"></point>
+        <point x="225" y="180"></point>
+        <point x="165" y="105"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="105" y="90"></point>
+        <point x="60" y="150"></point>
+        <point x="75" y="180"></point>
+        <point x="135" y="105"></point>
+      </polygon>
+    </shape>
+    <shape name="plant" rotatable="false" editableColorIndex="0">
+      <rectangle endX="165" startY="90" marked="true" color="-1920102913" endY="300" startX="135" filled="true"></rectangle>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="135" y="255"></point>
+        <point x="90" y="210"></point>
+        <point x="45" y="195"></point>
+        <point x="75" y="255"></point>
+        <point x="135" y="285"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="165" y="255"></point>
+        <point x="210" y="210"></point>
+        <point x="255" y="195"></point>
+        <point x="225" y="255"></point>
+        <point x="165" y="285"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="135" y="180"></point>
+        <point x="90" y="135"></point>
+        <point x="45" y="120"></point>
+        <point x="75" y="180"></point>
+        <point x="135" y="210"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="165" y="180"></point>
+        <point x="165" y="210"></point>
+        <point x="225" y="180"></point>
+        <point x="255" y="120"></point>
+        <point x="210" y="135"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="135" y="105"></point>
+        <point x="90" y="60"></point>
+        <point x="45" y="45"></point>
+        <point x="75" y="105"></point>
+        <point x="135" y="135"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="165" y="105"></point>
+        <point x="165" y="135"></point>
+        <point x="225" y="105"></point>
+        <point x="255" y="45"></point>
+        <point x="210" y="60"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="135" y="90"></point>
+        <point x="120" y="45"></point>
+        <point x="150" y="15"></point>
+        <point x="180" y="45"></point>
+        <point x="165" y="90"></point>
+      </polygon>
+    </shape>
+    <shape name="sheep" rotatable="false" editableColorIndex="15">
+      <circle x="203" y="65" marked="true" color="-1" diameter="88" filled="true"></circle>
+      <circle x="70" y="65" marked="true" color="-1" diameter="162" filled="true"></circle>
+      <circle x="150" y="105" marked="true" color="-1" diameter="120" filled="true"></circle>
+      <polygon color="-1920102913" filled="true" marked="false">
+        <point x="218" y="120"></point>
+        <point x="240" y="165"></point>
+        <point x="255" y="165"></point>
+        <point x="278" y="120"></point>
+      </polygon>
+      <circle x="214" y="72" marked="false" color="-1920102913" diameter="67" filled="true"></circle>
+      <rectangle endX="179" startY="223" marked="true" color="-1" endY="298" startX="164" filled="true"></rectangle>
+      <polygon color="-1" filled="true" marked="true">
+        <point x="45" y="285"></point>
+        <point x="30" y="285"></point>
+        <point x="30" y="240"></point>
+        <point x="15" y="195"></point>
+        <point x="45" y="210"></point>
+      </polygon>
+      <circle x="3" y="83" marked="true" color="-1" diameter="150" filled="true"></circle>
+      <rectangle endX="80" startY="221" marked="true" color="-1" endY="296" startX="65" filled="true"></rectangle>
+      <polygon color="-1" filled="true" marked="true">
+        <point x="195" y="285"></point>
+        <point x="210" y="285"></point>
+        <point x="210" y="240"></point>
+        <point x="240" y="210"></point>
+        <point x="195" y="210"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="false">
+        <point x="276" y="85"></point>
+        <point x="285" y="105"></point>
+        <point x="302" y="99"></point>
+        <point x="294" y="83"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="false">
+        <point x="219" y="85"></point>
+        <point x="210" y="105"></point>
+        <point x="193" y="99"></point>
+        <point x="201" y="83"></point>
+      </polygon>
+    </shape>
+    <shape name="square" rotatable="false" editableColorIndex="0">
+      <rectangle endX="270" startY="30" marked="true" color="-1920102913" endY="270" startX="30" filled="true"></rectangle>
+    </shape>
+    <shape name="square 2" rotatable="false" editableColorIndex="0">
+      <rectangle endX="270" startY="30" marked="true" color="-1920102913" endY="270" startX="30" filled="true"></rectangle>
+      <rectangle endX="240" startY="60" marked="false" color="255" endY="240" startX="60" filled="true"></rectangle>
+    </shape>
+    <shape name="star" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="151" y="1"></point>
+        <point x="185" y="108"></point>
+        <point x="298" y="108"></point>
+        <point x="207" y="175"></point>
+        <point x="242" y="282"></point>
+        <point x="151" y="216"></point>
+        <point x="59" y="282"></point>
+        <point x="94" y="175"></point>
+        <point x="3" y="108"></point>
+        <point x="116" y="108"></point>
+      </polygon>
+    </shape>
+    <shape name="target" rotatable="false" editableColorIndex="0">
+      <circle x="0" y="0" marked="true" color="-1920102913" diameter="300" filled="true"></circle>
+      <circle x="30" y="30" marked="false" color="255" diameter="240" filled="true"></circle>
+      <circle x="60" y="60" marked="true" color="-1920102913" diameter="180" filled="true"></circle>
+      <circle x="90" y="90" marked="false" color="255" diameter="120" filled="true"></circle>
+      <circle x="120" y="120" marked="true" color="-1920102913" diameter="60" filled="true"></circle>
+    </shape>
+    <shape name="tree" rotatable="false" editableColorIndex="0">
+      <circle x="118" y="3" marked="true" color="-1920102913" diameter="94" filled="true"></circle>
+      <rectangle endX="180" startY="195" marked="false" color="-1653716737" endY="300" startX="120" filled="true"></rectangle>
+      <circle x="65" y="21" marked="true" color="-1920102913" diameter="108" filled="true"></circle>
+      <circle x="116" y="41" marked="true" color="-1920102913" diameter="127" filled="true"></circle>
+      <circle x="45" y="90" marked="true" color="-1920102913" diameter="120" filled="true"></circle>
+      <circle x="104" y="74" marked="true" color="-1920102913" diameter="152" filled="true"></circle>
+    </shape>
+    <shape name="triangle" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="30"></point>
+        <point x="15" y="255"></point>
+        <point x="285" y="255"></point>
+      </polygon>
+    </shape>
+    <shape name="triangle 2" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="150" y="30"></point>
+        <point x="15" y="255"></point>
+        <point x="285" y="255"></point>
+      </polygon>
+      <polygon color="255" filled="true" marked="false">
+        <point x="151" y="99"></point>
+        <point x="225" y="223"></point>
+        <point x="75" y="224"></point>
+      </polygon>
+    </shape>
+    <shape name="truck" rotatable="false" editableColorIndex="0">
+      <rectangle endX="195" startY="45" marked="true" color="-1920102913" endY="187" startX="4" filled="true"></rectangle>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="296" y="193"></point>
+        <point x="296" y="150"></point>
+        <point x="259" y="134"></point>
+        <point x="244" y="104"></point>
+        <point x="208" y="104"></point>
+        <point x="207" y="194"></point>
+      </polygon>
+      <rectangle endX="195" startY="60" marked="false" color="-1" endY="105" startX="195" filled="true"></rectangle>
+      <polygon color="255" filled="true" marked="false">
+        <point x="238" y="112"></point>
+        <point x="252" y="141"></point>
+        <point x="219" y="141"></point>
+        <point x="218" y="112"></point>
+      </polygon>
+      <circle x="234" y="174" marked="false" color="255" diameter="42" filled="true"></circle>
+      <rectangle endX="214" startY="185" marked="true" color="-1920102913" endY="194" startX="181" filled="true"></rectangle>
+      <circle x="144" y="174" marked="false" color="255" diameter="42" filled="true"></circle>
+      <circle x="24" y="174" marked="false" color="255" diameter="42" filled="true"></circle>
+      <circle x="24" y="174" marked="true" color="-1920102913" diameter="42" filled="false"></circle>
+      <circle x="144" y="174" marked="true" color="-1920102913" diameter="42" filled="false"></circle>
+      <circle x="234" y="174" marked="true" color="-1920102913" diameter="42" filled="false"></circle>
+    </shape>
+    <shape name="turtle" rotatable="true" editableColorIndex="0">
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="215" y="204"></point>
+        <point x="240" y="233"></point>
+        <point x="246" y="254"></point>
+        <point x="228" y="266"></point>
+        <point x="215" y="252"></point>
+        <point x="193" y="210"></point>
+      </polygon>
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="195" y="90"></point>
+        <point x="225" y="75"></point>
+        <point x="245" y="75"></point>
+        <point x="260" y="89"></point>
+        <point x="269" y="108"></point>
+        <point x="261" y="124"></point>
+        <point x="240" y="105"></point>
+        <point x="225" y="105"></point>
+        <point x="210" y="105"></point>
+      </polygon>
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="105" y="90"></point>
+        <point x="75" y="75"></point>
+        <point x="55" y="75"></point>
+        <point x="40" y="89"></point>
+        <point x="31" y="108"></point>
+        <point x="39" y="124"></point>
+        <point x="60" y="105"></point>
+        <point x="75" y="105"></point>
+        <point x="90" y="105"></point>
+      </polygon>
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="132" y="85"></point>
+        <point x="134" y="64"></point>
+        <point x="107" y="51"></point>
+        <point x="108" y="17"></point>
+        <point x="150" y="2"></point>
+        <point x="192" y="18"></point>
+        <point x="192" y="52"></point>
+        <point x="169" y="65"></point>
+        <point x="172" y="87"></point>
+      </polygon>
+      <polygon color="1504722175" filled="true" marked="false">
+        <point x="85" y="204"></point>
+        <point x="60" y="233"></point>
+        <point x="54" y="254"></point>
+        <point x="72" y="266"></point>
+        <point x="85" y="252"></point>
+        <point x="107" y="210"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="119" y="75"></point>
+        <point x="179" y="75"></point>
+        <point x="209" y="101"></point>
+        <point x="224" y="135"></point>
+        <point x="220" y="225"></point>
+        <point x="175" y="261"></point>
+        <point x="128" y="261"></point>
+        <point x="81" y="224"></point>
+        <point x="74" y="135"></point>
+        <point x="88" y="99"></point>
+      </polygon>
+    </shape>
+    <shape name="wheel" rotatable="false" editableColorIndex="0">
+      <circle x="3" y="3" marked="true" color="-1920102913" diameter="294" filled="true"></circle>
+      <circle x="30" y="30" marked="false" color="255" diameter="240" filled="true"></circle>
+      <line endX="150" startY="285" marked="true" color="-1920102913" endY="15" startX="150"></line>
+      <line endX="285" startY="150" marked="true" color="-1920102913" endY="150" startX="15"></line>
+      <circle x="120" y="120" marked="true" color="-1920102913" diameter="60" filled="true"></circle>
+      <line endX="79" startY="40" marked="true" color="-1920102913" endY="269" startX="216"></line>
+      <line endX="269" startY="84" marked="true" color="-1920102913" endY="221" startX="40"></line>
+      <line endX="269" startY="216" marked="true" color="-1920102913" endY="79" startX="40"></line>
+      <line endX="221" startY="40" marked="true" color="-1920102913" endY="269" startX="84"></line>
+    </shape>
+    <shape name="wolf" rotatable="false" editableColorIndex="0">
+      <polygon color="255" filled="true" marked="false">
+        <point x="253" y="133"></point>
+        <point x="245" y="131"></point>
+        <point x="245" y="133"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="2" y="194"></point>
+        <point x="13" y="197"></point>
+        <point x="30" y="191"></point>
+        <point x="38" y="193"></point>
+        <point x="38" y="205"></point>
+        <point x="20" y="226"></point>
+        <point x="20" y="257"></point>
+        <point x="27" y="265"></point>
+        <point x="38" y="266"></point>
+        <point x="40" y="260"></point>
+        <point x="31" y="253"></point>
+        <point x="31" y="230"></point>
+        <point x="60" y="206"></point>
+        <point x="68" y="198"></point>
+        <point x="75" y="209"></point>
+        <point x="66" y="228"></point>
+        <point x="65" y="243"></point>
+        <point x="82" y="261"></point>
+        <point x="84" y="268"></point>
+        <point x="100" y="267"></point>
+        <point x="103" y="261"></point>
+        <point x="77" y="239"></point>
+        <point x="79" y="231"></point>
+        <point x="100" y="207"></point>
+        <point x="98" y="196"></point>
+        <point x="119" y="201"></point>
+        <point x="143" y="202"></point>
+        <point x="160" y="195"></point>
+        <point x="166" y="210"></point>
+        <point x="172" y="213"></point>
+        <point x="173" y="238"></point>
+        <point x="167" y="251"></point>
+        <point x="160" y="248"></point>
+        <point x="154" y="265"></point>
+        <point x="169" y="264"></point>
+        <point x="178" y="247"></point>
+        <point x="186" y="240"></point>
+        <point x="198" y="260"></point>
+        <point x="200" y="271"></point>
+        <point x="217" y="271"></point>
+        <point x="219" y="262"></point>
+        <point x="207" y="258"></point>
+        <point x="195" y="230"></point>
+        <point x="192" y="198"></point>
+        <point x="210" y="184"></point>
+        <point x="227" y="164"></point>
+        <point x="242" y="144"></point>
+        <point x="259" y="145"></point>
+        <point x="284" y="151"></point>
+        <point x="277" y="141"></point>
+        <point x="293" y="140"></point>
+        <point x="299" y="134"></point>
+        <point x="297" y="127"></point>
+        <point x="273" y="119"></point>
+        <point x="270" y="105"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="-1" y="195"></point>
+        <point x="14" y="180"></point>
+        <point x="36" y="166"></point>
+        <point x="40" y="153"></point>
+        <point x="53" y="140"></point>
+        <point x="82" y="131"></point>
+        <point x="134" y="133"></point>
+        <point x="159" y="126"></point>
+        <point x="188" y="115"></point>
+        <point x="227" y="108"></point>
+        <point x="236" y="102"></point>
+        <point x="238" y="98"></point>
+        <point x="268" y="86"></point>
+        <point x="269" y="92"></point>
+        <point x="281" y="87"></point>
+        <point x="269" y="103"></point>
+        <point x="269" y="113"></point>
+      </polygon>
+    </shape>
+    <shape name="x" rotatable="false" editableColorIndex="0">
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="270" y="75"></point>
+        <point x="225" y="30"></point>
+        <point x="30" y="225"></point>
+        <point x="75" y="270"></point>
+      </polygon>
+      <polygon color="-1920102913" filled="true" marked="true">
+        <point x="30" y="75"></point>
+        <point x="75" y="30"></point>
+        <point x="270" y="225"></point>
+        <point x="225" y="270"></point>
+      </polygon>
+    </shape>
+  </turtleShapes>
+  <linkShapes>
+    <shape name="default" curviness="0.0">
+      <lines>
+        <line x="-0.2" visible="false">
+          <dash value="0.0"></dash>
+          <dash value="1.0"></dash>
+        </line>
+        <line x="0.0" visible="true">
+          <dash value="1.0"></dash>
+          <dash value="0.0"></dash>
+        </line>
+        <line x="0.2" visible="false">
+          <dash value="0.0"></dash>
+          <dash value="1.0"></dash>
+        </line>
+      </lines>
+      <indicator>
+        <shape name="link direction" rotatable="true" editableColorIndex="0">
+          <line endX="90" startY="150" marked="true" color="-1920102913" endY="180" startX="150"></line>
+          <line endX="210" startY="150" marked="true" color="-1920102913" endY="180" startX="150"></line>
+        </shape>
+      </indicator>
+    </shape>
+  </linkShapes>
+  <previewCommands>setup repeat 75 [ go ]</previewCommands>
+  <experiments>
+    <experiment name="expQsArchipelago-simple" repetitions="500" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>runnr</metric>
+        <metric>stockA</metric>
+        <metric>accumCatchYearly</metric>
+        <metric>accumProfitYearly</metric>
+        <metric>fisherSatisfactionMean</metric>
+        <metric>fisherSatisfactionSD</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="end-of-sim-in-years">
+          <value value="25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots-60-40-0&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="30"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;none&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="expQsTrawler-simple" repetitions="500" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>runnr</metric>
+        <metric>stockB</metric>
+        <metric>stockC</metric>
+        <metric>stockD</metric>
+        <metric>accumCatchYearly</metric>
+        <metric>accumProfitYearly</metric>
+        <metric>fisherSatisfactionMean</metric>
+        <metric>fisherSatisfactionSD</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="end-of-sim-in-years">
+          <value value="25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots-60-40-0&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="30"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;expertise&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="expQsCoastal-simple" repetitions="500" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>stockA</metric>
+        <metric>runnr</metric>
+        <metric>stockB</metric>
+        <metric>accumCatchYearly</metric>
+        <metric>accumProfitYearly</metric>
+        <metric>fisherSatisfactionMean</metric>
+        <metric>fisherSatisfactionSD</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="end-of-sim-in-years">
+          <value value="25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots-60-40-0&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="45"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;expertise&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="home-satisf-threshold">
+          <value value="0.5"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="whyNotArchipelagosTickly" repetitions="100" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>stockA</metric>
+        <metric>catchMean</metric>
+        <metric>notFishing</metric>
+        <metric>numLayingLow</metric>
+        <metric>numThinkFishIsScarce</metric>
+        <metric>numSatisfied</metric>
+        <metric>numLowCapital</metric>
+        <metric>badWeather</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="manual-output">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="end-of-sim">
+          <value value="9125"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="30"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-knowledge-distr">
+          <value value="&quot;fishingStyle&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;none&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All?">
+          <value value="true"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="count-visits">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="env_scenario">
+          <value value="&quot;hotspot-constant&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots&quot;"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="whyNotCoastalsTickly" repetitions="100" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>stockA</metric>
+        <metric>stockB</metric>
+        <metric>catchMean</metric>
+        <metric>notFishing</metric>
+        <metric>badWeather</metric>
+        <metric>numFishersWgoodSpot</metric>
+        <metric>percFishersWgoodSpot</metric>
+        <metric>numExpectNoProfit</metric>
+        <metric>numWantToBeHome</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="manual-output">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="end-of-sim">
+          <value value="9125"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="45"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-knowledge-distr">
+          <value value="&quot;fishingStyle&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;expertise&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All?">
+          <value value="true"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="count-visits">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="env_scenario">
+          <value value="&quot;hotspot-constant&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots&quot;"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="whyNotTrawlerTickly" repetitions="100" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>stockB</metric>
+        <metric>stockC</metric>
+        <metric>stockD</metric>
+        <metric>catchMean</metric>
+        <metric>notFishing</metric>
+        <metric>numExpectNoProfit</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="manual-output">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="end-of-sim">
+          <value value="9125"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="30"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-knowledge-distr">
+          <value value="&quot;fishingStyle&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;expertise&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All?">
+          <value value="true"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="count-visits">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="env_scenario">
+          <value value="&quot;hotspot-constant&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots&quot;"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="expQsArchipelago-FuelSubs" repetitions="250" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>runnr</metric>
+        <metric>stockA</metric>
+        <metric>accumCatchYearly</metric>
+        <metric>accumProfitYearly</metric>
+        <metric>fisherSatisfactionMean</metric>
+        <metric>fisherSatisfactionSD</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="end-of-sim-in-years">
+          <value value="25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots-60-40-0&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="30"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+          <value value="0.5"></value>
+          <value value="0.75"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;none&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="expQsCoastal-FuelSubs" repetitions="250" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>stockA</metric>
+        <metric>runnr</metric>
+        <metric>stockB</metric>
+        <metric>accumCatchYearly</metric>
+        <metric>accumProfitYearly</metric>
+        <metric>fisherSatisfactionMean</metric>
+        <metric>fisherSatisfactionSD</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="end-of-sim-in-years">
+          <value value="25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots-60-40-0&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="45"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+          <value value="0.5"></value>
+          <value value="0.7"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;expertise&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="home-satisf-threshold">
+          <value value="0.5"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+    <experiment name="expQsTrawler-FuelSubs" repetitions="250" sequentialRunOrder="true" runMetricsEveryStep="true">
+      <setup>setup</setup>
+      <go>go</go>
+      <metrics>
+        <metric>runnr</metric>
+        <metric>stockB</metric>
+        <metric>stockC</metric>
+        <metric>stockD</metric>
+        <metric>accumCatchYearly</metric>
+        <metric>accumProfitYearly</metric>
+        <metric>fisherSatisfactionMean</metric>
+        <metric>fisherSatisfactionSD</metric>
+      </metrics>
+      <constants>
+        <enumeratedValueSet variable="end-of-sim-in-years">
+          <value value="25"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="spatial-representation">
+          <value value="&quot;hotspots-60-40-0&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="init-stock-size">
+          <value value="&quot;halfCarryingCap&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="offshore-trawler-fisher">
+          <value value="36"></value>
+          <value value="10"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="coastal-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="archipelago-fisher">
+          <value value="0"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fuel-subsidy">
+          <value value="0"></value>
+          <value value="0.25"></value>
+          <value value="0.5"></value>
+          <value value="0.75"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="socialInfluence">
+          <value value="&quot;expertise&quot;"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="bad-weather-probability">
+          <value value="0.1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-spatial-length">
+          <value value="20"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="memory-time-length">
+          <value value="365"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="ecologyOnly">
+          <value value="false"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="fish-price">
+          <value value="1"></value>
+        </enumeratedValueSet>
+        <enumeratedValueSet variable="repr4All">
+          <value value="1"></value>
+        </enumeratedValueSet>
+      </constants>
+    </experiment>
+  </experiments>
+</model>

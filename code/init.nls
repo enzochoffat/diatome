@@ -1,0 +1,381 @@
+;;;;;;;;;;;;;; SETUP PROCEDURES - INITIALISE THE SIMULATION ;;;;;;;;;;;;;;
+
+;; Creates the world: agents - fishers and resource - cod
+to setup
+  clear-all
+  init-vars
+  make-sea-and-fish
+  make-fishers
+  update-layout
+  reset-ticks
+  update-response-vars-tickly
+  set runnr 0
+end
+
+;; Initialises the global constants and variables
+to init-vars 
+  ;; constants
+  set A "regionA"
+  set B "regionB"
+  set C "regionC"
+  set D "regionD"
+
+  set MAXXABC 25
+  set MAXXD 50
+  set MAXYA 8
+  set MAXYB 24
+  set MAXYCD 56
+
+  set MINXABC 0
+  set MINXD MAXXABC
+  set MINYA 0
+  set MINYB 8
+  set MINYCD 24
+
+  set NULL "none"
+  set LOW "low"
+  set MEDIUM "medium"
+  set HIGH "high"
+  set MEDIUM-HIGH "medium-high"
+  set LOW-MEDIUM "low-medium"
+
+  set WEEK 7         ; 365/52
+  set MONTH WEEK * 4
+  set SEASON MONTH * 3
+  set HALFYEAR MONTH * 6  
+  set YEAR 365
+  
+  set end-of-sim end-of-sim-in-years * YEAR
+  
+  set IS-A-CROWD 2
+
+  ;COSTS AFTER CALIBRATION 23.02.16
+  set LOW-COST-EXISTANCE 0.5 
+  set MEDIUM-COST-EXISTANCE 1
+  set HIGH-COST-EXISTANCE 5
+
+  set LOW-COST-ACTIVITY 0.5
+  set MEDIUM-COST-ACTIVITY 1
+  set HIGH-COST-ACTIVITY 5
+
+  set LOW-COST-TRAVEL 2.5
+  set MEDIUM-COST-TRAVEL 5 ;
+  set MEDIUM-COST-TRAVEL-BIGVESSEL 8;
+  set HIGH-COST-travel 15
+  
+  ;; Daily catcabilities - default
+   set CATCHABIL-AR 5
+   set CATCHABIL-CO 10
+   set CATCHABIL-TR 50
+  
+  if (spatial-representation = "hotspots-60-40-0") [    ;FIBE
+    set LOW-CARCAP 4   ;should be 600 
+    set MEDIUM-CARCAP 3276
+    set HIGH-CARCAP 8736
+  ]
+
+   ;; dynamic variables
+   set hotSpotsVisible false
+   set fishDensVisible false
+
+   set hotspots no-patches
+   set hotspotCentresA (patch-set patch 7 3 patch 16 3)
+   set hotspotCentresB (patch-set patch 3 19 patch 8 11 patch 19 11 patch 15 19)
+   set hotspotCentresC (patch-set patch 4 51 patch 21 51 patch 13 45 patch 3 39 patch 12 36 patch 22 40 patch 7 27 patch 19 27)
+   set hotspotCentresD (patch-set patch 30 51 patch 47 51 patch 37 45 patch 29 39 patch 46 39 patch 37 33 patch 31 27 patch 44 27)
+   
+   set badWeather false
+
+  ; response variables FIBE 1.0
+   set accumCatchYearly 0
+   set accumCatchA 0
+   set accumCatchB 0
+   set accumCatchC 0
+   set accumCatchD 0
+   set meanTimesFishing 0
+   set giniCatch 0
+   set giniProfit 0
+   set fishingAtA 0
+   set fishingAtB 0
+   set fishingAtC 0
+   set fishingAtD 0
+   set notFishing 0
+end
+
+;; Initialises the spatial environment of the fishery and the fish
+;; Each patch represents a fish stock. Patches are grouped to distinguishes 4 regions.
+;; These regions represent different spatial areas (further away + increasingly large) that connects more costs (travel + money) to fish there
+;; A = close + small region, B = medium far + bigger region, C = far-out + huge region, D = far-out but different sea + huge region)
+;; Each region has 3 hotspots, areas within a region with a higher density of fish.
+to make-sea-and-fish
+  ask patches [
+    set region NULL
+    set density LOW
+    set patch-carrying-capacity LOW-CARCAP
+    set regenAmount 0
+    set growth-rate repr4All
+    ifelse (spatial-representation = "baseline-no-hotspots") [
+      set patch-carrying-capacity 1000 ]
+    [ set patch-carrying-capacity (random 999) + 1] ; spatial-representation = "hotspots"
+    set fish-stock 0 ]
+
+  set regionA patches with [ pxcor >= MINXABC and pxcor < MAXXABC and pycor >= MINYA  and pycor < MAXYA ]   ; region of 25 x 8 = 200 patches
+  set regionB patches with [ pxcor >= MINXABC and pxcor < MAXXABC and pycor >= MINYB  and pycor < MAXYB ]   ; region of 25 x 16 = 400 patches
+  set regionC patches with [ pxcor >= MINXABC and pxcor < MAXXABC and pycor >= MINYCD and pycor < MAXYCD ]  ; region of 25 x 32 = 800 patches
+  set regionD patches with [ pxcor >= MINXD   and pxcor < MAXXD   and pycor >= MINYCD and pycor < MAXYCD ]  ; region of 25 x 32 = 800 patches
+  set land    patches with [ pxcor >= MINXD   and pxcor < MAXXD   and pycor >= MINYA  and pycor < MAXYB  ]
+
+  ask regionA [
+    set region A
+    set patch-carrying-capacity getRandomCarCap(LOW)
+  ]
+  ask regionB [
+    set region B
+    set patch-carrying-capacity getRandomCarCap(LOW)
+  ]
+  ask regionC [
+    set region C
+    set patch-carrying-capacity getRandomCarCap(LOW)
+  ]
+  ask regionD [
+    set region D
+    set patch-carrying-capacity getRandomCarCap(LOW)
+  ]
+
+  if(spatial-representation != "baseline-no-hotspots") [
+    makeHotSpots hotspotCentresA A
+    makeHotSpots hotspotCentresB B
+    makeHotSpots hotspotCentresC C
+    makeHotSpots hotspotCentresD D
+  ]
+  
+  set medHighDensSpotsA patch-set regionA with [ density != "low" ]
+  set medHighDensSpotsB patch-set regionB with [ density != "low" ]
+  set medHighDensSpotsC patch-set regionC with [ density != "low" ]
+  set medHighDensSpotsD patch-set regionD with [ density != "low" ]
+  set lowDensSpotsA patch-set regionA with [ density = "low"]
+  set lowDensSpotsB patch-set regionB with [ density = "low"]
+  set lowDensSpotsC patch-set regionC with [ density = "low"]
+  set lowDensSpotsD patch-set regionD with [ density = "low"]
+
+  ;set relevant variables
+  ;Regional carrying capacity used for the optimal management baseline: regional carrying capcity = SUM(patch carrying capacity);
+  set CARCAP-A sum [patch-carrying-capacity] of regionA   ; Region A (200 patches): 8736 * 10 (hig dens patches) + 3276 * 40 (med dens patches) + 4*150 (low dense patches) = 219000 CarCap for the whole region
+  set CARCAP-B sum [patch-carrying-capacity] of regionB  ; Region B (400 patches): 8736 * 20 + 3276 * 80 + 4*300 = 438000 CarCap for the whole region
+  set CARCAP-C sum [patch-carrying-capacity] of regionC   ; Region C/D (each 800 patches): 8736 * 40 + 3276 * 160 + 4 *600 = 876000 CarCap for the whole region
+  set CARCAP-D sum [patch-carrying-capacity] of regionD   ; 1095000
+  ;msy stock for the benchmark scenario = half carryingCapacity
+  set MSY-STOCK-A round (CARCAP-A / 2)    
+  set MSY-STOCK-B round (CARCAP-B / 2)    
+  set MSY-STOCK-C round (CARCAP-C / 2)  
+  set MSY-STOCK-D round (CARCAP-D / 2)  
+  
+  ;place the fish in the seas
+  let factor -1
+  if (init-stock-size = "carryingCap")[ set factor 1 ]        ;show "init-stock-size = carryingCap"
+  if (init-stock-size = "halfCarryingCap")[ set factor 0.5 ]  ;show "init-stock-size = halfcarryingCap"
+  if (init-stock-size = "quartCarryingCap")[ set factor 0.25 ]
+
+  ask patches with [ region != NULL ]
+  [ ifelse (init-stock-size = "random")
+    [ set fish-stock random PATCH-CARRYING-CAPACITY ]
+    [ if (factor = -1) [ print "Syst.err in make-sea-and-fish - intial setting of init-stocksize is not in the right format"]
+      set fish-stock round(factor * PATCH-CARRYING-CAPACITY) ]]
+end
+
+;; Creates the hotspots - high dense fish areas
+;; @param hotspotsCoreX Midpatch of the hotspot
+;; @param X Region
+to makeHotSpots [ hotspotsCoreX X ]
+  let htspts no-patches
+  ask hotspotsCoreX [
+    set htspts (patch-set htspts self)
+    ask neighbors [ ask neighbors [
+        set density MEDIUM
+        set patch-carrying-capacity getRandomCarCap(MEDIUM)
+      ]]
+    ask neighbors4 [
+      set density HIGH
+      set patch-carrying-capacity getRandomCarCap(HIGH) ]
+
+    set density HIGH
+    set patch-carrying-capacity getRandomCarCap(HIGH) ]
+
+  set hotspots (patch-set hotspots htspts)
+  if X = A [ set hotspotCentresA htspts ]
+  if X = B [ set hotspotCentresB htspts ]
+  if X = C [ set hotspotCentresC htspts ]
+  if X = D [ set hotspotCentresD htspts ]
+end
+
+;; Creates the fisher agents
+;; Fishers can be initialised based on 3 fishing styles, inspired by the fishing styles observed in the Baltic sea
+;; Source: Boonstra & Hentati-Sundberg (2016). Classifying fishers' behaviour. An invitation to fishing styles. Fish and Fisheries, 1–23. http://doi.org/10.1111/faf.12092
+to make-fishers
+  create-archipelagoStyle-fishers archipelago-fisher
+  create-coastalStyle-fishers coastal-fisher
+  create-offshoreStyle-fishers offshore-trawler-fisher
+  init-nonFishingStyle-vars
+  
+  set archipelagos turtles with [ myStyle = "archipelago" ]
+  set coastals turtles with [ myStyle = "coastal" ]
+  set trawlers turtles with [ myStyle = "trawler" ]
+  set numFishers count fishers
+end
+
+;; Creates and initialises the archipelago fishers
+to create-archipelagoStyle-fishers [ amount ]
+  create-fishers amount [
+    move-to one-of regionA
+    ;; constant & homogenous in this implementation
+    set myStyle "archipelago"
+    set collegues false
+    set technology false
+    set catch-ability CATCHABIL-AR
+    set cost-equipment LOW-COST-ACTIVITY
+    set cost-travel LOW-COST-TRAVEL
+    set cost-existance LOW-COST-EXISTANCE
+    set ffinding-knowledge getRandom HIGH ; init-knowledge distriubtion --- constant & heterogeneous in this implementation
+    set partner true                
+
+    ;; dynamic (and heterogeneous)
+    set regionPref A
+    set memory-goodSpotsA init-memory-goodSpots medHighDensSpotsA lowDensSpotsA ffinding-knowledge
+    set myLastFishSpot one-of memory-goodSpotsA
+    set memory-goodSpotsB no-patches
+    set memory-goodSpotsC no-patches
+    set memory-goodSpotsD no-patches
+    
+    set memory-visitedSpots sort memory-goodSpotsA ;random order but transforms agentset to a list
+    set memory-fishAtSpot []
+    let index 0
+    let memoriesCnt length memory-visitedSpots
+    while [ memoriesCnt > index] 
+      [ let fish-spot item index memory-visitedSpots
+        let patch-stock [ fish-stock ] of fish-spot
+        set memory-fishAtSpot lput patch-stock memory-fishAtSpot
+        set index index + 1 
+  ]]
+    ;show (sentence "create-archips: memory-visited spots [" memory-visitedSpots "] memory-fishAtspots [" memory-fishAtSpot "]")
+end
+
+;; Creates and initialises the coastal fishers
+to create-coastalStyle-fishers [ amount ]
+  create-fishers amount [
+    let myregion (patch-set regionA regionB)
+    move-to one-of myregion
+
+    ;; constant & homogenous in this implmentation
+    set myStyle "coastal"
+    set collegues true
+    set technology false 
+    set catch-ability CATCHABIL-CO
+    set cost-equipment MEDIUM-COST-ACTIVITY
+    set cost-travel MEDIUM-COST-TRAVEL
+    set cost-existance MEDIUM-COST-EXISTANCE  
+    set ffinding-knowledge getRandom MEDIUM-HIGH  ; initial knowledge distribution constant & heterogeneous in this implementation
+   
+    set partner true                          
+
+    set regionPref NULL
+    set myLastFishSpot one-of myregion
+
+    set memory-goodSpotsA init-memory-goodSpots medHighDensSpotsA lowDensSpotsA ffinding-knowledge
+    set memory-goodSpotsB init-memory-goodSpots medHighDensSpotsB lowDensSpotsB ffinding-knowledge
+    set memory-goodSpotsC no-patches
+    set memory-goodSpotsD no-patches
+     
+    set homeTime-satisfaction 1 - ((random 51) / 100) ; random value between 0.5 and 1
+    set growth-satisfaction 1 - ((random 51) / 100)
+  ]
+end
+
+;; Creates and initialises the trawler fishers
+to create-offshoreStyle-fishers [ amount ]
+  create-fishers amount [
+    let myregion (patch-set regionB regionC regionD)
+    move-to one-of myregion
+
+    ;; constant & homogenous in this implmentation
+    set myStyle "trawler"
+    set collegues true
+    set technology true
+    set catch-ability CATCHABIL-TR
+    set cost-equipment HIGH-COST-ACTIVITY
+    set cost-travel HIGH-COST-TRAVEL
+    set cost-existance HIGH-COST-EXISTANCE
+
+    ;; constant & heterogeneous in this implementation
+    set partner false 
+    set ffinding-knowledge getRandom MEDIUM-HIGH ; initial knowledge distribution constant & heterogeneous in this implementation
+    
+    ;; dynamic (and heterogeneous)  || region B but also C
+    set myLastFishSpot one-of myregion
+    set regionPref NULL
+
+    set memory-goodSpotsA no-patches
+    set memory-goodSpotsB init-memory-goodSpots medHighDensSpotsB lowDensSpotsB ffinding-knowledge
+    set memory-goodSpotsC init-memory-goodSpots medHighDensSpotsC lowDensSpotsC ffinding-knowledge
+    set memory-goodSpotsD init-memory-goodSpots medHighDensSpotsD lowDensSpotsD ffinding-knowledge
+  ]
+end
+
+;; Initialises the non fishingstyle variables of the agents
+to init-nonFishingStyle-vars
+   ask fishers [
+    set shape "boat"
+    set color black
+
+    set willFish true
+    set layLow false
+    set atHome true
+    set f_capital 0
+    set prev-capital 0
+    set cost cost-existance + cost-equipment + cost-travel
+    set satisfaction random 101 / 100 ; value between 0 and 1
+    set catch 0
+    set accumulatedCatch 0
+    set accumCatchThisYear 0
+    set profit 0
+    set accumulatedProfit 0
+    set accumProfitThisYear 0
+    set lowCatchCnt 0
+    set notAtSeaCnt 0
+    set atSea false
+    set gonefishing false
+    set jumped false
+    set thinkFishIsScarce false
+    set storingcapacity catch-ability
+    set fish-onboard 0
+
+    set memoryCatchTick []
+    set memory-catch []
+    set memory-catchA []
+    set memory-catchB []
+    set memory-catchC []
+    set memory-catchD []
+    set memory_profit []
+    set growth-perception []
+
+    set goodSpotToday 0
+    set cntWentFishing 0
+    set cntWentFishingPeriod 0
+    ]
+end
+
+;; Returns memory filled with patched reflecting the level of konweldge
+;; allows for a discrepancy between actual good spots in reality vs what a fisher thinks is a good spot for fishing
+;; depending on the level of fish finding knowledge the percentage of memory slots to be filled with correct spots
+to-report init-memory-goodSpots [ medHighDensSpotsX lowDensSpotsX findingAbility ]
+  let fillcnt min(list (count medHighDensSpotsX) memory-spatial-length)
+  set fillcnt min(list round(fillcnt * findingAbility))
+
+  let memory-goodSpots n-of fillcnt medHighDensSpotsX
+  let cnt memory-spatial-length - count memory-goodSpots
+  if ((cnt > 0) AND findingAbility < 0.67 ) [   ;more spaces need to be filled (to reflect 'non'-perfect knowledge)
+                                                 ;show (sentence "adding low density spots, there are not hotspots anymore")
+    let additionals n-of cnt lowDensSpotsX
+    report (patch-set memory-goodSpots additionals)
+  ]
+  report memory-goodSpots
+end

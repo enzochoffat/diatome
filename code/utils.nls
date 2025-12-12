@@ -1,0 +1,280 @@
+;;;;;; Util functions ;;;;;;
+
+;; Resets the output variables counters to 0
+to reset-counters
+  ask turtles [
+    set accumCatchThisYear 0
+    set accumProfitThisYear 0 
+    set goodSpotToday 0 
+    ]
+  set accumCatchYearly 0
+  set accumProfitYearly 0
+  ;show (sentence "after reset counters(" ticks "): accumCatch (A-D) =" accumCatchA " " accumCatchB " " accumCatchC " " accumCatchD)
+end
+
+;### SETTERS
+
+;; Calculates and sets the expectation an agent has based on its catch
+;; inbuild preference for region B,C,D when expectation is equal (aligning with the region costs)
+to set-catch-expectation-and-regionPref 
+  ifelse (empty? memory-catchA)
+  [ set expected-catchA catch-ability ]
+  [ set expected-catchA mean memory-catchA ]
+  ifelse (empty? memory-catchB)
+  [ set expected-catchB catch-ability ]
+  [ set expected-catchB mean memory-catchB ]
+  ifelse (empty? memory-catchC)
+  [ set expected-catchC catch-ability ]
+  [ set expected-catchC mean memory-catchC ]
+  ifelse (empty? memory-catchD)
+  [ set expected-catchD catch-ability ]
+  [ set expected-catchD mean memory-catchD ]
+
+  set regionPref NULL
+  if (mystyle = "trawler") [
+  ifelse (expected-catchB >= expected-catchC) [
+    ifelse (expected-catchC >= expected-catchD)
+    [ set regionPref B ]
+    [ ifelse (expected-catchB >= expected-catchD)
+      [ set regionPref B ]
+      [ set regionPref D ]
+    ]]
+  [ ;expected-catchB < expected-catchC
+    ifelse (expected-catchC >= expected-catchD)
+    [ set regionPref C ]
+    [ set regionPref D ]
+  ]]
+  if (mystyle = "coastal") [
+    ifelse (expected-catchA >= expected-catchB)
+    [ set regionPref A ]
+    [ set regionPref B ]
+  ]
+
+  if regionPref = NULL [ print "Syst.err: Not all cases have been caught, regionPref is not properly set! in set-catch-expecation-and-regionPref" ]
+
+end
+
+
+;### Getters
+ 
+;; Returns the set with patches that given a particular region label
+;; @param rgn Region
+to-report getRegionPatchSet [ rgn ]
+  if ( rgn = A ) [ report regionA ]
+  if ( rgn = B ) [ report regionB ]
+  if ( rgn = C ) [ report regionC ]
+  if ( rgn = D ) [ report regionD ]
+end
+
+;; Returns the cost of existance for a fisher based on it's fishingstyle
+;; @param style Fishing style
+;; @report costs for existance
+to-report getMyExistCost [ style ]
+  if (style = "archipelago") [ report LOW-COST-EXISTANCE ] 
+  if (style = "coastal") [ report MEDIUM-COST-EXISTANCE ] 
+  if (style = "trawler") [ report HIGH-COST-EXISTANCE ] 
+  print (sentence "Syst.err. getMyExistCost received a mystyle = " style " that is not valid")
+end
+  
+;; Indicates whether it is the beginnign of the year, i.e. when the fish is most abundant
+;; assumed to be common knowledge of the fishers
+;; @report whether it is the beginning of the year (first month of the year)
+to-report beginning-season
+  let firstMonthOfTheYear ticks mod YEAR
+  ifelse (firstMonthOfTheYear < MONTH)
+  [ report true ]
+  [ report false ]
+end
+
+;; Returns a random value based on the level indicated
+;; low/medium/high knowledge -> value between 0-33%/34-66%/67-100%
+;; @param level Level being low, medium, low-medium, medium-high or high
+;; @report Random number 
+to-report getRandom [ level ]
+  let rnd random 34  ; random uniform value of 0-100
+  if (level = HIGH) [ report (rnd + 67) / 100 ]
+  if (level = MEDIUM) [ report (rnd + 34) / 100 ]
+  if (level = LOW) [ report (rnd) / 100 ]
+  if (level = MEDIUM-HIGH) [ 
+    set rnd random 67 
+    report (rnd + 34) / 100 ]
+  if (level = LOW-MEDIUM) [
+    set rnd random 67 
+    report rnd / 100 ]
+  
+  print (sentence "Syst.err getRandom() received invalid level value (" level " is not HIGH, MEDIUM OR LOW)")
+end
+
+;;Returns a random value for the carrying capacity of a patch within the low, medium or high range
+to-report getRandomCarCap [ level ]
+  let rndCarcap max(list 1 (random-normal LOW-CARCAP (sd-carcap * LOW-CARCAP)))
+  if (level = HIGH) [ 
+    set rndCarcap max(list 1 (random-normal HIGH-CARCAP (sd-carcap * HIGH-CARCAP))) ]
+  if (level = MEDIUM)[ 
+    set rndCarcap max(list 1 (random-normal MEDIUM-CARCAP (sd-carcap * MEDIUM-CARCAP))) ]
+  report round(rndCarcap)
+end
+
+;; Indicates the weather circumstances of that day based on a probility
+;; scenario settings:
+;; default setting is 14% of the time there is bad weather ~ corresponds with 2 days of bad weather every two weeks, estimate Jonas
+;; @report whether there is bad weather this tick
+to-report getWeather
+  let percentageBad bad-weather-probability
+  let rnd (random 101) / 100
+  ifelse (rnd >= percentageBad) 
+    [ report false ]  ; no badWeather
+    [ report true]  
+end
+
+;; Returns the carrying capacity of a patch given its density level and region
+;; @param level low medium or high
+;; @report carrying capacity
+to-report get-carryingCap-patch [ level ]
+  if level = LOW [ report LOW-CARCAP ]
+  if level = MEDIUM [ report MEDIUM-CARCAP ]
+  if level = HIGH [ report HIGH-CARCAP ]
+end
+
+;; Returns the  expected travel costs taken each region and the corresponding expected catch and fish wish into account and chooses the lowest costing area
+;; @param regX Region 1
+;; @param regY Region 2
+;; @param regX Region 3
+;; @param expectCatchX Expected catch in region 1
+;; @param expectCatchX Expected catch in region 2
+;; @param expectCatchX Expected catch in region 3
+;; @param fishWish The amount of fish the agent wants to catch
+;; @report expected travel cost
+to-report get-exp-travelcost [ regX regY regZ expectCatchX expectCatchY expectCatchZ fishWish ]
+  let expected-travel-cost NULL
+  ifelse (expectCatchX >= fishWish) [
+    set regionPref regX
+    set expected-travel-cost (getTravelCost regX myStyle) / 8
+  ]
+  [ ifelse (expectCatchY >= fishWish) [
+    set expected-travel-cost (getTravelCost regY myStyle)/ 2
+      set regionPref regY ]
+    [ ;if (expected-catchZ >= fishWish) [
+      set regionPref regZ
+      set expected-travel-cost (getTravelCost regY myStyle)/ 2
+  ] ]
+  report expected-travel-cost
+end
+  
+;;; VERIFICATION TESTS
+
+;; test whether memory of goodspot os working properly
+;; @param memSet Memory of goodspots
+;; @param fishingStyle Fishing style
+to check-memory-goodspots [ memSet fishingStyle ]
+  ;show memSet
+  if any? memSet = nobody [ print "this is not allowed" ]
+  if (fishingStyle = "trawler") [
+    if any? memSet with [ region != C AND region != D ] [
+      print "this agent has non-permitted patches in its memory" ]]
+  if (fishingStyle = "archipelago") [
+    if any? memSet with [ region != A ] [
+      print "this agent has non-permitted patches in its memory" ]]
+end
+
+;;; LAYOUT
+
+;; Updates the relevant viewer elements for the layout
+;; concerns the colour of the patches and the fishers
+to update-layout
+  if (layout) [
+    ifelse (showHotspots) [
+      ;colourRegions
+      ask regionA [ 
+        ;ifelse (density = HIGH)   ; shade of cyan
+        ifelse (fish-stock > MEDIUM-CARCAP) ; shade of cyan
+        [ set pcolor 83 ] 
+        [ ;ifelse (density = medium) 
+          ifelse (fish-stock > LOW-CARCAP) 
+          [set pcolor 84 ]
+          [ set pcolor 85 ]]
+      ]
+      ask regionB [ 
+        ;ifelse (density = HIGH)   ; shade of sky
+        ifelse (fish-stock > MEDIUM-CARCAP) ; shade of sky
+        [ set pcolor 93 ] 
+        [ ;ifelse (density = medium) 
+          ifelse (fish-stock > LOW-CARCAP) 
+          [ set pcolor 94 ]
+          [ set pcolor 95 ]]
+      ]
+      ask regionC [ 
+        ;ifelse (density = HIGH)   ; shade of blue
+        ifelse (fish-stock > MEDIUM-CARCAP) ; shade of blue
+        [ set pcolor 103 ] 
+        [ ;ifelse (density = medium) 
+          ifelse (fish-stock > LOW-CARCAP) 
+          [ set pcolor 104 ]
+          [ set pcolor 105 ]]
+      ]
+      ask regionD [ 
+        ;ifelse (density = HIGH)   ; shade of turquoise
+        ifelse (fish-stock > MEDIUM-CARCAP) ; shade of sky
+        [ set pcolor 73 ] 
+        [ ;ifelse (density = medium) 
+          ifelse (fish-stock > LOW-CARCAP) 
+          [set pcolor 74 ]
+          [ set pcolor 75 ]]]
+      set hotspotsVisible true
+    ]
+    [ if (not showHotspots and hotspotsVisible) [
+      colourRegions
+      ;TODO REMOVE? set fishDensVisible false
+      set hotspotsVisible false ]] 
+    
+    ask fishers [
+      ifelse (willfish = false) [
+        ;if myStyle = "archipelago" [ set color lime  ]  
+        ;if myStyle = "coastal" [  set color yellow ]
+        ;if myStyle = "trawler" [ set color magenta ]
+        set color black
+      ]
+      [ ifelse (gonefishing ) 
+        [ set color red ]
+        [ set color black ]]
+    ]] 
+end
+
+;; Colours the patches of each region in their own colour
+to colourRegions
+  ask regionA [ set pcolor cyan ]
+  ask regionB [ set pcolor sky ]
+  ask regionC [ set pcolor blue ]
+  ask regionD [ set pcolor turquoise ]
+end
+
+;; Returns a value rounded off to: 0, 0.5 or 1
+;; @param val A value 
+;; @report Rounded value
+to-report roundToPointFive [ val ]
+  if floor(val) = 0 [ report 0 ]
+  let residue val mod floor(val)
+  let val2 0.5
+
+  ifelse residue < 0.25
+  [ set val2 0 ]
+  [ if residue > 0.75
+    [ set val2 1 ]]
+
+  report floor(val) + val2
+end
+
+;; Subfunction to calculated the partial-sums, used for the GINI calculations
+;; adopted from https://subversion.american.edu/aisaac/notes/netlogo-intro.xhtml#plotting-gini-coefficient-and-lorenz-curve
+;; Written by Seth Tisue
+;; @param nums list of numbers
+;; @report sum of list of numbers
+to-report partial-sums [ nums ]
+  let total 0
+  let result []
+  foreach nums [ [x] ->
+    set total total + x
+    set result lput total result
+  ]
+  report result
+end
