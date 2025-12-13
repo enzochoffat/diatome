@@ -133,6 +133,22 @@ class FisherAgent(Agent):
         technology = True
         collegue = True
         partner = False
+        self.fFindingKnowledge = random.uniform(0.34, 0.67)
+        self.regionPreference = None
+        self.myLastFishSpot = random.choice(ZONE)
+        self.memoryGoodSpotsA = []
+        self.memoryGoodSpotsB = init_memory_good_spots(self.model.HOTSPOTS_B,
+                                                        low_dens_spots=[],
+                                                        finding_ability=self.fFindingKnowledge,
+                                                        memory_spatial_length=2)
+        self.memoryGoodSpotsC = init_memory_good_spots(self.model.HOTSPOTS_C,
+                                                        low_dens_spots=[],
+                                                        finding_ability=self.fFindingKnowledge,
+                                                        memory_spatial_length=2)
+        self.memoryGoodSpotsD = init_memory_good_spots(self.model.HOTSPOTS_D,
+                                                        low_dens_spots=[],
+                                                        finding_ability=self.fFindingKnowledge,
+                                                        memory_spatial_length=2)
 
 
 def init_memory_good_spots(med_high_dens_spots, low_dens_spots, finding_ability, memory_spatial_length):
