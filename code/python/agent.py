@@ -2,6 +2,8 @@ from mesa import Agent
 from model import *
 import random
 
+
+
 class FisherAgent(Agent):
     def __init__(self, model, style):
         super().__init__(model)
@@ -36,6 +38,28 @@ class FisherAgent(Agent):
         self.goodSpotToday = False # whether the fishing spot was good today
         self.counterWentFishing = 0 # counter for fishing trips
         self.counterFishingPeriod = 0 # counter for fishing periods
+        self.regionPreference = None # preferred fishing region
+        self.expectedCatchA = 0 # expected catch in region A
+        self.expectedCatchB = 0 # expected catch in region B
+        self.expectedCatchC = 0 # expected catch in region C
+        self.expectedCatchD = 0 # expected catch in region D
+        self.memoryGoodSpotsA = [] # memory of good spots in region A
+        self.memoryGoodSpotsB = [] # memory of good spots in region B
+        self.memoryGoodSpotsC = [] # memory of good spots in region C
+        self.memoryGoodSpotsD = [] # memory of good spots in region D
+        self.memoryFishAtSpot = [] # memory of fish at specific spots
+        self.memoryVisitedSpots = [] # memory of visited spots
+        self.fFindingKnowledge = 0 # knowledge about fish finding
+        self.movedToday = False # whether the agent moved today
+        self.myLastFishSpot = None # last fishing spot used
+        self.atSeaCounter = 0 # counter for days at sea
+        self.hitGoodSpotCounter = 0 # counter for hitting good spots
+        self.storingCapacity = 0 # capacity to store fish onboard
+        self.homeSatisfaction = random.uniform(0.5, 1) # satisfaction related to home conditions
+        self.growthSatisfaction = random.uniform(0.5, 1) # satisfaction related to growth conditions
+        self.expectedProfit = 0 # expected profit from fishing
+        self.wannaBeHome = False # desire to be at home
+
 
     def step(self):
         if self.style == "archipelago":
@@ -48,6 +72,7 @@ class FisherAgent(Agent):
             self.trawler()
 
     def archipelago(self):
+        # constants
         ZONE = [self.model.REGION_A]
         CATCHABILITY = self.model.CATCHABILITY_ARCHEPELAGO
         COST_EXISTENCE = self.model.LOW_COST_EXISTENCE
@@ -56,6 +81,23 @@ class FisherAgent(Agent):
         technology = False
         collegue = False
         partner = True
+        fFindingKnowledge = random.uniform(0.67, 1)
+
+        # dynamic
+        regionPreference = self.model.REGION_A
+        self.memoryGoodSpotsA = init_memory_good_spots(self.model.HOTSPOTS_A,
+                                                       low_dens_spots=[],
+                                                         finding_ability=fFindingKnowledge,
+                                                            memory_spatial_length=5) # un peu annecdotique je sais pas trop comment sont défini les paramètres de cette fonction
+        myLastFishSpot = random.choice(self.memoryGoodSpotsA) if self.memoryGoodSpotsA else None
+        self.memoryGoodSpotsB = []
+        self.memoryGoodSpotsC = []
+        self.memoryGoodSpotsD = []
+        self.memoryVisitedSpots = sorted(self.memoryGoodSpotsA)
+        self.memoryFishAtSpot = []
+        for fish_spot in self.memoryVisitedSpots:
+            patch_stock = fish_spot.fish_stock
+            self.memoryFishAtSpot.append(patch_stock)
 
     def coastal(self):
         ZONE = [self.model.REGION_A, self.model.REGION_B]
@@ -76,3 +118,26 @@ class FisherAgent(Agent):
         technology = True
         collegue = True
         partner = False
+
+
+def init_memory_good_spots(med_high_dens_spots, low_dens_spots, finding_ability, memory_spatial_length):
+    
+    # Calculate how many spots to remember based on available good spots and memory capacity
+    fillcnt = min(len(med_high_dens_spots), memory_spatial_length)
+    # Adjust based on finding ability (e.g., 0.8 ability = remember 80% of spots)
+    fillcnt = min(fillcnt, round(fillcnt * finding_ability))
+    
+    # Select random good spots to remember
+    memory_good_spots = random.sample(med_high_dens_spots, fillcnt) if fillcnt > 0 else []
+    
+    # Calculate remaining memory slots
+    cnt = memory_spatial_length - len(memory_good_spots)
+    
+    # If memory not full AND finding ability is low (<0.67), fill with "false positives"
+    # This simulates imperfect knowledge: fisher thinks some poor spots are good
+    if cnt > 0 and finding_ability < 0.67:
+        # Add poor spots to fill remaining memory
+        additionals = random.sample(low_dens_spots, min(cnt, len(low_dens_spots)))
+        memory_good_spots.extend(additionals)
+    
+    return memory_good_spots

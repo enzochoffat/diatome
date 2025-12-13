@@ -68,5 +68,11 @@ class FisheryModel(Model):
         self.CATCHABILITY_COASTAL = 10 # coastal
         self.CATCHABILITY_TRAWLER = 50 # trawler
 
+        # Define patchs 
+        self.HOTSPOTS_A = [[7, 3], [16, 3]] # high density spots in region A
+        self.HOTSPOTS_B = [[3, 19], [8, 11], [19, 11], [15, 19]] # high density spots in region B
+        self.HOTSPOTS_C = [[4, 51], [21, 51], [13, 45], [3, 39], [12, 36], [22, 40], [7, 27], [19, 27]] # high density spots in region C
+        self.HOTSPOTS_D = [[30, 51], [47, 51], [37, 45], [29, 39], [46, 39], [37, 33], [31, 27], [44, 27]] # high density spots in region D
+
         
     
