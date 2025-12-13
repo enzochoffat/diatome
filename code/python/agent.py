@@ -108,6 +108,21 @@ class FisherAgent(Agent):
         technology = False
         collegue = True
         partner = True
+        self.fFindingKnowledge = random.uniform(0.34, 0.67)
+        self.regionPreference = None
+        self.myLastFishSpot = random.choice(ZONE)
+        self.memoryGoodSpotsA = init_memory_good_spots(self.model.HOTSPOTS_A,
+                                                       low_dens_spots=[],
+                                                        finding_ability=self.fFindingKnowledge,
+                                                        memory_spatial_length=3)
+        self.memoryGoodSpotsB = init_memory_good_spots(self.model.HOTSPOTS_B,
+                                                       low_dens_spots=[],
+                                                        finding_ability=self.fFindingKnowledge,
+                                                        memory_spatial_length=3)
+        self.memoryGoodSpotsC = []
+        self.memoryGoodSpotsD = []
+        self.homeSatisfaction = random.uniform(0.5, 1)
+        self.growthSatisfaction = random.uniform(0.5, 1)
 
     def trawler(self):
         ZONE = [self.model.REGION_B, self.model.REGION_C, self.model.REGION_D]
