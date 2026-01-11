@@ -109,15 +109,15 @@ class FisheryModel(Model):
                 fish_stock = self.get_initial_fish_stock(x, y, region, density)
                 carrying_capacity = self.get_carrying_capacity(region, density)
                 
-        # Store patch attributes
-        self.patches[(x, y)] = {
-            'region' : region,
-            'density' : density,
-            'fish_stock' : fish_stock,
-            'carrying_capacity' : carrying_capacity,
-            'growth_rate' : self.GROWTH_RATE,
-            'regen_amount' : 0,
-            'patch_stock_after_regrowth' : fish_stock
+                # Store patch attributes
+                self.patches[(x, y)] = {
+                    'region' : region,
+                    'density' : density,
+                    'fish_stock' : fish_stock,
+                    'carrying_capacity' : carrying_capacity,
+                    'growth_rate' : self.GROWTH_RATE,
+                    'regen_amount' : 0,
+                    'patch_stock_after_regrowth' : fish_stock
             
         }
     
@@ -183,7 +183,7 @@ class FisheryModel(Model):
         elif density == self.MEDIUM:
             return self.MEDIUM_CARRYING_CAPACITY
         elif density == self.LOW:
-            return self.LOW
+            return self.LOW_CARRYING_CAPACITY
         else:
             return 0
         
@@ -193,12 +193,12 @@ class FisheryModel(Model):
             return 0
         
         carrying_capacity = self.get_carrying_capacity(region, density)
-        return round(carrying_capacity /2)
+        return round(carrying_capacity / 2)
     
     def get_region_stock(self, region_name):
         """Calculate total fish stock in a specific region"""
         total = 0
-        for pos, patch in self.patches.item():
+        for pos, patch in self.patches.items():
             if patch['region'] == region_name:
                 total += patch['fish_stock']
         return total
