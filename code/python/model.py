@@ -1,4 +1,6 @@
 from mesa import Model
+from mesa.space import MultiGrid
+from mesa.datacollection import DataCollector
 
 class FisheryModel(Model):
     def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler):
@@ -74,5 +76,168 @@ class FisheryModel(Model):
         self.HOTSPOTS_C = [[4, 51], [21, 51], [13, 45], [3, 39], [12, 36], [22, 40], [7, 27], [19, 27]] # high density spots in region C
         self.HOTSPOTS_D = [[30, 51], [47, 51], [37, 45], [29, 39], [46, 39], [37, 33], [31, 27], [44, 27]] # high density spots in region D
 
+        # Define growth rate
+        self.GROWTH_RATE = 0.1 # 10% per year
         
+        # Initialize spatial grid(50x56)
+        self.grid = MultiGrid(50, 56, torus=False)
+
+        # Initialize patches with fish stocks
+        self.init_patches()
+        
+        # Data collector
+        self.datacollector = DataCollector(
+            model_reporters={
+                "stock_A": lambda m: m.get_region_stock("A"),
+                "stock_B": lambda m: m.get_region_stock("B"),
+                "stock_C": lambda m: m.get_region_stock("C"),
+                "stock_D": lambda m: m.get_region_stock("D"),
+                "total_stock": lambda m: m.get_total_stock()
+            }
+        )
+        
+    def init_patches(self):
+        """Initialize all patches with region, density, and fish stock information"""
+        # Dictionary to store patch attributes
+        self.patches = {}
+        
+        # Initialize all patches in the grid
+        for x in range(self.grid.width):
+            for y in range(self.grid.height):
+                region = self.get_region(x, y)
+                density = self.get_density(x, y, region)
+                fish_stock = self.get_initial_fish_stock(x, y, region, density)
+                carrying_capacity = self.get_carrying_capacity(region, density)
+                
+        # Store patch attributes
+        self.patches[(x, y)] = {
+            'region' : region,
+            'density' : density,
+            'fish_stock' : fish_stock,
+            'carrying_capacity' : carrying_capacity,
+            'growth_rate' : self.GROWTH_RATE,
+            'regen_amount' : 0,
+            'patch_stock_after_regrowth' : fish_stock
+            
+        }
     
+    def get_region(self, x, y):
+        """Determine which region a coordinate belongs to"""
+        # Region A: x[0,25], y[0,8]
+        if 0 <= x < 25 and 0 <= y < 8:
+            return 'A'
+        # Region B: x[0,25], y[8,24]
+        elif 0 <= x < 25 and 8 <= y < 24:
+            return 'B'
+        # Region C: x[0,25], y[24,56]
+        elif 0 <= x < 25 and 24 <= y < 56:
+            return 'C'
+        # Region D: x[25,50], y[24,56]
+        elif 25 <= x < 50 and 24 <= y < 56:
+            return 'D'
+        # Land: x[25,50], y[0,24]
+        elif 25 <= x < 50 and 0 <= y < 24:
+            return 'LAND'
+        else:
+            return 'NULL'
+    
+    def get_density(self, x, y, region):
+        if region == 'LAND' or region == 'NULL':
+            return None
+        
+        coord = [x, y]
+        
+        # Check if coordinate is a hotspot center
+        hotspots = []
+        if region == 'A':
+            hotspots = self.HOTSPOTS_A
+        elif region == 'B':
+            hotspots = self.HOTSPOTS_B
+        elif region == 'C':
+            hotspots = self.HOTSPOTS_C
+        elif region == 'D':
+            hotspots = self.HOTSPOTS_D
+            
+        # if this is a hotspot center, it's high density
+        if coord in hotspots:
+            return self.HIGH
+        
+        # Check the proxinmity to hotspots (within radius 3 for example)
+        for hs in hotspots:
+            distance = ((x - hs[0])**2 + (y - hs[1])**2)**0.5
+            if distance <= 1.5:
+                return self.HIGH
+            elif distance <= 3:
+                return self.MEDIUM
+            
+        # Default to LOW density
+        return self.LOW
+    
+    def get_carrying_capacity(self, region, density):
+        """Get carrying capacity based on region and density"""
+        if region == "LAND" or region == "NULL":
+            return 0
+        
+        if density == self.HIGH:
+            return self.HIGH_CARRYING_CAPACITY
+        elif density == self.MEDIUM:
+            return self.MEDIUM_CARRYING_CAPACITY
+        elif density == self.LOW:
+            return self.LOW
+        else:
+            return 0
+        
+    def get_initial_fish_stock(self, x, y, region, density):
+        """Calculate initial fish stock for a patch"(half of carrying capacity MSY)"""
+        if region == "LAND" or region == "NULL":
+            return 0
+        
+        carrying_capacity = self.get_carrying_capacity(region, density)
+        return round(carrying_capacity /2)
+    
+    def get_region_stock(self, region_name):
+        """Calculate total fish stock in a specific region"""
+        total = 0
+        for pos, patch in self.patches.item():
+            if patch['region'] == region_name:
+                total += patch['fish_stock']
+        return total
+    
+    def get_total_stock(self):
+        """Calculate total fish stock across all regions"""
+        return sum(patch['fish_stock'] for patch in self.patches.values() if patch['region'] not in ["LAND", "NULL"])
+    
+    def update_fish_stock(self):
+        """Update fish stocks with yearly regrowth (logistic growth)"""
+        for pos, patch in self.patches.items():
+            if patch['region'] not in ["LAND", "NULL"]:
+                current_stock = patch['fish_stock']
+                carrying_capacity = patch['carrying_capacity']
+                growth_rate = patch['growth_rate']
+                
+                regen_amount = round(
+                    current_stock * growth_rate * (1 - current_stock/carrying_capacity)
+                )
+                
+                patch['regen_amount'] = regen_amount
+                patch['fish_stock'] = current_stock + regen_amount
+                patch['patch_stock_after_regrowth'] = patch['fish_stock']
+                
+    def get_patch_info(self, x, y):
+        """Get information about a specific patch"""
+        return self.patches.get((x, y), None)
+    
+    def reduce_stock(self, x, y, catch_amount):
+        "Reduce fish stock at a specific location due to fishing"
+        if (x, y) in self.patches:
+            patch = self.patches[(x, y)]
+            patch['fish_stock'] = max(0, patch['fish_stock'] - catch_amount)
+    
+    def step(self):
+        """Advance the model by one step"""
+        # Check if it's time for yearly update (every 365 ticks)
+        if self.schedule.steps % self.YEAR == 0:
+            self.update_fish_stock()
+            
+        # Collect data
+        self.datacollector.collect(self)       

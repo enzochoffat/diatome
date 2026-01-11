@@ -155,7 +155,7 @@ def init_memory_good_spots(med_high_dens_spots, low_dens_spots, finding_ability,
     
     # Calculate how many spots to remember based on available good spots and memory capacity
     fillcnt = min(len(med_high_dens_spots), memory_spatial_length)
-    # Adjust based on finding ability (e.g., 0.8 ability = remember 80% of spots)
+    # Adjust based on finding ability (0.8 = 80%)
     fillcnt = min(fillcnt, round(fillcnt * finding_ability))
     
     # Select random good spots to remember
