@@ -177,15 +177,23 @@ class FisheryModel(Model):
         """Get carrying capacity based on region and density"""
         if region == "LAND" or region == "NULL":
             return 0
-        
-        if density == self.HIGH:
+    
+        # Normaliser la densité pour la comparaison (case-insensitive)
+        if density is None:
+            return 0
+    
+        density_upper = density.upper() if isinstance(density, str) else str(density).upper()
+    
+        if density_upper == "HIGH":
             return self.HIGH_CARRYING_CAPACITY
-        elif density == self.MEDIUM:
+        elif density_upper == "MEDIUM":
             return self.MEDIUM_CARRYING_CAPACITY
-        elif density == self.LOW:
+        elif density_upper == "LOW":
             return self.LOW_CARRYING_CAPACITY
         else:
+            print(f"WARNING: Unknown density '{density}' for region {region}")
             return 0
+
         
     def get_initial_fish_stock(self, x, y, region, density):
         """Calculate initial fish stock for a patch"(half of carrying capacity MSY)"""
@@ -209,7 +217,11 @@ class FisheryModel(Model):
     
     def update_fish_stock(self):
         """Update fish stocks with yearly regrowth (logistic growth)"""
+        
+        growth_by_region = {"A": 0, "B": 0, "C": 0, "D": 0}
+        
         for pos, patch in self.patches.items():
+            region = patch['region']
             if patch['region'] not in ["LAND", "NULL"]:
                 current_stock = patch['fish_stock']
                 carrying_capacity = patch['carrying_capacity']
@@ -220,8 +232,32 @@ class FisheryModel(Model):
                 )
                 
                 patch['regen_amount'] = regen_amount
-                patch['fish_stock'] = current_stock + regen_amount
-                patch['patch_stock_after_regrowth'] = patch['fish_stock']
+                growth_by_region[region] += regen_amount
+        
+        # Check regional constraints before applying growth
+        for region in ["A", "B", "C", "D"]:
+            current_regional_stock = self.get_region_stock(region)
+            regional_capacity = self.get_region_carrying_capacity(region)
+            proposed_stock = current_regional_stock + growth_by_region[region]
+            
+            if proposed_stock > regional_capacity:
+                if growth_by_region[region] > 0:
+                    scale_factor = (regional_capacity - current_regional_stock) / growth_by_region[region]
+                    scale_factor = max(0, min(1, scale_factor))
+                else:
+                    scale_factor = 0
+                    
+                for pos, patch in self.patches.items():
+                    if patch['region'] == region:
+                        patch['regen_amount'] = round(patch['regen_amount'] * scale_factor)
+                        patch['fish_stock'] = patch['fish_stock'] + patch['regen_amount']
+                        patch['patch_stock_after_regrowth'] = patch['fish_stock']
+            
+            else:
+                for pos, patch in self.patches.items():
+                    if patch['region'] == region:
+                        patch['fish_stock'] = patch['fish_stock'] + patch['regen_amount']
+                        patch['patch_stock_after_regrowth'] = patch['fish_stock']
                 
     def get_patch_info(self, x, y):
         """Get information about a specific patch"""
@@ -240,4 +276,58 @@ class FisheryModel(Model):
             self.update_fish_stock()
             
         # Collect data
-        self.datacollector.collect(self)       
+        self.datacollector.collect(self)
+    
+    def get_region_carrying_capacity(self, region_name):
+        """Get total carrying capacity for a region"""
+        capacities = {
+            "A": self.CARRYING_CAPACITY_A,
+            "B": self.CARRYING_CAPACITY_B,
+            "C": self.CARRYING_CAPACITY_C,
+            "D": self.CARRYING_CAPACITY_D,
+            "LAND": 0,
+            "NULL": 0
+        }
+        return capacities.get(region_name, 0)
+    
+    def reduce_stock(self, x, y, catch_amount):
+        """
+        Reduce fish stock at a specific locationdue to fishing.
+        Returns the actual amount caught.
+        """
+        if (x, y) in self.patches:
+            patch = self.patches[(x, y)]
+            current_stock = patch['fish_stock']
+            
+            # Can't catch more than available
+            actual_catch = min(catch_amount, current_stock)
+            
+            # Update stock
+            patch['fish_stock'] = max(0, current_stock - actual_catch)
+            
+            return actual_catch
+        
+        return 0
+    
+    def validate_regional_stocks(self):
+        """
+        Validate that regional stocks don't exceed their carrying capacities.
+        Returns a list of violations (empty if all OK)
+        """
+        
+        violation = []
+        
+        for region in ["A", "B", "C", "D"]:
+            current_stock = self.get_region_stock(region)
+            max_capacity = self.get_region_carrying_capacity(region)
+            
+            if current_stock > max_capacity:
+                violation.append({
+                    "region" : region,
+                    "current" : current_stock,
+                    "max": max_capacity,
+                    "excess": current_stock - max_capacity,
+                    "percentage": ((current_stock / max_capacity)*100)
+                })
+        return violation
+    
