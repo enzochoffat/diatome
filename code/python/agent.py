@@ -10,13 +10,29 @@ class FisherAgent(Agent):
         super().__init__(model)
         self.fisher_type = fisher_type # "archipelago", "coastal", "trawler"
         self.unique_id = unique_id
+        
         # Basic attributes
         self.wealth = 0
+        self.capital = 0
         self.age = random.randint(18, 65)
         self.days_at_sea = 0
         self.total_catch = 0
         self.total_profit = 0
         
+        # Trip tracking
+        self.accumulated_catch = 0
+        self.trip_cost = 0
+        self.days_in_current_trip = 0
+        
+        
+        # Decision variable
+        self.current_location = None
+        self.target_location = None
+        self.at_home = True
+        self.gone_fishing = False
+        self.will_fish = False
+        self.lay_low = False
+               
         # Type-specific attribute
         self._set_type_attributes()
         
@@ -28,11 +44,6 @@ class FisherAgent(Agent):
         self.good_spots_memory = {} # {(x,y): {'visits': n, 'avg_catch': x, 'last_visit': tick}}
         self.good_spots_threshold = 0.7
         
-        # Decision variable
-        self.current_location = None
-        self.target_location = None
-        self.days_in_current_trip = 0
-        
     def _set_type_attributes(self):
         """Set attributes specific to fisher type"""
         if self.fisher_type == "archipelago":
@@ -41,6 +52,7 @@ class FisherAgent(Agent):
             self.catchability = self.model.CATCHABILITY_ARCHEPELAGO
             self.accessible_regions = ["A"]
             self.lifestyle_preference = "high"
+            self.max_good_spots = 5
             
         elif self.fisher_type == "coastal":
             self.cost_existence = self.model.MEDIUM_COST_EXISTENCE
@@ -48,6 +60,7 @@ class FisherAgent(Agent):
             self.catchability = self.model.CATCHABILITY_COASTAL
             self.accessible_regions = ["A", "B"]
             self.lifestyle_preference = "medium"
+            self.max_good_spots = 3
             
         elif self.fisher_type == "trawler":
             self.cost_existence = self.model.HIGH_COST_EXISTENCE
@@ -55,6 +68,7 @@ class FisherAgent(Agent):
             self.catchability = self.model.CATCHABILITY_TRAWLER
             self.accessible_regions = ["A", "B", "C", "D"]
             self.lifestyle_preference = "low"
+            self.max_good_spots = 2
             
     def update_memory(self, trip_info):
         """
@@ -191,10 +205,236 @@ class FisherAgent(Agent):
         
         for location in location_to_remove:
             del self.good_spots_memory[location]
+    
+    def move_to(self, x, y):
+        """
+        Move agent to a specific location on the grid
+        
+        Args:
+            x, y: Target coordinates
+        """
+        
+        # Remove from current position if exists
+        if self.current_location:
+            self.model.grid.remove_agent(self)
+        
+        # Place at new position
+        self.model.grid.place_agent(self, (x, y))
+        self.current_location = (x, y)
+        
+    def calculate_travel_cost(self, from_pos, to_pos):
+        """
+        Calculate travel cost between two positions.
+        For now, simple distance-based cost.
+        
+        Args:
+            from_pos: (x, y) starting position
+            to_pos: (x, y) destination position
             
+        Returns:
+            float: Travel cost
+        """
+        if from_pos is None or to_pos is None:
+            return 0
+        
+        # Euclidean distance
+        dx = to_pos[0] - from_pos[0]
+        dy = to_pos[1] - from_pos[1]
+        distance = (dx**2 + dy**2)**0.5
+        
+        # Base travel cost per unit distance
+        travel_cost_per_unit = 1.0
+        
+        return distance * travel_cost_per_unit
+    
+    def go_fish(self, location):
+        """
+        Execute fishing at a specific location (single day trip for archipelago).
+        
+        Args:
+            location: (x, y) tuple of fishing spot
+            
+        Returns:
+            dict: Trip results with catch, costs, profit
+        """
+        # Get patch info
+        patch = self.model.get_patch_info(location[0], location[1])
+        
+        if not patch:
+            return {
+                'catch': 0,
+                'cost': self.cost_existence + self.cost_activity,
+                'profit': -(self.cost_activity + self.cost_existence),
+                'location': location
+            }
+        
+        # Calculate potential catch (min of catchability and available stock)
+        available_stock = patch['fish_stock']
+        potential_catch = min(self.catchability, available_stock)
+        
+        # Reduce stock in the model
+        actual_catch = self.model.reduce_stock(location[0], location[1], potential_catch)
+        
+        # Calculate costs
+        travel_cost = self.calculate_travel_cost(self.current_location, location)
+        total_cost = self.cost_existence + self. cost_activity + travel_cost
+        
+        # Calculate profit
+        price_per_catch = 1.0
+        revenue = actual_catch * price_per_catch
+        profit = revenue - total_cost
+        
+        # Updating agent state
+        self.accumulated_catch += actual_catch
+        self.total_catch += actual_catch
+        self.trip_cost += total_cost
+        self.days_at_sea += 1
+        
+        # Update memory for this spot
+        expected_catch = self.catchability
+        self.update_memory_good_spots(location, actual_catch, expected_catch)
+        
+        return {
+            'catch': actual_catch,
+            'costs': total_cost,
+            'profit': profit,
+            'location': location,
+            'revenue': revenue
+        }
+        
+    def select_fishing_spot(self, region=None):
+        """
+        Select a fishing spot based on memory (knowledge-based).
+        For archipelago: simple selection from good spots.
+        
+        Args:
+            region: Region to fish in (default: first accessible region)
+            
+        Returns:
+            (x, y) tuple or None
+        """
+        
+        if region is None:
+            region = self.accessible_regions[0] if self.accessible_regions else None
+            
+        if not region:
+            return None
+        
+        # Get good spots from memory
+        good_spots = self.get_good_spots(region=region, min_visits=1)
+        
+        if good_spots:
+            # Choose randomly among good spots
+            spot, memory = random.choice(good_spots)
+            return spot
+        else:
+            # Exploration
+            return self.explore_random_spot(region)
+        
+    def explore_random_spot(self, region):
+        """
+        Choose a random hotspot for exploration.
+        
+        Args:
+            region: Region to explore
+            
+        Returns:
+            (x, y) tuple or None
+        """
+        # Get hotspots for this region
+        if region == "A":
+            hotspots = self.model.HOTSPOTS_A
+        elif region == "B":
+            hotspots = self.model.HOTSPOTS_B
+        elif region == "C":
+            hotspots = self.model.HOTSPOTS_C
+        elif region == "D":
+            hotspots = self.model.HOTSPOTS_D
+        else:
+            return None
+        
+        if hotspots:
+            spot = random.choice(hotspots)
+            return tuple(spot)
+        
+        return None
+    
+    def execute_decision(self):
+        """
+        Execute the agent's fishing decision.
+        For archipelago (Step 4): simple single-day trip.
+        """
+        
+        if self.will_fish and not self.lay_low:
+            
+            target_spot = self.select_fishing_spot(region="A")
+            
+            if target_spot:
+                self.move_to(target_spot[0], target_spot[1])
+                
+                trip_result = self.go_fish(target_spot)
+                
+                self.capital += trip_result['profit']
+                self.wealth += trip_result['profit']
+                
+                trip_info = {
+                    'location': target_spot,
+                    'catch': trip_result['catch'],
+                    'cost': trip_result['costs'],
+                    'profit': trip_result['profit'],
+                    'days': 1,
+                    'tick': self.model.steps
+                }
+                self.update_memory(trip_info)
+                
+                # Update state
+                self.at_home = False
+                self.gone_fishing = True
+                
+                # Return home
+                self.return_home()
+            else:
+                self.stay_home()
+        else:
+            self.stay_home()
+    
+    def stay_home(self):
+        """
+        Agent stays home, pays only existence costs.
+        """
+        # Pay existence costs
+        daily_cost = self.cost_existence
+        self.capital -= daily_cost
+        self.wealth -= daily_cost
+        
+        # Update state
+        self.at_home = True
+        self.gone_fishing = False
+        
+    def return_home(self):
+        """
+        Agent returns home after fishing trip.
+        """
+        # Reset trip variables
+        self.accumulated_catch = 0
+        self.trip_cost = 0
+        self.days_in_current_trip = 0
+        
+        # Update state
+        self.at_home = True
+        self.gone_fishing = False
+        self.current_location = None
+        
+    def decide_to_fish_simple(self):
+        """
+        Simple decision: fish with 70% probability (for testing Step 4).
+        Will be replaced by satisfice_lifestyle() in Step 6.
+        """
+        self.will_fish = random.random() < 0.7
+        
     def step(self):
         """Execute one step of the agent"""
-        # to be implemented in step 4
-        pass      
+        self.decide_to_fish_simple()
+        self.execute_decision()      
             
-        
+    

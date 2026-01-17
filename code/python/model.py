@@ -302,7 +302,7 @@ class FisheryModel(Model):
         self.steps += 1
         
         # Check if it's time for yearly update (every 365 ticks)       
-        if self.schedule.steps % self.YEAR == 0:
+        if self.steps % self.YEAR == 0:
             self.update_fish_stock()
             
         # Collect data
