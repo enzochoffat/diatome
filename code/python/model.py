@@ -1,10 +1,14 @@
 from mesa import Model
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
+from agent import FisherAgent
 
 class FisheryModel(Model):
     def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler):
         super().__init__()
+        
+        self.steps = 0
+        
         self.num_archipelago = num_archipelago
         self.num_coastal = num_coastal
         self.num_trawler = num_trawler
@@ -85,6 +89,9 @@ class FisheryModel(Model):
         # Initialize patches with fish stocks
         self.init_patches()
         
+        self._recalculate_regional_capacities()
+        
+        self._create_agents()
         # Data collector
         self.datacollector = DataCollector(
             model_reporters={
@@ -95,7 +102,24 @@ class FisheryModel(Model):
                 "total_stock": lambda m: m.get_total_stock()
             }
         )
+    
+    def _create_agents(self):
+        """Create fisher agents of different types"""
         
+        agent_id = 0
+        
+        for _ in range(self.num_archipelago):
+            agent = FisherAgent(agent_id, self, "archipelago")
+            agent_id += 1
+            
+        for _ in range(self.num_coastal):
+            agent = FisherAgent(agent_id, self, "coastal")
+            agent_id += 1
+            
+        for _ in range(self.num_trawler):
+            agent = FisherAgent(agent_id, self, "trawler")
+            agent_id += 1
+       
     def init_patches(self):
         """Initialize all patches with region, density, and fish stock information"""
         # Dictionary to store patch attributes
@@ -271,7 +295,13 @@ class FisheryModel(Model):
     
     def step(self):
         """Advance the model by one step"""
-        # Check if it's time for yearly update (every 365 ticks)
+        
+        for agent in self.agents:
+            agent.step()
+            
+        self.steps += 1
+        
+        # Check if it's time for yearly update (every 365 ticks)       
         if self.schedule.steps % self.YEAR == 0:
             self.update_fish_stock()
             
@@ -331,3 +361,30 @@ class FisheryModel(Model):
                 })
         return violation
     
+    def _recalculate_regional_capacities(self):
+        """Recalculate regional carrying capacities based on actual patch distribution"""
+        for region in ["A", "B", "C", "D"]:
+            total_capacity = 0
+            for pos, patch in self.patches.items():
+                if patch['region'] == region:
+                    total_capacity += patch['carrying_capacity']
+            
+            # Update the capacity constants with actual values
+            if region == "A":
+                self.CARRYING_CAPACITY_A = total_capacity
+                self.MSY_STOCK_A = round(total_capacity / 2)
+            elif region == "B":
+                self.CARRYING_CAPACITY_B = total_capacity
+                self.MSY_STOCK_B = round(total_capacity / 2)
+            elif region == "C":
+                self.CARRYING_CAPACITY_C = total_capacity
+                self.MSY_STOCK_C = round(total_capacity / 2)
+            elif region == "D":
+                self.CARRYING_CAPACITY_D = total_capacity
+                self.MSY_STOCK_D = round(total_capacity / 2)
+        
+        print(f"Capacités régionales recalculées:")
+        print(f"  Region A: {self.CARRYING_CAPACITY_A} (MSY: {self.MSY_STOCK_A})")
+        print(f"  Region B: {self.CARRYING_CAPACITY_B} (MSY: {self.MSY_STOCK_B})")
+        print(f"  Region C: {self.CARRYING_CAPACITY_C} (MSY: {self.MSY_STOCK_C})")
+        print(f"  Region D: {self.CARRYING_CAPACITY_D} (MSY: {self.MSY_STOCK_D})")
