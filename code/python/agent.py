@@ -503,7 +503,8 @@ class FisherAgent(Agent):
             
         return self.bankrupt
     
-    def can_afford_trip(self)
+    def can_afford_trip(self):
+        pass
         
     def step(self):
         """Execute one step of the agent"""
