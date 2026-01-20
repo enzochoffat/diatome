@@ -42,10 +42,4 @@ desktop.ini
 *.tmp
 *.bak
 code/python/# Plan de Conversion NetLogo → Python.prompt.md
-test/test_agents.py
-test/test_fish_dynamic.py
-test/test_fish_stock.py
-test/test_multiple_agents.py
-code/python/test_fish_dynamic.py
-test/test_agent.py
-code/python/test_archipelago.py
+

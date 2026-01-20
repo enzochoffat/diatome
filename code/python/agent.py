@@ -13,11 +13,19 @@ class FisherAgent(Agent):
         
         # Basic attributes
         self.wealth = 0
-        self.capital = 0
+        self.capital = 1000
         self.age = random.randint(18, 65)
         self.days_at_sea = 0
         self.total_catch = 0
         self.total_profit = 0
+        self.total_cost = 0
+        self.total_revenue = 0
+        
+        # Economic 
+        self.bankrupt = False
+        self.years_active = 0
+        self.profitable_trip = 0
+        self.unprofitable_trip = 0
         
         # Trip tracking
         self.accumulated_catch = 0
@@ -431,6 +439,71 @@ class FisherAgent(Agent):
         Will be replaced by satisfice_lifestyle() in Step 6.
         """
         self.will_fish = random.random() < 0.7
+    
+    def calculate_profit(self, catch, costs):
+        """
+        Calculate profit from a fishing trip.
+        
+        Args:
+            catch (float): Amount of fish caught
+            costs (float): Total costs incurred
+            
+        Returns:
+            dict: Breakdown of profit calculation
+        """
+        price_per_unit = 1.0
+        
+        revenue = catch * price_per_unit
+        profit = revenue - costs
+        
+        return {
+            'revenue': revenue,
+            'cost': costs,
+            'profit': profit,
+            'catch': catch,
+            'price_per_unit': price_per_unit
+        }
+    
+    def update_finances(self, profit, costs, revenue):
+        """
+        Update agent's financial state.
+        
+        Args:
+            profit (float): Net profit from trip
+            costs (float): Total costs
+            revenue (float): Total revenue
+        """
+        
+        self.capital += profit
+        
+        self.total_profit += profit
+        self.total_cost += costs
+        self.total_revenue += revenue
+        self.wealth = self.capital
+        
+        if profit > 0:
+            self.profitable_trip += 1
+        else:
+            self.unprofitable_trip += 1
+            
+        if self.capital < 0 and not self.bankrupt:
+            self.bankrupt = True
+            print(f" Agent {self.unique_id} ({self.fisher_type}) est en faillite! Capital: {self.capital:.2f}")
+            
+    def check_bankrupt(self):
+        """
+        Check if agent should declare bankruptcy.
+        
+        Returns:
+            bool: True if bankrupt
+        """
+        
+        if self.capital < 0:
+            self.bankrupt = True
+            
+        return self.bankrupt
+    
+    def can_afford_trip(self)
         
     def step(self):
         """Execute one step of the agent"""
