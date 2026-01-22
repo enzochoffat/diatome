@@ -31,14 +31,27 @@ class FisherAgent(Agent):
         self.accumulated_catch = 0
         self.trip_cost = 0
         self.days_in_current_trip = 0
+        self.days_at_sea_current_trip = 0
         
         
         # Decision variable
         self.current_location = None
         self.target_location = None
+        self.current_region = None
         self.at_home = True
+        self.at_sea = False
         self.gone_fishing = False
         self.lay_low = False
+        self.lay_low_counter = 0
+        
+        # Decision-making attributes
+        self.region_preference = None
+        self.spot_selection_strategy = "knowledge"
+        
+        # Perception 
+        self.growth_perception = 0.0  # Perception croissance poissons
+        
+        
                
         # Type-specific attribute
         self._set_type_attributes()
@@ -396,6 +409,7 @@ class FisherAgent(Agent):
         
         if self.will_fish and not self.lay_low:
             
+            target_region = self.region_preference if self.region_preference else self.accessible_regions[0]
             target_spot = self.select_fishing_spot(region=self.accessible_regions[0])
             
             if target_spot:
@@ -417,7 +431,8 @@ class FisherAgent(Agent):
                     'cost': trip_result['costs'],
                     'profit': trip_result['profit'],
                     'days': 1,
-                    'tick': self.model.current_step
+                    'tick': self.model.current_step,
+                    'region': target_region
                 }
                 self.update_memory(trip_info)
                 
@@ -586,10 +601,7 @@ class FisherAgent(Agent):
         
         return base_cost
         
-    def step(self):
-        """Execute one step of the agent"""
-        self.decide_to_fish_simple()
-        self.execute_decision()      
+
           
 # ==================== ARCHIPELAGO DECISION ====================
 
@@ -607,8 +619,11 @@ class FisherAgent(Agent):
         weekly_needs = self.cost_existence * 7
         
         # Check if fish is perceived as scarce
-        fish_is_scarce = self.growth_perception < self.scarce_perception_threshold
-        
+        if len(self.memory) >= 10:
+            fish_is_scarce = self.growth_perception < (self.scarce_perception_threshold * 2)
+        else:
+            fish_is_scarce = False
+            
         # Check if in laylow mode
         if self.lay_low:
             self.lay_low_counter -= 1
@@ -619,7 +634,8 @@ class FisherAgent(Agent):
         
         # Decision logic
         needs_money = catches_last_week < weekly_needs or self.capital < 0
-        can_fish = not fish_is_scarce and not self.model.bad_weather
+        desperate = self.capital < 0
+        can_fish = not self.model.bad_weather and (not fish_is_scarce or desperate)
         
         self.will_fish = needs_money and can_fish
         
@@ -627,6 +643,26 @@ class FisherAgent(Agent):
         if self.will_fish:
             self.region_preference = "A"
             
+    def update_growth_perception(self):
+        """
+        Update perception of fish growth based on recent catches
+        """
+        if len(self.memory) >= 10:
+            # Compare recent catches (last 5) vs older catches (5 before that)
+            recent_catches = [trip['catch'] for trip in list(self.memory)[-5:]]
+            avg_recent = sum(recent_catches) / len(recent_catches)
+            
+            older_catches = [trip['catch'] for trip in list(self.memory)[-10:-5]]
+            avg_older = sum(older_catches) / len(older_catches) if older_catches else avg_recent
+            
+            if avg_older > 0:
+                self.growth_perception = (avg_recent - avg_older) / avg_older
+            else:
+                self.growth_perception = 0
+        else:
+            # Pas assez d'historique : perception neutre
+            self.growth_perception = 0 
+                
 # ==================== COASTAL DECISION ====================
 
     def optimise_lifestyle_and_growth(self):
@@ -634,27 +670,29 @@ class FisherAgent(Agent):
         Coastal decision model: Balance between lifestyle and profit
         Trade-off between staying home and maximizing catch
         """
-        
         # Calculate expected catches per region
         expected_catches = {}
         for region in self.accessible_regions:
             region_memory = [trip for trip in self.memory if trip.get('region') == region]
             if region_memory:
-                expected_catches[region] = statistics.mean(trip['catch'] for trip in region_memory[-30:])
+                # Weight recent trips more heavily
+                recent = region_memory[-30:] if len(region_memory) >= 30 else region_memory
+                expected_catches[region] = statistics.mean(trip['catch'] for trip in recent)
             else:
-                expected_catches[region] = self.catchability * 0.5 # Conservative estimate
-                
+                # Conservative estimate if no memory for this region
+                expected_catches[region] = self.catchability * 0.8
+        
         # Calculate expected costs per region
         expected_costs = {}
         for region in self.accessible_regions:
             travel_cost = self.get_travel_cost(region)
             expected_costs[region] = self.cost_existence + self.cost_activity + travel_cost
-            
+        
         # Calculate expected profits
         expected_profits = {}
         for region in self.accessible_regions:
             expected_profits[region] = expected_catches[region] - expected_costs[region]
-            
+        
         # Determine best region
         if expected_profits:
             self.region_preference = max(expected_profits, key=expected_profits.get)
@@ -662,21 +700,38 @@ class FisherAgent(Agent):
         else:
             self.region_preference = self.accessible_regions[0]
             max_profit = 0
-            
-        # Calculate satisfactions
-        recent_home_days = sum(1 for trip in list(self.memory)[-14:] if not trip.get('went_fishing', True))
-        satisfaction_home = recent_home_days / 14 if len(self.memory) >= 14 else 0.5
         
-        satisfaction_growth = max_profit / (self.cost_existence * 2) if max_profit > 0 else 0
+        # Calculate satisfactions
+        # Home satisfaction: how much time spent at home recently
+        recent_trips = list(self.memory)[-14:] if len(self.memory) >= 14 else list(self.memory)
+        if recent_trips:
+            went_fishing_count = sum(1 for trip in recent_trips if trip.get('profit', 0) != 0)
+            satisfaction_home = 1.0 - (went_fishing_count / len(recent_trips))
+        else:
+            satisfaction_home = 0.5
+        
+        # Growth satisfaction: potential profit vs needs
+        if max_profit > 0:
+            satisfaction_growth = max_profit / (self.cost_existence * 2)
+            satisfaction_growth = min(satisfaction_growth, 1.0)  # Cap at 1.0
+        else:
+            satisfaction_growth = 0
         
         # Decision logic
-        profit_wortwhile = max_profit > self.cost_existence
+        profit_worthwhile = max_profit > self.cost_existence
         growth_desire = satisfaction_growth > self.satisfaction_growth_threshold
         home_desire = satisfaction_home < self.satisfaction_home_threshold
         desperate = self.capital < 0
         can_fish = not self.model.bad_weather
         
-        self.will_fish = can_fish and profit_wortwhile and (growth_desire or home_desire or desperate)
+        if len(self.memory) < 5:
+            # Phase d'exploration initiale
+            self.will_fish = can_fish and profit_worthwhile
+        else:
+            # Phase normale
+            self.will_fish = can_fish and profit_worthwhile and (growth_desire or home_desire or desperate)
+
+
         
 # ==================== TRAWLER DECISION ====================
 
@@ -696,6 +751,7 @@ class FisherAgent(Agent):
         
         # Check if storage is full
         if self.fish_onboard >= self.storing_capacity:
+            # Must return home
             self.will_fish = False
             self.region_preference = None
             return
@@ -716,7 +772,7 @@ class FisherAgent(Agent):
             if profit > best_switch_profit:
                 best_switch_profit = profit
                 best_switch_region = region
-                
+        
         # Calculate profit if returning home
         days_at_sea = self.days_at_sea_current_trip
         avg_daily_profit = self.fish_onboard / days_at_sea if days_at_sea > 0 else 0
@@ -738,28 +794,27 @@ class FisherAgent(Agent):
             
     def _decide_while_at_home(self):
         """Decision logic when trawler is at home"""
-        
         # Calculate expected profits per region
-        expected_profit = {}
+        expected_profits = {}
         for region in self.accessible_regions:
             expected_catch = self._estimate_catch(region)
             travel_cost = self.get_travel_cost(region)
             total_cost = self.cost_existence + self.cost_activity + travel_cost
-            expected_profit[region] = expected_catch - total_cost
-            
+            expected_profits[region] = expected_catch - total_cost
+        
         # Find best region
-        if expected_profit:
-            best_region = max(expected_profit, key= expected_profit.get)
-            max_profit = expected_profit[best_region]
+        if expected_profits:
+            best_region = max(expected_profits, key=expected_profits.get)
+            max_profit = expected_profits[best_region]
             
-            # decide to go if profit exceed threshold
-            profit_threshold = self.cost_existence * 3 # Must be worth at least 3 days of esxistence
+            # Decide to go if profit exceeds threshold
+            profit_threshold = self.cost_existence * 3  # Must be worth at least 3 days of existence
             
             if max_profit > profit_threshold or self.capital < 0:
                 self.will_fish = True
                 self.region_preference = best_region
                 self.fish_onboard = 0
-                self.days_in_current_trip = 0
+                self.days_at_sea_current_trip = 0
                 self.jumped = False
             else:
                 self.will_fish = False
@@ -776,4 +831,163 @@ class FisherAgent(Agent):
         else:
             return self.catchability * 0.6
         
+    def land_fish(self):
+        """Land fish when returning home (trawler only)"""
+        if self.fisher_type == "trawler" and self.fish_onboard > 0:
+            revenue = self.fish_onboard
+            self.capital += revenue
+            self.wealth += revenue
+            self.total_catch += self.fish_onboard
+            
+            # Reset
+            self.fish_onboard = 0
+            self.days_in_current_trip = 0
+            self.jumped = False
+            
+# ==================== SPOT SELECTION ====================
+
+    def decide_fishSpot(self, region):
+        """
+        Main spot selection method
+        Routes to different strategies based on agent type and strategy
+        """
+        if not region:
+            return None
+        
+        # Trawler with technology uses uphill climbing
+        if self.fisher_type == "trawler" and hasattr(self, 'has_technology') and self.has_technology:
+            return self.get_fishSpot_uphill_climbing(region)
+        
+        # Route to strategy
+        if self.spot_selection_strategy == "knowledge":
+            return self.get_fishSpot_knowledge(region)
+        elif self.spot_selection_strategy == "expertise":
+            return self.get_fishSpot_expertise(region)
+        elif self.spot_selection_strategy == "descrpitive_norm":
+            return self.get_fishSpot_descriptive_norm(region)
+        else:
+            return self.get_fishSpot_knowledge(region)
+        
+    def get_fishSpot_knowledge(self, region):
+        """Select spot from memory (knowledge-based)"""
+        good_spots = self.get_good_spots(region)
+        
+        if good_spots:
+            spot, memory = random.choice(list(good_spots))
+            return spot
+        else:
+            return self.explore_random_spot(region)
+        
+    def get_fishSpot_expertise(self, region):
+        """Follow the most successful fisher (expertise-based)"""
+        # Find agents currently fishing in this region
+        fishing_agents = [a for a in self.model.agents 
+                        if a != self 
+                        and hasattr(a, 'gone_fishing') 
+                        and a.gone_fishing 
+                        and hasattr(a, 'current_region')
+                        and a.current_region == region]
+        
+        if fishing_agents:
+            # Find agent with highest total catch
+            expert = max(fishing_agents, key=lambda a: a.total_catch)
+            if hasattr(expert, 'pos') and expert.pos:
+                return expert.pos
+        
+        # Fallback to knowledge
+        return self.get_fishSpot_knowledge(region)
+
     
+    def get_fishSpot_descriptive_norm(self, region):
+        """Go where most fishers are (descriptive norm)"""
+        spot_with_most = self.fishspot_with_most_fishers(region)
+        
+        if spot_with_most:
+            return spot_with_most
+        else:
+            # Fallback to knowledge
+            return self.get_fishSpot_knowledge(region)
+        
+    def fishspot_with_most_fishers(self, region):
+        """Find the spot with the most fishers in a region"""
+        # Count agents per position
+        agent_counts = {}
+        for agent in self.model.agents:
+            if (agent != self 
+                and hasattr(agent, 'gone_fishing') 
+                and agent.gone_fishing
+                and hasattr(agent, 'current_region')
+                and agent.current_region == region 
+                and hasattr(agent, 'pos')
+                and agent.pos):
+                
+                pos = agent.pos
+                agent_counts[pos] = agent_counts.get(pos, 0) + 1
+        
+        if agent_counts:
+            return max(agent_counts, key=agent_counts.get)
+        else:
+            return None
+        
+    def get_fishSpot_uphill_climbing(self, region):
+        """
+        Trawler with technology: move to neighboring patch with highest stock
+        """
+        if self.pos:
+            neighbors = self.model.grid.get_neighborhood(
+                self.pos, more=True, include_center=True, radius=1
+            )
+            
+            valid_neighbors = []
+            for pos in neighbors:
+                patch = self.model.get_patch_info(pos[0], pos[1])
+                if patch and patch['region'] == region:
+                    valid_neighbors.append((pos, patch['fish_stock']))
+                    
+            if valid_neighbors:
+                best_spot = max(valid_neighbors, key=lambda x: x[1])
+                return best_spot[0]
+            
+        return self.get_fishSpot_knowledge(region)##
+    
+# ==================== HELPER METHODS ====================
+
+    def get_travel_cost(self, region):
+        """Calculate travel cost to a region"""
+        if region == "A":
+            return self.model.LOW_COST_TRAVEL
+        elif region == "B":
+            if self.fisher_type == "trawler":
+                return self.model.MEDIUM_COST_TRAVEL_BIGVESSEL
+            else:
+                return self.model.MEDIUM_COST_TRAVEL
+        elif region in ["C", "D"]:
+            return self.model.HIGH_COST_TRAVEL
+        else:
+            return 0
+        
+    def get_travel_cost_between_regions(self, from_region, to_region):
+        """Calculate cost to travel between two regions"""
+        return self.get_travel_cost(to_region) * 0.5
+    
+# ==================== MAIN DECISION METHOD ====================
+
+    def make_decision(self):
+        """
+        Main decision-making method
+        Routes to appropriate decision model based on fisher type
+        """
+        if self.fisher_type == "archipelago":
+            self.satisfice_lifestyle()
+        elif self.fisher_type == "coastal":
+            self.optimise_lifestyle_and_growth()
+        elif self.fisher_type == "trawler":
+            self.optimise_growth()
+        else:
+            self.will_fish = False
+            
+    def step(self):
+        """Execute one step of the agent"""
+        self.make_decision()
+        self.execute_decision()      
+        self.update_growth_perception()
