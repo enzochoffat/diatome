@@ -1,7 +1,7 @@
 from mesa import Agent
 from model import *
 import random
-
+import statistics
 
 
 class FisherAgent(Agent):
@@ -38,7 +38,6 @@ class FisherAgent(Agent):
         self.target_location = None
         self.at_home = True
         self.gone_fishing = False
-        self.will_fish = False
         self.lay_low = False
                
         # Type-specific attribute
@@ -51,6 +50,21 @@ class FisherAgent(Agent):
         # Spatial memory
         self.good_spots_memory = {} # {(x,y): {'visits': n, 'avg_catch': x, 'last_visit': tick}}
         self.good_spots_threshold = 0.7
+        
+        # Decision-making attributes
+        self.will_fish = False
+        self.region_preference = None
+        self.spot_selection_strategy = "knowledge"      
+        
+        # Threshold
+        self.satisfaction_home_threshold = 0.5
+        self.satisfaction_growth_threshold = 0.6
+        self.scarce_perception_threshold = -0.05
+        
+        # Trawler specific
+        self.fish_onboard = 0
+        self.storing_capacity = 5000 if fisher_type == "trawler" else 0
+        self.jumped = False # Changed region while at sea  
         
     def _set_type_attributes(self):
         """Set attributes specific to fisher type"""
@@ -120,13 +134,13 @@ class FisherAgent(Agent):
             total_visits = spot['visits']
             spot['avg_catch'] = (spot['avg_catch'] * total_visits + catch) / (total_visits + 1)
             spot['visits'] += 1
-            spot['last_visit'] = self.model.steps
+            spot['last_visit'] = self.model.current_step
             spot['efficiency'] = catch_efficiency
         else:
             self.good_spots_memory[location] = {
                 'avg_catch': catch,
                 'visits': 1,
-                'last_visit': self.model.steps,
+                'last_visit': self.model.current_step,
                 'efficiency': catch_efficiency
             }
         
@@ -203,7 +217,7 @@ class FisherAgent(Agent):
         Args:
             max_age_ticks (int): Maximum age in ticks before forgetting
         """
-        current_tick = self.model.steps
+        current_tick = self.model.current_step
         location_to_remove = []
         
         for location, memory in self.good_spots_memory.items():
@@ -269,10 +283,13 @@ class FisherAgent(Agent):
         patch = self.model.get_patch_info(location[0], location[1])
         
         if not patch:
+            costs = self.cost_existence + self.cost_activity
+            self.update_finances( -costs, costs, 0)
             return {
                 'catch': 0,
-                'cost': self.cost_existence + self.cost_activity,
-                'profit': -(self.cost_activity + self.cost_existence),
+                'costs': costs,
+                'profit': -costs,
+                'revenue': 0,
                 'location': location
             }
         
@@ -288,9 +305,14 @@ class FisherAgent(Agent):
         total_cost = self.cost_existence + self. cost_activity + travel_cost
         
         # Calculate profit
-        price_per_catch = 1.0
-        revenue = actual_catch * price_per_catch
-        profit = revenue - total_cost
+        profit_calc = self.calculate_profit(actual_catch, total_cost)
+        
+        # Update agent finances
+        self.update_finances(
+            profit_calc['profit'],
+            profit_calc['costs'],
+            profit_calc['revenue']
+        )
         
         # Updating agent state
         self.accumulated_catch += actual_catch
@@ -302,13 +324,7 @@ class FisherAgent(Agent):
         expected_catch = self.catchability
         self.update_memory_good_spots(location, actual_catch, expected_catch)
         
-        return {
-            'catch': actual_catch,
-            'costs': total_cost,
-            'profit': profit,
-            'location': location,
-            'revenue': revenue
-        }
+        return profit_calc
         
     def select_fishing_spot(self, region=None):
         """
@@ -373,17 +389,27 @@ class FisherAgent(Agent):
         For archipelago (Step 4): simple single-day trip.
         """
         
+        if self.bankrupt:
+            self.lay_low = True
+            self.will_fish = False
+            return
+        
         if self.will_fish and not self.lay_low:
             
-            target_spot = self.select_fishing_spot(region="A")
+            target_spot = self.select_fishing_spot(region=self.accessible_regions[0])
             
             if target_spot:
+                estimated_cost = self.estimate_trip_cost(target_spot)
+                
+                if not self.can_afford_trip(estimated_cost):
+                    print(f" Agent {self.unique_id} cannot afford trip (capital: {self.capital:.2f}, cost: {estimated_cost:.2f})")
+                    self.stay_home()
+                    return
+                
                 self.move_to(target_spot[0], target_spot[1])
                 
                 trip_result = self.go_fish(target_spot)
                 
-                self.capital += trip_result['profit']
-                self.wealth += trip_result['profit']
                 
                 trip_info = {
                     'location': target_spot,
@@ -391,7 +417,7 @@ class FisherAgent(Agent):
                     'cost': trip_result['costs'],
                     'profit': trip_result['profit'],
                     'days': 1,
-                    'tick': self.model.steps
+                    'tick': self.model.current_step
                 }
                 self.update_memory(trip_info)
                 
@@ -405,6 +431,30 @@ class FisherAgent(Agent):
                 self.stay_home()
         else:
             self.stay_home()
+            
+    def get_financial_summary(self):
+        """
+        Get summary of agent's financial state.
+        
+        Returns:
+            dict: Financial statistics
+        """
+        total_trips = self.profitable_trip + self.unprofitable_trip
+        
+        return {
+            'capital': self.capital,
+            'wealth': self.wealth,
+            'total_revenue': self.total_revenue,
+            'total_costs': self.total_cost,
+            'total_profit': self.total_profit,
+            'total_catch': self.total_catch,
+            'profitable_trips': self.profitable_trip,
+            'unprofitable_trips': self.unprofitable_trip,
+            'total_tripd': total_trips,
+            'success_rate': self.profitable_trip / total_trips if total_trips > 0 else 0,
+            'avg_profit_per_trip': self.total_profit / total_trips if total_trips > 0 else 0,
+            'bankrupt': self.b
+        }
     
     def stay_home(self):
         """
@@ -412,8 +462,8 @@ class FisherAgent(Agent):
         """
         # Pay existence costs
         daily_cost = self.cost_existence
-        self.capital -= daily_cost
-        self.wealth -= daily_cost
+        
+        self.update_finances(-daily_cost, daily_cost, 0)
         
         # Update state
         self.at_home = True
@@ -458,10 +508,11 @@ class FisherAgent(Agent):
         
         return {
             'revenue': revenue,
-            'cost': costs,
+            'costs': costs,
             'profit': profit,
             'catch': catch,
-            'price_per_unit': price_per_unit
+            'price_per_unit': price_per_unit,
+            'location': None,
         }
     
     def update_finances(self, profit, costs, revenue):
@@ -503,12 +554,226 @@ class FisherAgent(Agent):
             
         return self.bankrupt
     
-    def can_afford_trip(self):
-        pass
+    def can_afford_trip(self, estimated_cost):
+        """
+        Check if agent can afford a fishing trip.
+        
+        Args:
+            estimated_cost (float): Estimated cost of trip
+            
+        Returns:
+            bool: True if agent can afford
+        """
+        safety_buffer = self.cost_existence * 7
+        
+        return self.capital >= (estimated_cost + safety_buffer)
+    
+    def estimate_trip_cost( self, location= None):
+        """
+        Estimate the cost of a fishing trip.
+        
+        Args:
+            location (tuple): Target location (optional)
+            
+        Returns:
+            float: Estimated cost
+        """
+        base_cost = self.cost_activity + self.cost_existence
+        
+        if location and self.current_location:
+            travel_cost = self.calculate_travel_cost(self.current_location, location)
+            return base_cost + travel_cost
+        
+        return base_cost
         
     def step(self):
         """Execute one step of the agent"""
         self.decide_to_fish_simple()
         self.execute_decision()      
+          
+# ==================== ARCHIPELAGO DECISION ====================
+
+    def satisfice_lifestyle(self):
+        """
+        Archipelago decision model: Satisficing behavior
+        Fish only when necessary to meet basic needs
+        """
+        
+        # Calculate catches from last week
+        recent_memory = list(self.memory)[-7:] if len(self.memory) >= 7 else list(self.memory)
+        catches_last_week = sum(trip['catch'] for trip in recent_memory)
+        
+        # Calculate weekly needs
+        weekly_needs = self.cost_existence * 7
+        
+        # Check if fish is perceived as scarce
+        fish_is_scarce = self.growth_perception < self.scarce_perception_threshold
+        
+        # Check if in laylow mode
+        if self.lay_low:
+            self.lay_low_counter -= 1
+            if self.lay_low_counter <= 0:
+                self.lay_low = False
+            self.will_fish = False
+            return
+        
+        # Decision logic
+        needs_money = catches_last_week < weekly_needs or self.capital < 0
+        can_fish = not fish_is_scarce and not self.model.bad_weather
+        
+        self.will_fish = needs_money and can_fish
+        
+        # Set region (archipelago only access A)
+        if self.will_fish:
+            self.region_preference = "A"
             
+# ==================== COASTAL DECISION ====================
+
+    def optimise_lifestyle_and_growth(self):
+        """
+        Coastal decision model: Balance between lifestyle and profit
+        Trade-off between staying home and maximizing catch
+        """
+        
+        # Calculate expected catches per region
+        expected_catches = {}
+        for region in self.accessible_regions:
+            region_memory = [trip for trip in self.memory if trip.get('region') == region]
+            if region_memory:
+                expected_catches[region] = statistics.mean(trip['catch'] for trip in region_memory[-30:])
+            else:
+                expected_catches[region] = self.catchability * 0.5 # Conservative estimate
+                
+        # Calculate expected costs per region
+        expected_costs = {}
+        for region in self.accessible_regions:
+            travel_cost = self.get_travel_cost(region)
+            expected_costs[region] = self.cost_existence + self.cost_activity + travel_cost
+            
+        # Calculate expected profits
+        expected_profits = {}
+        for region in self.accessible_regions:
+            expected_profits[region] = expected_catches[region] - expected_costs[region]
+            
+        # Determine best region
+        if expected_profits:
+            self.region_preference = max(expected_profits, key=expected_profits.get)
+            max_profit = expected_profits[self.region_preference]
+        else:
+            self.region_preference = self.accessible_regions[0]
+            max_profit = 0
+            
+        # Calculate satisfactions
+        recent_home_days = sum(1 for trip in list(self.memory)[-14:] if not trip.get('went_fishing', True))
+        satisfaction_home = recent_home_days / 14 if len(self.memory) >= 14 else 0.5
+        
+        satisfaction_growth = max_profit / (self.cost_existence * 2) if max_profit > 0 else 0
+        
+        # Decision logic
+        profit_wortwhile = max_profit > self.cost_existence
+        growth_desire = satisfaction_growth > self.satisfaction_growth_threshold
+        home_desire = satisfaction_home < self.satisfaction_home_threshold
+        desperate = self.capital < 0
+        can_fish = not self.model.bad_weather
+        
+        self.will_fish = can_fish and profit_wortwhile and (growth_desire or home_desire or desperate)
+        
+# ==================== TRAWLER DECISION ====================
+
+    def optimise_growth(self):
+        """
+       Trawler decision model: Pure profit maximization
+       Multi-day trips with storage capacity
+       """
+        if self.at_sea:
+            self._decide_while_at_sea()
+        else:
+            self._decide_while_at_home()
+            
+    def _decide_while_at_sea(self):
+        """Decision logic when trawler is already at sea"""
+        current_region = self.region_preference
+        
+        # Check if storage is full
+        if self.fish_onboard >= self.storing_capacity:
+            self.will_fish = False
+            self.region_preference = None
+            return
+        
+        # Calculate profit if staying
+        expected_catch_stay = self._estimate_catch(current_region)
+        profit_stay = expected_catch_stay - self.cost_activity
+        
+        # Calculate profit if switching region
+        other_regions = [r for r in self.accessible_regions if r != current_region]
+        best_switch_profit = 0
+        best_switch_region = None
+        
+        for region in other_regions:
+            expected_catch = self._estimate_catch(region)
+            travel_cost = self.get_travel_cost_between_regions(current_region, region)
+            profit = expected_catch - self.cost_activity - travel_cost
+            if profit > best_switch_profit:
+                best_switch_profit = profit
+                best_switch_region = region
+                
+        # Calculate profit if returning home
+        days_at_sea = self.days_at_sea_current_trip
+        avg_daily_profit = self.fish_onboard / days_at_sea if days_at_sea > 0 else 0
+        profit_return = avg_daily_profit - self.cost_existence
+        
+        # Make decision
+        if best_switch_profit > profit_stay and best_switch_profit > profit_return:
+            # Switch region
+            self.region_preference = best_switch_region
+            self.jumped = True
+            self.will_fish = True
+        elif profit_stay > profit_return:
+            # Stay in current region
+            self.will_fish = True
+        else:
+            # Return home
+            self.will_fish = False
+            self.region_preference = None
+            
+    def _decide_while_at_home(self):
+        """Decision logic when trawler is at home"""
+        
+        # Calculate expected profits per region
+        expected_profit = {}
+        for region in self.accessible_regions:
+            expected_catch = self._estimate_catch(region)
+            travel_cost = self.get_travel_cost(region)
+            total_cost = self.cost_existence + self.cost_activity + travel_cost
+            expected_profit[region] = expected_catch - total_cost
+            
+        # Find best region
+        if expected_profit:
+            best_region = max(expected_profit, key= expected_profit.get)
+            max_profit = expected_profit[best_region]
+            
+            # decide to go if profit exceed threshold
+            profit_threshold = self.cost_existence * 3 # Must be worth at least 3 days of esxistence
+            
+            if max_profit > profit_threshold or self.capital < 0:
+                self.will_fish = True
+                self.region_preference = best_region
+                self.fish_onboard = 0
+                self.days_in_current_trip = 0
+                self.jumped = False
+            else:
+                self.will_fish = False
+        else:
+            self.will_fish = False
+            
+    def _estimate_catch(self, region):
+        """Estimate expected catch in a region based on memory"""
+        region_memory = [trip for trip in self.memory if trip.get('region') == region]
+        if region_memory:
+            # Weight recent trips more
+            recent = region_memory[-10:]
+            return statistics.mean(trip['catch'] for trip in recent)
+        else:
+            return self.catchability * 0.6
+        
     

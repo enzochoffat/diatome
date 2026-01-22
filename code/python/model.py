@@ -2,13 +2,15 @@ from mesa import Model
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
 from agent import FisherAgent
+import random
 
 class FisheryModel(Model):
     def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler):
         super().__init__()
         
-        self.steps = 0
-        
+        self.current_step = 0
+        self.end_of_sim = end_of_sim
+
         self.num_archipelago = num_archipelago
         self.num_coastal = num_coastal
         self.num_trawler = num_trawler
@@ -20,6 +22,10 @@ class FisheryModel(Model):
         self.HALFYEAR = 168
         self.YEAR = 365
         self.end_of_sim = end_of_sim
+        
+        # Weather tracking
+        self.bad_weather = False
+        self.bad_weather_probability = 0.1
 
         # Define spatial constants
         self.REGION_A = [[0, 25], [0, 8]]
@@ -95,11 +101,38 @@ class FisheryModel(Model):
         # Data collector
         self.datacollector = DataCollector(
             model_reporters={
+                # Fish stocks
                 "stock_A": lambda m: m.get_region_stock("A"),
                 "stock_B": lambda m: m.get_region_stock("B"),
                 "stock_C": lambda m: m.get_region_stock("C"),
                 "stock_D": lambda m: m.get_region_stock("D"),
-                "total_stock": lambda m: m.get_total_stock()
+                "total_stock": lambda m: m.get_total_stock(),
+                
+                # Agent counts
+                "num_fishing": lambda m: sum(1 for a in m.agents if hasattr(a, 'gone_fishing') and a.gone_fishing),
+                "num_at_home": lambda m: sum(1 for a in m.agents if hasattr(a, 'at_home') and a.at_home),
+                
+                # Economic metrics
+                "avg_capital": lambda m: sum(a.capital for a in m.agents) / len(list(m.agents)) if len(list(m.agents)) > 0 else 0,
+                "total_catch": lambda m: sum(a.total_catch for a in m.agents),
+                "avg_catch": lambda m: sum(a.total_catch for a in m.agents) / len(list(m.agents)) if len(list(m.agents)) > 0 else 0,
+                
+                # Weather
+                "bad_weather": lambda m: 1 if m.bad_weather else 0,
+                
+                # Time
+                "current_step": lambda m: m.current_step,
+                "current_year": lambda m: m.current_step // m.YEAR,
+                "current-day-of-year": lambda m: m.current_step % m.YEAR,
+            },
+            agent_reporters={
+                "fisher_type": "fisher_type",
+                "capital": "capital",
+                "wealth": "wealth",
+                "total_catch": "total_catch",
+                "days_at_sea": "days_at_sea",
+                "at_home": "at_home",
+                "gone_fishing": "gone_fishing", 
             }
         )
     
@@ -294,19 +327,49 @@ class FisheryModel(Model):
             patch['fish_stock'] = max(0, patch['fish_stock'] - catch_amount)
     
     def step(self):
-        """Advance the model by one step"""
+        """
+        Advance the model by one step (one day).
         
+        Daily execution order:
+        1. Determine weather
+        2. Agents make decisions and execute actions
+        3. Collect data
+        4. (If end of year) Fish stock regeneration
+        5. Check simulation end condition
+        """
+        
+        # Determine weather
+        self.determine_weather()
+        
+        # All agent act
         for agent in self.agents:
             agent.step()
-            
-        self.steps += 1
         
-        # Check if it's time for yearly update (every 365 ticks)       
-        if self.steps % self.YEAR == 0:
+        # Increment step counter
+        self.current_step += 1
+        
+        # Yearly fish stock regeneration       
+        if self.current_step % self.YEAR == 0:
             self.update_fish_stock()
+            year = self.current_step // self.YEAR
+            print(f"Year {year} completed - Fish stocks regenerated")
+            
+            # Print yearly summary
+            total_stock = self.get_total_stock()
+            num_agents = len(list(self.agents))
+            avg_capital = sum(a.capital for a in self.agents) / num_agents if num_agents > 0 else 0
+            total_catch = sum(a.total_catch for a in self.agents)
+            
+            print(f" Total stock: {total_stock:,.0f}")
+            print(f" Avg capital: {avg_capital:,.2f}")
+            print(f" Total catch: {total_catch:,.0f}")
             
         # Collect data
         self.datacollector.collect(self)
+        
+        # Check if simulation should end
+        if self.current_step >= self.end_of_sim:
+            self.running = False
     
     def get_region_carrying_capacity(self, region_name):
         """Get total carrying capacity for a region"""
@@ -388,3 +451,68 @@ class FisheryModel(Model):
         print(f"  Region B: {self.CARRYING_CAPACITY_B} (MSY: {self.MSY_STOCK_B})")
         print(f"  Region C: {self.CARRYING_CAPACITY_C} (MSY: {self.MSY_STOCK_C})")
         print(f"  Region D: {self.CARRYING_CAPACITY_D} (MSY: {self.MSY_STOCK_D})")
+
+    def determine_weather(self):
+        """
+        Determine daily weather conditions (stochastic).
+        Bad weather occurs with 10% probability per day.
+        """
+        self.bad_weather = random.random() < self.bad_weather_probability
+        return self.bad_weather
+    
+    def run_model(self, steps=None):
+        """
+        Run the model for a specified number of steps or until end_of_sim.
+        
+        Args:
+            steps: Number of steps to run (if None, runs until end_of_sim)
+        """
+        
+        if steps is None:
+            steps = self.end_of_sim
+            
+        print(f"Starting simulation for {steps} days ({steps/self.YEAR:.1f} years)")
+        print(f"Agents: {self.num_archipelago} archipelago, {self.num_coastal} coastal, {self.num_trawler} trawler")
+        print("=" * 60) 
+        
+        for _ in range(steps):
+            self.step()
+            
+            # Print progress every month
+            if self.current_step % self.MONTH == 0:
+                month = self.current_step // self.MONTH
+                print(f"Month {month} - Day {self.current_step} - Stock A: {self.get_region_stock('A'):,.0f}")
+  
+            if not self.running:
+                break
+            
+        print("=" * 60)
+        print(f"Simulation completed after {self.current_step} days ({self.current_step/self.YEAR:.1f} years)")
+
+    def get_model_summary(self):
+        """
+        Get a summary of current model state.
+        
+        Returns:
+            dict: Summary statistics
+        """
+        
+        agents_list = list(self.agents)
+        num_agents = len(agents_list)
+        
+        return{
+            'current_step': self.current_step,
+            'current_year': self.current_step // self.YEAR,
+            'current_day': self.current_step % self.YEAR,
+            'num_agents': num_agents,
+            'num_fishing': sum(1 for a in agents_list if a.gone_fishing),
+            'num_at_home': sum(1 for a in agents_list if a.at_home),
+            'total_stock': self.get_total_stock(),
+            'stock_A': self.get_region_stock("A"),
+            'stock_B': self.get_region_stock("B"),
+            'stock_C': self.get_region_stock("C"),
+            'stock_D': self.get_region_stock("D"),
+            'total_catch': sum(a.total_catch for a in agents_list),
+            'avg_capital': sum(a.capital for a in agents_list) / num_agents if num_agents > 0 else 0,
+            'bad_weather': self.bad_weather
+        }
