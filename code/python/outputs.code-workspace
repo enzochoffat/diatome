@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "outputs",
+			"path": "../../../outputs"
+		},
+		{
+			"name": "diatome",
+			"path": "../.."
+		}
+	],
+	"settings": {}
+}
