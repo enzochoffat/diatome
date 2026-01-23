@@ -44,3 +44,5 @@ desktop.ini
 code/python/# Plan de Conversion NetLogo → Python.prompt.md
 
 code/python/test_helpers.py
+code/python/test_export_data.py
+.~lock.test_yearly_20260123_183613.csv#

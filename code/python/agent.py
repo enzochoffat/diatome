@@ -13,7 +13,7 @@ class FisherAgent(Agent):
         
         # Basic attributes
         self.wealth = 0
-        self.capital = 1000
+        self.capital = 1
         self.age = random.randint(18, 65)
         self.days_at_sea = 0
         self.total_catch = 0
@@ -374,10 +374,13 @@ class FisherAgent(Agent):
         
         # Updating agent state
         self.accumulated_catch += actual_catch
-        self.total_catch += actual_catch
+        #self.total_catch += actual_catch
         self.trip_cost += total_cost
         self.days_at_sea += 1
         
+        if self.fisher_type == "trawler":
+            self.fish_onboard += actual_catch
+            
         # Update memory for this spot
         expected_catch = self.catchability
         self.update_memory_good_spots(location, actual_catch, expected_catch)
@@ -461,7 +464,7 @@ class FisherAgent(Agent):
                 estimated_cost = self.estimate_trip_cost(target_spot)
                 
                 if not self.can_afford_trip(estimated_cost):
-                    print(f" Agent {self.unique_id} cannot afford trip (capital: {self.capital:.2f}, cost: {estimated_cost:.2f})")
+                    #print(f" Agent {self.unique_id} cannot afford trip (capital: {self.capital:.2f}, cost: {estimated_cost:.2f})")
                     self.stay_home()
                     return
                 
@@ -551,6 +554,8 @@ class FisherAgent(Agent):
         Agent returns home after fishing trip.
         Handles state updates and fish landing (for trawlers)
         """
+        if self.fisher_type in ["archipelago", "coastal"]:
+            self.total_catch += self.accumulated_catch
         if self.fisher_type == "trawler":
             self.land_fish()
             
@@ -587,7 +592,7 @@ class FisherAgent(Agent):
         Returns:
             dict: Breakdown of profit calculation
         """
-        price_per_unit = 1.0
+        price_per_unit = self.model.FISH_PRICE
         
         revenue = catch * price_per_unit
         profit = revenue - costs
@@ -639,7 +644,7 @@ class FisherAgent(Agent):
             self.bankrupt = True
             self.lay_low = True
             self.lay_low_counter = 30
-            print(f"Agent {self.unique_id} ({self.fisher_type}) is bankrupt!")
+            #print(f"Agent {self.unique_id} ({self.fisher_type}) is bankrupt!")
         elif self.capital < 0:
             if not self.lay_low:
                 if random.random() < 0.3:
@@ -680,7 +685,7 @@ class FisherAgent(Agent):
             
         total_cost = self.cost_activity + self.cost_existence + travel_cost
         
-        return travel_cost
+        return total_cost
 
           
 # ==================== ARCHIPELAGO DECISION ====================
@@ -695,6 +700,8 @@ class FisherAgent(Agent):
         recent_memory = list(self.memory)[-7:] if len(self.memory) >= 7 else list(self.memory)
         catches_last_week = sum(trip['catch'] for trip in recent_memory)
         
+        # Convert to revenue
+        revenue_last_week = catches_last_week * self.model.FISH_PRICE
         # Calculate weekly needs
         weekly_needs = self.cost_existence * 7
         
@@ -713,7 +720,7 @@ class FisherAgent(Agent):
             return
         
         # Decision logic
-        needs_money = catches_last_week < weekly_needs or self.capital < 0
+        needs_money = revenue_last_week < weekly_needs or self.capital < 0
         desperate = self.capital < 0
         can_fish = not self.model.bad_weather and (not fish_is_scarce or desperate)
         
@@ -766,12 +773,13 @@ class FisherAgent(Agent):
         expected_costs = {}
         for region in self.accessible_regions:
             travel_cost = self.get_travel_cost(region)
-            expected_costs[region] = self.cost_existence + self.cost_activity + travel_cost
+            expected_costs[region] = self.cost_existence + self.cost_activity + travel_cost    
         
         # Calculate expected profits
         expected_profits = {}
         for region in self.accessible_regions:
-            expected_profits[region] = expected_catches[region] - expected_costs[region]
+            expected_revenue = expected_catches[region] * self.model.FISH_PRICE
+            expected_profits[region] = expected_revenue - expected_costs[region]
         
         # Determine best region
         if expected_profits:
@@ -838,7 +846,8 @@ class FisherAgent(Agent):
         
         # Calculate profit if staying
         expected_catch_stay = self._estimate_catch(current_region)
-        profit_stay = expected_catch_stay - self.cost_activity
+        revenue_stay = expected_catch_stay * self.model.FISH_PRICE
+        profit_stay = revenue_stay - self.cost_activity
         
         # Calculate profit if switching region
         other_regions = [r for r in self.accessible_regions if r != current_region]
@@ -848,14 +857,15 @@ class FisherAgent(Agent):
         for region in other_regions:
             expected_catch = self._estimate_catch(region)
             travel_cost = self.get_travel_cost_between_regions(current_region, region)
-            profit = expected_catch - self.cost_activity - travel_cost
+            revenue = expected_catch * self.model.FISH_PRICE
+            profit = revenue - self.cost_activity - travel_cost
             if profit > best_switch_profit:
                 best_switch_profit = profit
                 best_switch_region = region
         
         # Calculate profit if returning home
         days_at_sea = self.days_at_sea_current_trip
-        avg_daily_profit = self.fish_onboard / days_at_sea if days_at_sea > 0 else 0
+        avg_daily_profit = (self.fish_onboard * self.model.FISH_PRICE) / days_at_sea if days_at_sea > 0 else 0
         profit_return = avg_daily_profit - self.cost_existence
         
         # Make decision
@@ -880,7 +890,8 @@ class FisherAgent(Agent):
             expected_catch = self._estimate_catch(region)
             travel_cost = self.get_travel_cost(region)
             total_cost = self.cost_existence + self.cost_activity + travel_cost
-            expected_profits[region] = expected_catch - total_cost
+            expected_revenue = expected_catch * self.model.FISH_PRICE
+            expected_profits[region] = expected_revenue - total_cost
         
         # Find best region
         if expected_profits:
@@ -914,9 +925,10 @@ class FisherAgent(Agent):
     def land_fish(self):
         """Land fish when returning home (trawler only)"""
         if self.fisher_type == "trawler" and self.fish_onboard > 0:
-            revenue = self.fish_onboard
+            revenue = self.fish_onboard * self.model.FISH_PRICE
             self.capital += revenue
             self.wealth += revenue
+            self.total_revenue += revenue
             self.total_catch += self.fish_onboard
             
             # Reset
