@@ -43,3 +43,4 @@ desktop.ini
 *.bak
 code/python/# Plan de Conversion NetLogo → Python.prompt.md
 
+code/python/test_helpers.py
