@@ -1,5 +1,5 @@
 from mesa import Agent
-from model import *
+from . import config
 import random
 import statistics
 
@@ -13,8 +13,8 @@ class FisherAgent(Agent):
         
         # Basic attributes
         self.wealth = 0
-        self.capital = 1
-        self.age = random.randint(18, 65)
+        self.capital = config.INITIAL_CAPITAL
+        self.age = random.randint(config.MIN_AGE, config.MAX_AGE)
         self.days_at_sea = 0
         self.total_catch = 0
         self.total_profit = 0
@@ -57,12 +57,12 @@ class FisherAgent(Agent):
         self._set_type_attributes()
         
         # Memory system
-        self.memory_size = 10 # Remenber last 10 fishing trips
+        self.memory_size = config.DEFAULT_MEMORY_SIZE
         self.memory = []
         
         # Spatial memory
         self.good_spots_memory = {} # {(x,y): {'visits': n, 'avg_catch': x, 'last_visit': tick}}
-        self.good_spots_threshold = 0.7
+        self.good_spots_threshold = config.GOOD_SPOT_EFFICIENCY_THRESHOLD
         
         # Decision-making attributes
         self.will_fish = False
@@ -70,13 +70,13 @@ class FisherAgent(Agent):
         self.spot_selection_strategy = "knowledge"      
         
         # Threshold
-        self.satisfaction_home_threshold = 0.5
-        self.satisfaction_growth_threshold = 0.6
-        self.scarce_perception_threshold = -0.05
+        self.satisfaction_home_threshold = config.SATISFACTION_HOME_THRESHOLD
+        self.satisfaction_growth_threshold = config.SATISFACTION_GROWTH_THRESHOLD
+        self.scarce_perception_threshold = config.SCARCE_PERCEPTION_THRESHOLD
         
         # Trawler specific
         self.fish_onboard = 0
-        self.storing_capacity = 5000 if fisher_type == "trawler" else 0
+        self.storing_capacity = config.TRAWLER_STORAGE_CAPACITY if fisher_type == "trawler" else 0
         self.jumped = False # Changed region while at sea  
         
     def _set_type_attributes(self):
@@ -322,10 +322,7 @@ class FisherAgent(Agent):
         dy = to_pos[1] - from_pos[1]
         distance = (dx**2 + dy**2)**0.5
         
-        # Base travel cost per unit distance
-        travel_cost_per_unit = 1.0
-        
-        return distance * travel_cost_per_unit
+        return distance * config.TRAVEL_COST_PER_UNIT
     
     def go_fish(self, location):
         """
@@ -573,13 +570,6 @@ class FisherAgent(Agent):
         self.accumulated_catch = 0
         self.trip_cost = 0
         self.days_in_current_trip = 0
-        
-    def decide_to_fish_simple(self):
-        """
-        Simple decision: fish with 70% probability (for testing Step 4).
-        Will be replaced by satisfice_lifestyle() in Step 6.
-        """
-        self.will_fish = random.random() < 0.7
     
     def calculate_profit(self, catch, costs):
         """
@@ -643,13 +633,13 @@ class FisherAgent(Agent):
         if self.capital <  bankruptcy_threshold:
             self.bankrupt = True
             self.lay_low = True
-            self.lay_low_counter = 30
+            self.lay_low_counter = config.BANKRUPTCY_LAYLOW_DAYS
             #print(f"Agent {self.unique_id} ({self.fisher_type}) is bankrupt!")
         elif self.capital < 0:
             if not self.lay_low:
-                if random.random() < 0.3:
+                if random.random() < config.NEGATIVE_CAPITAL_LAYLOW_PROBABILITY:
                     self.lay_low = True
-                    self.lay_low_counter = 7
+                    self.lay_low_counter = config.NEGATIVE_CAPITAL_LAYLOW_DAYS
     
     def can_afford_trip(self, cost):
         """
@@ -661,7 +651,7 @@ class FisherAgent(Agent):
         Returns:
             bool: True if agent can afford
         """
-        safety_buffer = self.cost_existence * 7
+        safety_buffer = config.get_safety_buffer(self.cost_existence)
         
         return self.capital + safety_buffer >= cost
     
@@ -697,7 +687,7 @@ class FisherAgent(Agent):
         """
         
         # Calculate catches from last week
-        recent_memory = list(self.memory)[-7:] if len(self.memory) >= 7 else list(self.memory)
+        recent_memory = list(self.memory)[-config.MEMORY_WEEKLY_WINDOW:] if len(self.memory) >= config.MEMORY_WEEKLY_WINDOW else list(self.memory)
         catches_last_week = sum(trip['catch'] for trip in recent_memory)
         
         # Convert to revenue
@@ -706,7 +696,7 @@ class FisherAgent(Agent):
         weekly_needs = self.cost_existence * 7
         
         # Check if fish is perceived as scarce
-        if len(self.memory) >= 10:
+        if len(self.memory) >= config.SCARCITY_MIN_MEMORY:
             fish_is_scarce = self.growth_perception < (self.scarce_perception_threshold * 2)
         else:
             fish_is_scarce = False
@@ -734,12 +724,12 @@ class FisherAgent(Agent):
         """
         Update perception of fish growth based on recent catches
         """
-        if len(self.memory) >= 10:
+        if len(self.memory) >= config.MEMORY_OLDER_WINDOW:
             # Compare recent catches (last 5) vs older catches (5 before that)
-            recent_catches = [trip['catch'] for trip in list(self.memory)[-5:]]
+            recent_catches = [trip['catch'] for trip in list(self.memory)[-config.MEMORY_RECENT_WINDOW:]]
             avg_recent = sum(recent_catches) / len(recent_catches)
             
-            older_catches = [trip['catch'] for trip in list(self.memory)[-10:-5]]
+            older_catches = [trip['catch'] for trip in list(self.memory)[-config.MEMORY_OLDER_WINDOW: -config.MEMORY_RECENT_WINDOW]]
             avg_older = sum(older_catches) / len(older_catches) if older_catches else avg_recent
             
             if avg_older > 0:
@@ -899,7 +889,7 @@ class FisherAgent(Agent):
             max_profit = expected_profits[best_region]
             
             # Decide to go if profit exceeds threshold
-            profit_threshold = self.cost_existence * 3  # Must be worth at least 3 days of existence
+            profit_threshold = self.cost_existence * config.TRAWLER_PROFIT_THRESHOLD_DAYS  # Must be worth at least 3 days of existence
             
             if max_profit > profit_threshold or self.capital < 0:
                 self.will_fish = True
@@ -1163,11 +1153,11 @@ class FisherAgent(Agent):
         Update agent's perception of fish scarcity
         Based on catch trends and memory
         """
-        if len(self.memory) < 10:
+        if len(self.memory) < config.SCARCITY_MIN_MEMORY:
             self.perceive_scarcity = False
             return
         
-        recent = list(self.memory)[-10:]
+        recent = list(self.memory)[-config.SCARCITY_MIN_MEMORY:]
         recent_catches = [t['catch'] for t in recent if t.get('went_fishing', True)]
         
         if not recent_catches:
@@ -1181,7 +1171,7 @@ class FisherAgent(Agent):
         if expected_catch > 0:
             catch_ratio = avg_recent_catch / expected_catch
             
-            self.perceive_scarcity = catch_ratio < 0.5
+            self.perceive_scarcity = catch_ratio < config.SCARCITY_CATCH_RATIO_THRESHOLD
         else:
             self.perceive_scarcity = False
             

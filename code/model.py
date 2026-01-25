@@ -1,14 +1,18 @@
 from mesa import Model
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
-from agent import FisherAgent
+from .agent import FisherAgent
+from . import config
 import random
 import pandas as pd
 from datetime import datetime
+import os
 
 class FisheryModel(Model):
-    def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler):
+    def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler, verbose=True):
         super().__init__()
+        
+        self.verbose = verbose
         
         self.current_step = 0
         self.end_of_sim = end_of_sim
@@ -18,83 +22,82 @@ class FisheryModel(Model):
         self.num_trawler = num_trawler
 
         # Define time constants
-        self.WEEK = 7
-        self.MONTH = 28
-        self.SEASON = 84
-        self.HALFYEAR = 168
-        self.YEAR = 365
-        self.end_of_sim = end_of_sim
+        self.WEEK = config.WEEK
+        self.MONTH = config.MONTH
+        self.SEASON = config.SEASON
+        self.HALFYEAR = config.HALFYEAR
+        self.YEAR = config.YEAR
         
         # Weather tracking
         self.bad_weather = False
-        self.bad_weather_probability = 0.1
+        self.bad_weather_probability = config.BAD_WEATHER_PROBABILITY
 
         # Define spatial constants
-        self.REGION_A = [[0, 25], [0, 8]]
-        self.REGION_B = [[0, 25], [8, 24]]
-        self.REGION_C = [[0, 25], [24, 56]]
-        self.REGION_D = [[25, 50], [24, 56]]
-        self.LAND = [[25, 50], [0, 24]]
+        self.REGION_A = config.REGION_A
+        self.REGION_B = config.REGION_B
+        self.REGION_C = config.REGION_C
+        self.REGION_D = config.REGION_D
+        self.LAND = config.LAND
 
         # Define level labels
-        self.LOW = "low"
-        self.MEDIUM = "medium"
-        self.HIGH = "high"
-        self.MEDIUM_HIGH = "medium_high"
-        self.LOW_MEDIUM = "low_medium"
+        self.LOW = config.LOW
+        self.MEDIUM = config.MEDIUM
+        self.HIGH = config.HIGH
+        self.MEDIUM_HIGH = config.MEDIUM_HIGH
+        self.LOW_MEDIUM = config.LOW_MEDIUM
 
         # Define cost existence values
-        self.LOW_COST_EXISTENCE = 0.5 # archepelago
-        self.MEDIUM_COST_EXISTENCE = 1.0 # coastal
-        self.HIGH_COST_EXISTENCE = 5.0 # trawler
+        self.LOW_COST_EXISTENCE = config.ARCHIPELAGO_COST_EXISTENCE # archepelago
+        self.MEDIUM_COST_EXISTENCE = config.COASTAL_COST_EXISTENCE # coastal
+        self.HIGH_COST_EXISTENCE = config.TRAWLER_COST_EXISTENCE # trawler
 
         # Define activity cost
-        self.LOW_COST_ACTIVITY = 0.5 # small equipment
-        self.MEDIUM_COST_ACTIVITY = 1.0 # medium equipment
-        self.HIGH_COST_ACTIVITY = 5.0 # industrial equipment
+        self.LOW_COST_ACTIVITY = config.ARCHIPELAGO_COST_ACTIVITY # small equipment
+        self.MEDIUM_COST_ACTIVITY = config.COASTAL_COST_ACTIVITY # medium equipment
+        self.HIGH_COST_ACTIVITY = config.TRAWLER_COST_ACTIVITY # industrial equipment
 
         # Define travel cost
-        self.LOW_COST_TRAVEL = 2.5 # go to region A
-        self.MEDIUM_COST_TRAVEL = 5.0 # go to region B
-        self.MEDIUM_COST_TRAVEL_BIGVESSEL = 8 # go to region B with trawler
-        self.HIGH_COST_TRAVEL = 15.0 # go to region C or D
+        self.LOW_COST_TRAVEL = config.LOW_COST_TRAVEL # go to region A
+        self.MEDIUM_COST_TRAVEL = config.MEDIUM_COST_TRAVEL # go to region B
+        self.MEDIUM_COST_TRAVEL_BIGVESSEL = config.MEDIUM_COST_TRAVEL_BIGVESSEL # go to region B with trawler
+        self.HIGH_COST_TRAVEL = config.HIGH_COST_TRAVEL # go to region C or D
         # self.COST_TRAVEL_B2C = 10.0 # go from region B to C
         # self.COST_TRAVEL_C2D = 10.0 # go from region C to D
         # self.COST_TRAVEL_B2D = 15.0 # go from region B to D
 
         # Define carring capacity
-        self.LOW_CARRYING_CAPACITY = 4 # poor patch
-        self.MEDIUM_CARRYING_CAPACITY = 3276 # medium patch
-        self.HIGH_CARRYING_CAPACITY = 873600 # rich patch
-        self.CARRYING_CAPACITY_A = 219000 # capacity region A
-        self.CARRYING_CAPACITY_B = 438000 # capacity region B
-        self.CARRYING_CAPACITY_C = 876000 # capacity region C
-        self.CARRYING_CAPACITY_D = 876000 # capacity region D
+        self.LOW_CARRYING_CAPACITY = config.LOW_CARRYING_CAPACITY # poor patch
+        self.MEDIUM_CARRYING_CAPACITY = config.MEDIUM_CARRYING_CAPACITY # medium patch
+        self.HIGH_CARRYING_CAPACITY = config.HIGH_CARRYING_CAPACITY # rich patch
+        self.CARRYING_CAPACITY_A = config.CARRYING_CAPACITY_A_INITIAL # capacity region A
+        self.CARRYING_CAPACITY_B = config.CARRYING_CAPACITY_B_INITIAL # capacity region B
+        self.CARRYING_CAPACITY_C = config.CARRYING_CAPACITY_C_INITIAL # capacity region C
+        self.CARRYING_CAPACITY_D = config.CARRYING_CAPACITY_D_INITIAL # capacity region D
 
         # Define MSY (Maximum Sustainable Yield)
-        self.MSY_STOCK_A = round(self.CARRYING_CAPACITY_A / 2) # MSY region A
-        self.MSY_STOCK_B = round(self.CARRYING_CAPACITY_B / 2) # MSY region B
-        self.MSY_STOCK_C = round(self.CARRYING_CAPACITY_C / 2) # MSY region C
-        self.MSY_STOCK_D = round(self.CARRYING_CAPACITY_D / 2) # MSY region D
+        self.MSY_STOCK_A = config.get_msy_stock(self.CARRYING_CAPACITY_A)
+        self.MSY_STOCK_B = config.get_msy_stock(self.CARRYING_CAPACITY_B)
+        self.MSY_STOCK_C = config.get_msy_stock(self.CARRYING_CAPACITY_C)
+        self.MSY_STOCK_D = config.get_msy_stock(self.CARRYING_CAPACITY_D)
 
         # Define daily catchability
-        self.CATCHABILITY_ARCHEPELAGO = 5 # archepelago
-        self.CATCHABILITY_COASTAL = 10 # coastal
-        self.CATCHABILITY_TRAWLER = 50 # trawler
+        self.CATCHABILITY_ARCHEPELAGO = config.ARCHIPELAGO_CATCHABILITY # archepelago
+        self.CATCHABILITY_COASTAL = config.COASTAL_CATCHABILITY # coastal
+        self.CATCHABILITY_TRAWLER = config.TRAWLER_CATCHABILITY # trawler
 
         # Define patchs 
-        self.HOTSPOTS_A = [[7, 3], [16, 3], [3, 3], [10, 7]] # high density spots in region A
-        self.HOTSPOTS_B = [[3, 19], [8, 11], [19, 11], [15, 19]] # high density spots in region B
-        self.HOTSPOTS_C = [[4, 51], [21, 51], [13, 45], [3, 39], [12, 36], [22, 40], [7, 27], [19, 27]] # high density spots in region C
-        self.HOTSPOTS_D = [[30, 51], [47, 51], [37, 45], [29, 39], [46, 39], [37, 33], [31, 27], [44, 27]] # high density spots in region D
+        self.HOTSPOTS_A = config.HOTSPOTS_A # high density spots in region A
+        self.HOTSPOTS_B = config.HOTSPOTS_B # high density spots in region B
+        self.HOTSPOTS_C = config.HOTSPOTS_C # high density spots in region C
+        self.HOTSPOTS_D = config.HOTSPOTS_D # high density spots in region D
 
         # Define growth rate
-        self.GROWTH_RATE = 0.1 # 10% per year
+        self.GROWTH_RATE = config.GROWTH_RATE # 10% per year
         
-        self.FISH_PRICE = 10.0
+        self.FISH_PRICE = config.FISH_PRICE
         
         # Initialize spatial grid(50x56)
-        self.grid = MultiGrid(50, 56, torus=False)
+        self.grid = MultiGrid(config.GRID_WIDTH, config.GRID_HEIGHT, torus=False)
 
         # Initialize patches with fish stocks
         self.init_patches()
@@ -429,7 +432,7 @@ class FisheryModel(Model):
         # --- DEBUG: snapshot before fishing (monthly) ---
         if self.current_step % self.MONTH == 0:
             p = self.patches.get((7, 3), {})
-            print(f"[Before fishing] Day {self.current_step} | Patch(7,3)={p.get('fish_stock', 0):.2f} | Stock A={self.get_region_stock('A'):,.0f}")
+            #print(f"[Before fishing] Day {self.current_step} | Patch(7,3)={p.get('fish_stock', 0):.2f} | Stock A={self.get_region_stock('A'):,.0f}")
 
         # All agent act
         for agent in self.agents:
@@ -438,7 +441,7 @@ class FisheryModel(Model):
         # --- DEBUG: snapshot after fishing (monthly) ---
         if self.current_step % self.MONTH == 0:
             p = self.patches.get((7, 3), {})
-            print(f"[After fishing ] Day {self.current_step} | Patch(7,3)={p.get('fish_stock', 0):.2f} | Stock A={self.get_region_stock('A'):,.0f}")
+            #print(f"[After fishing ] Day {self.current_step} | Patch(7,3)={p.get('fish_stock', 0):.2f} | Stock A={self.get_region_stock('A'):,.0f}")
 
         # Collect daily data
         self.datacollector.collect(self)
@@ -449,7 +452,7 @@ class FisheryModel(Model):
         # --- DEBUG: snapshot after regen (monthly) ---
         if self.current_step % self.MONTH == 0:
             p = self.patches.get((7, 3), {})
-            print(f"[After regen   ] Day {self.current_step} | Patch(7,3)={p.get('fish_stock', 0):.2f} | Stock A={self.get_region_stock('A'):,.0f}")
+            #print(f"[After regen   ] Day {self.current_step} | Patch(7,3)={p.get('fish_stock', 0):.2f} | Stock A={self.get_region_stock('A'):,.0f}")
 
         
         # Increment step counter
@@ -477,34 +480,35 @@ class FisheryModel(Model):
             # Collect yearly data
             yearly_summary = self.collect_yearly_data()
             
-            year = self.current_step // self.YEAR
-            print(f"\n{'='*60}")
-            print(f"YEAR {year} COMPLETED")
-            print(f"{'='*60}")
-            print(f"Stocks: A={yearly_summary['stock_A']:,.0f} ({yearly_summary['stock_A_pct_K']:.1%}), "
-                f"B={yearly_summary['stock_B']:,.0f} ({yearly_summary['stock_B_pct_K']:.1%})")
-            print(f"Yearly catch: {yearly_catch:,.0f}")  # ← Capture de l'année
-            print(f"Total catch: {yearly_summary['total_catch_all']:,.0f}")
-            print(f"Avg capital: {yearly_summary['total_capital']/len(list(self.agents)):,.2f}")
-            print(f"Gini capital: {yearly_summary['gini_capital']:.3f}")
-            print(f"Success rate: {yearly_summary['avg_success_rate']:.1%}")
-            print(f"{'='*60}\n")
-            
-            total = sum(agent.total_catch for agent in self.agents)
-            print(f"Year {self.current_step//365}: Real total_catch = {total}")
-            
-            # Debug par type
-            for ftype in ["archipelago", "coastal", "trawler"]:
-                agents = [a for a in self.agents if a.fisher_type == ftype]
-                if agents:
-                    catch = sum(a.total_catch for a in agents)
-                    print(f"  {ftype}: {len(agents)} agents, {catch} total catch")
-            
+            if self.verbose:
+                year = self.current_step // self.YEAR
+                print(f"\n{'='*60}")
+                print(f"YEAR {year} COMPLETED")
+                print(f"{'='*60}")
+                print(f"Stocks: A={yearly_summary['stock_A']:,.0f} ({yearly_summary['stock_A_pct_K']:.1%}), "
+                    f"B={yearly_summary['stock_B']:,.0f} ({yearly_summary['stock_B_pct_K']:.1%})")
+                print(f"Yearly catch: {yearly_catch:,.0f}")  # ← Capture de l'année
+                print(f"Total catch: {yearly_summary['total_catch_all']:,.0f}")
+                print(f"Avg capital: {yearly_summary['total_capital']/len(list(self.agents)):,.2f}")
+                print(f"Gini capital: {yearly_summary['gini_capital']:.3f}")
+                print(f"Success rate: {yearly_summary['avg_success_rate']:.1%}")
+                print(f"{'='*60}\n")
+                
+                total = sum(agent.total_catch for agent in self.agents)
+                print(f"Year {self.current_step//365}: Real total_catch = {total}")
+                
+                # Debug par type
+                for ftype in ["archipelago", "coastal", "trawler"]:
+                    agents = [a for a in self.agents if a.fisher_type == ftype]
+                    if agents:
+                        catch = sum(a.total_catch for a in agents)
+                        print(f"  {ftype}: {len(agents)} agents, {catch} total catch")
+                
         # Check if simulation should end
         if self.current_step >= self.end_of_sim:
-            self.export_data(filename_prefix="test")
             self.running = False
-            self.print_final_summary()
+            if self.verbose:
+                self.print_final_summary()
             
     def print_final_summary(self):
         """Print comprehensive summary at end of simulation"""
@@ -553,7 +557,7 @@ class FisheryModel(Model):
         
         print("="*80 + "\n")
         
-    def export_data(self, filename_prefix='fibe_output'):
+    def export_data(self, filename_prefix='fibe_output', directory='./results/'):
         """
         Export collected data to CSV files.
         
@@ -561,25 +565,30 @@ class FisheryModel(Model):
             filename_prefix: Prefix for output files
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        directory = directory + f"{timestamp}/"
+        os.makedirs(directory, exist_ok=True)
         
         # Export daily model data
         model_df = self.datacollector.get_model_vars_dataframe()
-        model_df.to_csv(f"{filename_prefix}_model_{timestamp}.csv")
-        print(f"Exported: {filename_prefix}_model_{timestamp}.csv ({len(model_df)} rows)")
+        model_df.to_csv(f"{os.path.join(directory, f"{filename_prefix}_model_{timestamp}.csv")}", index=False)
+        if self.verbose:
+            print(f"Exported: {filename_prefix}_model_{timestamp}.csv ({len(model_df)} rows)")
         
         # Export daily agent data
         agent_df = self.datacollector.get_agent_vars_dataframe()
-        agent_df.to_csv(f"{filename_prefix}_agents_{timestamp}.csv")
-        print(f"Exported: {filename_prefix}_agents_{timestamp}.csv ({len(agent_df)} rows)")
+        agent_df.to_csv(f"{os.path.join(directory, f"{filename_prefix}_agent_{timestamp}.csv")}", index=False)
+        if self.verbose:
+            print(f"Exported: {filename_prefix}_agents_{timestamp}.csv ({len(agent_df)} rows)")
         
         if self.yearly_data:
             yearly_df = pd.DataFrame(self.yearly_data)
-            yearly_df.to_csv(f"{filename_prefix}_yearly_{timestamp}.csv", index=False)
-            print(f"Exported: {filename_prefix}_yearly_{timestamp}.csv ({len(yearly_df)} rows)")
+            yearly_df.to_csv(f"{os.path.join(directory, f"{filename_prefix}_yearly_{timestamp}.csv")}", index=False)
+            if self.verbose:
+                print(f"Exported: {filename_prefix}_yearly_{timestamp}.csv ({len(yearly_df)} rows)")
         
-        print(f"\n All data exported with timestamp: {timestamp}")
+        if self.verbose:
+            print(f"\n All data exported with timestamp: {timestamp}")
         
-    
     def get_region_carrying_capacity(self, region_name):
         """Get total carrying capacity for a region"""
         capacities = {
@@ -655,11 +664,12 @@ class FisheryModel(Model):
                 self.CARRYING_CAPACITY_D = total_capacity
                 self.MSY_STOCK_D = round(total_capacity / 2)
         
-        print(f"Capacités régionales recalculées:")
-        print(f"  Region A: {self.CARRYING_CAPACITY_A} (MSY: {self.MSY_STOCK_A})")
-        print(f"  Region B: {self.CARRYING_CAPACITY_B} (MSY: {self.MSY_STOCK_B})")
-        print(f"  Region C: {self.CARRYING_CAPACITY_C} (MSY: {self.MSY_STOCK_C})")
-        print(f"  Region D: {self.CARRYING_CAPACITY_D} (MSY: {self.MSY_STOCK_D})")
+        if self.verbose:
+            print(f"Capacités régionales recalculées:")
+            print(f"  Region A: {self.CARRYING_CAPACITY_A} (MSY: {self.MSY_STOCK_A})")
+            print(f"  Region B: {self.CARRYING_CAPACITY_B} (MSY: {self.MSY_STOCK_B})")
+            print(f"  Region C: {self.CARRYING_CAPACITY_C} (MSY: {self.MSY_STOCK_C})")
+            print(f"  Region D: {self.CARRYING_CAPACITY_D} (MSY: {self.MSY_STOCK_D})")
 
     def determine_weather(self):
         """
@@ -679,11 +689,12 @@ class FisheryModel(Model):
         
         if steps is None:
             steps = self.end_of_sim
-            
-        print(f"Starting simulation for {steps} days ({steps/self.YEAR:.1f} years)")
-        print(f"Agents: {self.num_archipelago} archipelago, {self.num_coastal} coastal, {self.num_trawler} trawler")
-        print("=" * 60) 
         
+        if self.verbose:    
+            print(f"Starting simulation for {steps} days ({steps/self.YEAR:.1f} years)")
+            print(f"Agents: {self.num_archipelago} archipelago, {self.num_coastal} coastal, {self.num_trawler} trawler")
+            print("=" * 60) 
+            
         for _ in range(steps):
             self.step()
             
@@ -694,13 +705,14 @@ class FisheryModel(Model):
             if self.current_step % self.MONTH == 0:
                 month = self.current_step // self.MONTH
                 patch_7_3 = self.patches.get((7, 3), {}).get('fish_stock', 0)
-                print(f"Month {month} - Day {self.current_step} - Stock A: {self.get_region_stock('A'):,.0f} - Patch(7,3): {patch_7_3:,.2f}")
+                #print(f"Month {month} - Day {self.current_step} - Stock A: {self.get_region_stock('A'):,.0f} - Patch(7,3): {patch_7_3:,.2f}")
   
             if not self.running:
                 break
-            
-        print("=" * 60)
-        print(f"Simulation completed after {self.current_step} days ({self.current_step/self.YEAR:.1f} years)")
+        
+        if self.verbose:    
+            print("=" * 60)
+            print(f"Simulation completed after {self.current_step} days ({self.current_step/self.YEAR:.1f} years)")
 
     def get_model_summary(self):
         """

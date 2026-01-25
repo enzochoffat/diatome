@@ -41,8 +41,16 @@ desktop.ini
 # Temporary files
 *.tmp
 *.bak
-code/python/# Plan de Conversion NetLogo → Python.prompt.md
 
-code/python/test_helpers.py
-code/python/test_export_data.py
-.~lock.test_yearly_20260123_183613.csv#
+# Results (keep structure, ignore data)
+results/temp/
+results/**/*.csv
+!results/examples/
+
+# Notebooks
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Local config
+config/local.yaml
+.env
