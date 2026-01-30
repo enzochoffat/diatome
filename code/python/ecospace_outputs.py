@@ -8,62 +8,69 @@ from pathlib import Path
 
 
 
-def lire_csv_en_listes(fichier_csv):
-    with open(fichier_csv, mode='r', newline='', encoding='utf-8') as f:
-        reader = csv.reader(f)
-        lignes = list(reader)
+def export_data_outputs():
+    #formaliser les données en listes de float  
+    p = Path(__file__).parent
+    file_path = (p / ".." / ".."/ "outputs").resolve()
+    # Lister les fichiers .csv directement dans ce dossier
+    fichiers_csv = [f for f in os.listdir(file_path) 
+                    if os.path.isfile(os.path.join(file_path, f)) 
+                    and f.lower().endswith('.csv')]
+
+    # Boucle pour traiter chaque fichier
+    for fichier in fichiers_csv:
+        chemin_complet = os.path.join(file_path, fichier)
+
+        with open(chemin_complet, mode='r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f, delimiter=',')
+            rows = list(reader)
+
+        headers = rows[1]
     
-    headers = lignes[1]  # Ligne 2 : noms des colonnes
-    headers[0] = 'time'  # S'assurer que la première colonne s'appelle 'time'
+        data = {header: [] for header in headers}
+        time = []           
 
-    
-    donnees = {header: [] for header in headers}
-    time = []
-    for row in lignes[2:] : 
-        time.append(row[0])
+        #construire la liste contenant toutes les données 
+        for row in rows[2:]:
+            time.append(row[0])
+            for i, valeur in enumerate(row):
+                if i < len(headers):
+                    data[headers[i]].append(valeur)
+        data.pop(headers[0])
 
-    for row in lignes[2:]:
-        for i, valeur in enumerate(row):
-            if i < len(headers):
-                donnees[headers[i]].append(valeur)
+        #récupérer time comme liste et data comme disctionnaire
+        time = list(map(float, time))
+        for key, value in data.items() :
+            data[key] = list(map(float, data[key]))
 
-    return donnees, time, headers
-
-#formaliser les données en listes de float  
-p = Path(__file__).parent
-file_path = (p / ".." / ".."/ "outputs").resolve()
-# Lister les fichiers .csv directement dans ce dossier
-fichiers_csv = [
-    f for f in os.listdir(file_path)
-    if os.path.isfile(os.path.join(file_path, f)) and f.lower().endswith('.csv')]
-
-# Boucle pour traiter chaque fichier
-for fichier in fichiers_csv:
-    chemin_complet = os.path.join(file_path, fichier)
-    print(f"Traitement du fichier : {chemin_complet}")
-    donnees = lire_csv_en_listes(chemin_complet)[0]
-    time = np.array(lire_csv_en_listes(chemin_complet)[1])
-    headers = lire_csv_en_listes(chemin_complet)[2]
-    #traiter les fichiers time et donnees
-    time = list(map(float, time))
-    for key, value in donnees.items() : 
-        for str in donnees[key] : 
-            donnees[key] = list(map(float, donnees[key]))
-    #test d'affichage
-    for key, value in donnees.items() : 
-        test = donnees[key]
-        plt.plot(time, test)
-        title = os.path.basename(chemin_complet).split('/')[-1]
-        plt.title(title)
-    plt.show()
-
-#pour accéder aux outputs de chaque simulation 
-#acces = donnees[headers[i]]
-#print(acces, headers[i])
+    return data, time, headers
 
 
+end_of_sim = 120
+current_step = 15
+GET_ALL_FISH = True
+STUDIED_SPECIES = {'OctopusVulgaris','MelicertusKerathurus', 'TrachurusTrachurus'}
 
-           
+def population_evolution() : 
+    "Descripton of the fishes population evolution based on Ecospace's outputs."
+    evol = export_data_outputs()
+    data = evol[0]
+    time = evol[1]
+    headers = evol[2]
+    if end_of_sim == len(time) :
+        if GET_ALL_FISH == True : 
+            a = []
+            for key in data.keys() :
+                a.append(data[key])
+            all_fishes = list(map(sum, zip(*a)))
+            print(all_fishes)
+            current_sock = {'all' : all_fishes[current_step]}
+        else : 
+            studied_data = {key: data[key] for key in data.keys() & STUDIED_SPECIES}
+            for species in range(len(studied_data)) :
+                return(type(species))
+
+population_evolution()
 
 
 

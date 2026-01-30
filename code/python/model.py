@@ -3,6 +3,7 @@ from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
 from agent import FisherAgent
 import random
+from ecospace_outputs import export_data_outputs
 
 class FisheryModel(Model):
     def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler):
@@ -87,7 +88,7 @@ class FisheryModel(Model):
         self.HOTSPOTS_D = [[30, 51], [47, 51], [37, 45], [29, 39], [46, 39], [37, 33], [31, 27], [44, 27]] # high density spots in region D
 
         # Define growth rate
-        self.GROWTH_RATE = 0.1 # 10% per year
+        self.GROWTH_RATE = 0.1 # 10% per year #sera inutile après implémentation d'ecospace
         
         # Initialize spatial grid(50x56)
         self.grid = MultiGrid(50, 56, torus=False)
@@ -135,7 +136,10 @@ class FisheryModel(Model):
                 "gone_fishing": "gone_fishing", 
             }
         )
-    
+
+        self.GET_ALL_FISH = True
+        self.STUDIED_SPECIES = {'OctopusVulgaris', 'MelicertusKerathurus', 'TrachurusTrachurus'}
+         
     def _create_agents(self):
         """Create fisher agents of different types"""
         
@@ -315,7 +319,25 @@ class FisheryModel(Model):
                     if patch['region'] == region:
                         patch['fish_stock'] = patch['fish_stock'] + patch['regen_amount']
                         patch['patch_stock_after_regrowth'] = patch['fish_stock']
-                
+
+
+    def population_evolution(self) : 
+        "Descripton of the fishes population evolution based on Ecospace's outputs."
+        evol = export_data_outputs
+        data = evol[0]
+        time = evol[1]
+        headers = evol[2]
+        if self.end_of_sim == len(time) :
+            if self.GET_ALL_FISH == True : 
+                for key in data.keys() :
+                    all_fishes = [sum(x) for x in data[key]]
+                current_sock = {'all' : all_fishes[self.current_step]}
+            else : 
+                studied_data = {key: data[key] for key in data.keys() & self.STUDIED_SPECIES}
+                for species in range(len(studied_data)) :
+                    current_sock =  
+
+
     def get_patch_info(self, x, y):
         """Get information about a specific patch"""
         return self.patches.get((x, y), None)
