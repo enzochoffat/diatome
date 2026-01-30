@@ -51,8 +51,6 @@ class FisherAgent(Agent):
         # Perception 
         self.growth_perception = 0.0  # Perception croissance poissons
         
-        
-               
         # Type-specific attribute
         self._set_type_attributes()
         
