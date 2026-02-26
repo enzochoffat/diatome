@@ -140,7 +140,7 @@ class FisheryModel(Model):
         self.GET_ALL_FISH = True
         self.STUDIED_SPECIES = {'OctopusVulgaris', 'MelicertusKerathurus', 'TrachurusTrachurus'}
          
-    def _create_agents(self):
+    def _create_agents(self): #agent pas utilisé ? 
         """Create fisher agents of different types"""
         
         agent_id = 0
@@ -172,7 +172,7 @@ class FisheryModel(Model):
                 
                 # Store patch attributes
                 self.patches[(x, y)] = {
-                    'region' : region,
+                    'region' : region, #donne la même info que x et y 
                     'density' : density,
                     'fish_stock' : fish_stock,
                     'carrying_capacity' : carrying_capacity,
@@ -182,7 +182,7 @@ class FisheryModel(Model):
             
         }
     
-    def get_region(self, x, y):
+    def get_region(self, x, y): 
         """Determine which region a coordinate belongs to"""
         # Region A: x[0,25], y[0,8]
         if 0 <= x < 25 and 0 <= y < 8:
