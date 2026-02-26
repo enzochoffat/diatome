@@ -7,7 +7,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
 
-def choisir_fichiers_csv():
+def choose_csv_file():
     """
     Ouvre une fenêtre pour sélectionner un ou plusieurs fichiers CSV.
     Retourne une liste des chemins absolus des fichiers sélectionnés.
@@ -27,45 +27,20 @@ def choisir_fichiers_csv():
     return file_paths
 
 def safe_float(s):
+    "Retourne un float si possible, sinon la valeur initiale"
     try:
         return float(s)
     except (ValueError, TypeError):
         return s
 
-
-def pop_evol_over_time(): 
-    p = Path(__file__).parent
-    file_path = (p / ".." / ".."/ "Ecospace_outputs/biomass").resolve()
-    # Lister les fichiers .csv directement dans ce dossier
-    fichiers_csv = [f for f in os.listdir(file_path) 
-                    if os.path.isfile(os.path.join(file_path, f)) 
-                    and f.lower().endswith('.csv')]
-    for fichier in fichiers_csv:
-        chemin_complet = os.path.join(file_path, fichier)
-
-        with open(chemin_complet, mode='r', newline='', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=',')
-            rows = [[safe_float(cell) for cell in row] for row in reader]
-
-        maps = dict(dates = [], map = [])
-        for nb, row in enumerate(rows) : 
-            if row : 
-                if row[0] == 'MapRows' : 
-                    maps_row = int(row[1])
-                if row[0] == 'Year' : 
-                    year = row[1] 
-                    start = nb + 1
-                    if len(row) > 2 : 
-                        month = row[2]
-                    else : 
-                        month = '0'
-                    maps['dates'] += [[year] + [month]]
-                    maps['map'].append(rows[start: start + maps_row])
-        
-        break
-
 def pop_evol_over_time_test():
-    file_paths = choisir_fichiers_csv()
+    """
+    Utilise choose_csv_file() pour obtenir la liste des fichiers que l'utilisateur veut étudier
+    Retourne un dictionnaire de dictionnaire contenant en premier item le nom des espèces étudiées
+    et en deuxième item un dictionnaire contenant en premier item les dates associées aux maps qui
+    sont dans le deuxième item 
+    """
+    file_paths = choose_csv_file()
     dic_tot = dict(esp = [], maps = dict(dates = [], map = []))
     maps = dic_tot['maps']
     for fichier in file_paths:
@@ -91,90 +66,7 @@ def pop_evol_over_time_test():
                     maps['dates'].append([year] + [month])
                     maps['map'].append(rows[start: start + maps_row])
 
-    print(len(dic_tot['maps']['dates']))
-    print(dic_tot['esp'])
-
-pop_evol_over_time_test()
-
-def pop_evol_over_time_alone(f): 
-        reader = csv.reader(f, delimiter=',')
-        rows = list(reader)
-        print(rows)
-        for row in rows : 
-            print(row[0])
-            if row[0] == 'Year' : 
-                date = row[1] 
-                print(row[0])
-            break
-
-#print(pop_evol_over_time_alone('/home/agathe/Documents/CS/3A/projet/diatome/Ecospace_outputs/biomass/EcospaceMapBiomass-Bacteria.csv'))
+    return dic_tot
 
 
-def export_data_outputs():
-    #formaliser les données en listes de float  
-    p = Path(__file__).parent
-    file_path = (p / ".." / ".."/ "Ecospace_outputs").resolve()
-    # Lister les fichiers .csv directement dans ce dossier
-    fichiers_csv = [f for f in os.listdir(file_path) 
-                    if os.path.isfile(os.path.join(file_path, f)) 
-                    and f.lower().endswith('.csv')]
-
-    # Boucle pour traiter chaque fichier
-    for fichier in fichiers_csv:
-        chemin_complet = os.path.join(file_path, fichier)
-
-        with open(chemin_complet, mode='r', newline='', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=',')
-            rows = list(reader)
-
-        headers = rows[1]
-    
-        data = {header: [] for header in headers}
-        time = []           
-
-        #construire la liste contenant toutes les données 
-        for row in rows[2:]:
-            time.append(row[0])
-            for i, valeur in enumerate(row):
-                if i < len(headers):
-                    data[headers[i]].append(valeur)
-        data.pop(headers[0])
-
-        #récupérer time comme liste et data comme disctionnaire
-        time = list(map(float, time))
-        for key, value in data.items() :
-            data[key] = list(map(float, data[key]))
-
-    return data, time, headers
-
-
-end_of_sim = 120
-current_step = 15
-GET_ALL_FISH = True
-STUDIED_SPECIES = {'OctopusVulgaris','MelicertusKerathurus', 'TrachurusTrachurus'}
-
-def population_evolution() : 
-    "Descripton of the fishes population evolution based on Ecospace's outputs."
-    evol = export_data_outputs()
-    data = evol[0]
-    time = evol[1]
-    headers = evol[2]
-    if end_of_sim == len(time) :
-        if GET_ALL_FISH : 
-            a = []
-            for key in data.keys() :
-                a.append(data[key])
-            all_fishes = list(map(sum, zip(*a)))
-            print(all_fishes)
-            current_sock = {'all' : all_fishes[current_step]}
-        else : 
-            studied_data = {key: data[key] for key in data.keys() & STUDIED_SPECIES}
-            for species in range(len(studied_data)) :
-                return(type(species))
-
-#population_evolution()
-
-
-
-
-
+### pour ajouter ces informations au code initial, il faut changer la fonction update_fish_stock 
