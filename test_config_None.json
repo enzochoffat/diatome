@@ -6,15 +6,15 @@
     "created": "2026-01-25"
   },
   "simulation": {
-    "duration_years": 10,
-    "verbose": false,
+    "duration_years": 25,
+    "verbose": true,
     "random_seed": null,
     "repetitions": 1
   },
   "agents": {
-    "num_archipelago": 40,
-    "num_coastal": 40,
-    "num_trawler": 40
+    "num_archipelago": 20,
+    "num_coastal": 10,
+    "num_trawler": 5
   },
   "output": {
     "export_data": true,
@@ -37,7 +37,7 @@
     }
   },
   "execution": {
-    "timestamp": "2026-01-29T18:09:54.741661",
+    "timestamp": "2026-02-12T18:33:21.792111",
     "config_loader_version": "1.0"
   }
 }

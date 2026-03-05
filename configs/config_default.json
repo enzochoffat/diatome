@@ -7,19 +7,19 @@
   },
   
   "simulation": {
-    "duration_years": 10,
-    "verbose": false,
+    "duration_years": 25,
+    "verbose": true,
     "random_seed": null
   },
   
   "agents": {
-    "num_archipelago": 40,
-    "num_coastal": 40,
-    "num_trawler": 40
+    "num_archipelago": 10,
+    "num_coastal": 10,
+    "num_trawler": 10
   },
   
   "output": {
-    "export_data": true,
+    "export_data": false,
     "filename_prefix": "test",
     "export_interval_years": 1
   },
@@ -30,7 +30,7 @@
       "initial_stock_ratio": 0.5
     },
     "economics": {
-      "fish_price": 10.0,
+      "fish_price": 1.0,
       "initial_capital": 1000.0
     },
     "weather": {

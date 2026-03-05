@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<model version="NetLogo 7.0.2" snapToGrid="true">
+<model version="NetLogo 7.0.3" snapToGrid="true">
   <code><![CDATA[;;; @author Nanda Wijermans
 ;;; @email nanda.wijermans@su.se
 ;;; @version 1.0
@@ -944,11 +944,11 @@ to update-response-vars-periodicly
 end]]></code>
   <widgets>
     <view x="195" wrappingAllowedX="false" y="55" frameRate="10.0" minPycor="0" height="340" showTickCounter="true" patchSize="6.0" fontSize="10" wrappingAllowedY="false" width="304" tickCounterLabel="ticks" maxPycor="55" updateMode="1" maxPxcor="49" minPxcor="0"></view>
-    <button x="10" y="10" height="40" disableUntilTicks="false" forever="false" kind="Observer" width="55">setup</button>
-    <button x="68" y="10" height="40" disableUntilTicks="false" forever="true" kind="Observer" width="55">go</button>
-    <button x="125" y="10" height="40" disableUntilTicks="false" forever="false" kind="Observer" width="55" display="go once">go</button>
-    <slider x="10" step="1" y="229" max="100" width="175" display="offshore-trawler-fisher" height="50" min="0" direction="Horizontal" default="0.0" variable="offshore-trawler-fisher"></slider>
-    <plot x="530" autoPlotX="true" yMax="1130000.0" autoPlotY="true" y="45" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="245" display="Stock in region C &amp; D">
+    <button x="10" y="10" height="40" disableUntilTicks="false" forever="false" kind="Observer" width="55" sizeVersion="0">setup</button>
+    <button x="68" y="10" height="40" disableUntilTicks="false" forever="true" kind="Observer" width="55" sizeVersion="0">go</button>
+    <button x="125" y="10" height="40" disableUntilTicks="false" forever="false" kind="Observer" display="go once" width="55" sizeVersion="0">go</button>
+    <slider x="10" step="1" y="229" max="100" display="offshore-trawler-fisher" height="50" min="0" direction="Horizontal" default="0.0" variable="offshore-trawler-fisher" width="175" sizeVersion="0"></slider>
+    <plot x="530" autoPlotX="true" yMax="1130000.0" autoPlotY="true" y="45" xMin="0.0" height="219" legend="true" xMax="10.0" yMin="0.0" display="Stock in region C &amp; D" width="245" sizeVersion="0">
       <setup></setup>
       <update></update>
       <pen interval="1.0" mode="0" display="stockC" color="-13345367" legend="true">
@@ -972,11 +972,11 @@ end]]></code>
     <note x="355" y="232" backgroundDark="0" fontSize="14" width="15" markdown="false" height="18" textColorDark="-1" textColorLight="-1" backgroundLight="0">D</note>
     <note x="14" y="634" backgroundDark="0" fontSize="11" width="137" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Initial stocksize</note>
     <note x="15" y="726" backgroundDark="0" fontSize="11" width="118" markdown="false" height="19" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Reproduction-rate</note>
-    <switch x="290" y="10" height="40" on="true" variable="showHotSpots" width="130" display="showHotSpots"></switch>
+    <switch x="290" y="10" height="40" on="true" variable="showHotSpots" display="showHotSpots" width="130" sizeVersion="0"></switch>
     <note x="205" y="327" backgroundDark="0" fontSize="14" width="15" markdown="false" height="18" textColorDark="-1" textColorLight="-1" backgroundLight="0">B</note>
     <note x="15" y="381" backgroundDark="0" fontSize="15" width="105" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Scenarios</note>
-    <slider x="200" step="1" y="458" max="200" width="165" display="memory-spatial-length" height="50" min="0" direction="Horizontal" default="20.0" variable="memory-spatial-length"></slider>
-    <plot x="848" autoPlotX="true" yMax="0.0" autoPlotY="true" y="489" xMin="0.0" height="243" legend="true" xMax="0.0" yMin="0.0" width="260" display="decision to go fish">
+    <slider x="200" step="1" y="458" max="200" display="memory-spatial-length" height="50" min="0" direction="Horizontal" default="20.0" variable="memory-spatial-length" width="165" sizeVersion="0"></slider>
+    <plot x="848" autoPlotX="true" yMax="0.0" autoPlotY="true" y="493" xMin="0.0" height="246" legend="true" xMax="0.0" yMin="0.0" display="decision to go fish" width="260" sizeVersion="0">
       <setup></setup>
       <update></update>
       <pen interval="1.0" mode="0" display="# out to fish" color="-9276814" legend="true">
@@ -992,10 +992,10 @@ end]]></code>
         <update>plot count trawlers with [ willFish = true ]</update>
       </pen>
     </plot>
-    <switch x="5" y="897" height="40" on="false" variable="ecologyOnly" width="135" display="ecologyOnly"></switch>
+    <switch x="5" y="897" height="40" on="false" variable="ecologyOnly" display="ecologyOnly" width="135" sizeVersion="0"></switch>
     <note x="320" y="435" backgroundDark="0" fontSize="11" width="50" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Memory</note>
-    <slider x="10" step="5" y="174" max="100" width="175" display="coastal-fisher" height="50" min="0" direction="Horizontal" default="45.0" variable="coastal-fisher"></slider>
-    <plot x="530" autoPlotX="true" yMax="110500.0" autoPlotY="true" y="463" xMin="0.0" height="191" legend="true" xMax="10.0" yMin="0.0" width="245" display="Stock in Region A">
+    <slider x="10" step="5" y="174" max="100" display="coastal-fisher" height="50" min="0" direction="Horizontal" default="0.0" variable="coastal-fisher" width="175" sizeVersion="0"></slider>
+    <plot x="530" autoPlotX="true" yMax="110500.0" autoPlotY="true" y="466" xMin="0.0" height="192" legend="true" xMax="10.0" yMin="0.0" display="Stock in Region A" width="245" sizeVersion="0">
       <setup></setup>
       <update></update>
       <pen interval="1.0" mode="0" display="stockA" color="-11221820" legend="true">
@@ -1007,33 +1007,33 @@ end]]></code>
         <update><![CDATA[if (ticks > 0) [ plot MSY-STOCK-A ]]]></update>
       </pen>
     </plot>
-    <monitor x="530" precision="17" y="659" height="60" fontSize="11" width="100" display="# out fishing">count turtles with [ willFish = true ]</monitor>
-    <monitor x="638" precision="17" y="659" height="60" fontSize="11" width="100" display="# not fishing">count turtles with [ willFish = false ]</monitor>
-    <slider x="10" step="0.05" y="411" max="1" width="175" display="fuel-subsidy" height="50" min="0" direction="Horizontal" default="0.0" variable="fuel-subsidy"></slider>
-    <switch x="5" y="944" height="40" on="false" variable="fisherAtMaxCatch" width="170" display="fisherAtMaxCatch"></switch>
-    <chooser x="10" y="657" height="60" variable="init-stock-size" current="2" width="155" display="init-stock-size">
+    <monitor x="530" precision="17" y="663" height="60" fontSize="11" display="# out fishing" width="100" sizeVersion="0">count turtles with [ willFish = true ]</monitor>
+    <monitor x="638" precision="17" y="663" height="60" fontSize="11" display="# not fishing" width="100" sizeVersion="0">count turtles with [ willFish = false ]</monitor>
+    <slider x="10" step="0.05" y="411" max="1" display="fuel-subsidy" height="50" min="0" direction="Horizontal" default="0.0" variable="fuel-subsidy" width="175" sizeVersion="0"></slider>
+    <switch x="5" y="944" height="40" on="false" variable="fisherAtMaxCatch" display="fisherAtMaxCatch" width="170" sizeVersion="0"></switch>
+    <chooser x="10" y="657" height="60" variable="init-stock-size" current="2" display="init-stock-size" width="155" sizeVersion="0">
       <choice type="string" value="random"></choice>
       <choice type="string" value="carryingCap"></choice>
       <choice type="string" value="halfCarryingCap"></choice>
       <choice type="string" value="quartCarryingCap"></choice>
     </chooser>
-    <monitor x="743" precision="17" y="659" height="60" fontSize="11" width="100" display="alreadyAtSea">count fishers with [ goneFishing = true ]</monitor>
-    <slider x="10" step="0.1" y="750" max="1" width="155" display="repr4All" height="50" min="0" direction="Horizontal" default="1.0" variable="repr4All"></slider>
-    <chooser x="11" y="569" height="60" variable="spatial-representation" current="1" width="153" display="spatial-representation">
+    <monitor x="743" precision="17" y="663" height="60" fontSize="11" display="alreadyAtSea" width="100" sizeVersion="0">count fishers with [ goneFishing = true ]</monitor>
+    <slider x="10" step="0.1" y="750" max="1" display="repr4All" height="50" min="0" direction="Horizontal" default="1.0" variable="repr4All" width="155" sizeVersion="0"></slider>
+    <chooser x="11" y="569" height="60" variable="spatial-representation" current="1" display="spatial-representation" width="153" sizeVersion="0">
       <choice type="string" value="baseline-no-hotspots"></choice>
       <choice type="string" value="hotspots-60-40-0"></choice>
     </chooser>
-    <slider x="200" step="7" y="515" max="375" width="165" display="memory-time-length" height="50" min="1" direction="Horizontal" default="365.0" variable="memory-time-length"></slider>
-    <slider x="212" step="0.5" y="791" max="10" width="150" display="fish-price" height="50" min="1" direction="Horizontal" default="1.0" variable="fish-price"></slider>
-    <chooser x="10" y="286" height="60" variable="socialInfluence" current="2" width="175" display="socialInfluence">
+    <slider x="200" step="7" y="515" max="375" display="memory-time-length" height="50" min="1" direction="Horizontal" default="365.0" variable="memory-time-length" width="165" sizeVersion="0"></slider>
+    <slider x="212" step="0.5" y="791" max="10" display="fish-price" height="50" min="1" direction="Horizontal" default="1.0" variable="fish-price" width="150" sizeVersion="0"></slider>
+    <chooser x="10" y="286" height="60" variable="socialInfluence" current="0" display="socialInfluence" width="175" sizeVersion="0">
       <choice type="string" value="none"></choice>
       <choice type="string" value="descriptiveNorm"></choice>
       <choice type="string" value="expertise"></choice>
     </chooser>
-    <monitor x="848" precision="17" y="737" height="60" fontSize="11" width="100" display="badWeather?">badWeather</monitor>
-    <slider x="10" step="0.1" y="468" max="1" width="175" display="bad-weather-probability" height="50" min="0" direction="Horizontal" default="0.1" variable="bad-weather-probability"></slider>
+    <monitor x="848" precision="17" y="744" height="60" fontSize="11" display="badWeather?" width="100" sizeVersion="0">badWeather</monitor>
+    <slider x="10" step="0.1" y="468" max="1" display="bad-weather-probability" height="50" min="0" direction="Horizontal" default="0.1" variable="bad-weather-probability" width="175" sizeVersion="0"></slider>
     <note x="200" y="420" backgroundDark="0" fontSize="17" width="150" markdown="false" height="21" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Fisher agents</note>
-    <plot x="530" autoPlotX="true" yMax="220840.0" autoPlotY="true" y="267" xMin="0.0" height="191" legend="true" xMax="10.0" yMin="0.0" width="245" display="Stock in region B">
+    <plot x="530" autoPlotX="true" yMax="220840.0" autoPlotY="true" y="269" xMin="0.0" height="192" legend="true" xMax="10.0" yMin="0.0" display="Stock in region B" width="245" sizeVersion="0">
       <setup></setup>
       <update></update>
       <pen interval="1.0" mode="0" display="stockB" color="-13791810" legend="true">
@@ -1045,34 +1045,14 @@ end]]></code>
         <update>plot MSY-STOCK-B</update>
       </pen>
     </plot>
-    <switch x="195" y="10" height="40" on="true" variable="layout" width="90" display="layout"></switch>
-    <slider x="10" step="1" y="62" max="50" width="172" display="end-of-sim-in-years" height="50" min="0" direction="Horizontal" default="25.0" variable="end-of-sim-in-years"></slider>
-    <slider x="10" step="1" y="119" max="250" width="177" display="archipelago-fisher" height="50" min="0" direction="Horizontal" default="0.0" variable="archipelago-fisher"></slider>
-    <monitor x="1058" precision="17" y="737" height="60" fontSize="11" width="100" display="meanCatch">precision (mean [ catch ] of fishers) 2</monitor>
-    <monitor x="953" precision="17" y="802" height="60" fontSize="11" width="100" display="goodSpotHitters">numFishersWgoodSpot</monitor>
-    <monitor x="1058" precision="17" y="802" height="60" fontSize="11" width="137" display="goodSpotHittersPerc">precision percFishersWgoodSpot 2</monitor>
-    <monitor x="953" precision="17" y="737" height="60" fontSize="11" width="100" display="catchBtickly">catchBtickly</monitor>
-    <plot x="780" autoPlotX="true" yMax="1.0" autoPlotY="true" y="45" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="260" display="Profit (mean per year)">
-      <setup></setup>
-      <update></update>
-      <pen interval="1.0" mode="0" display="archipelagos" color="-13840069" legend="true">
-        <setup></setup>
-        <update>if any? archipelagos [ plot mean [ accumProfitThisYear ] of archipelagos]</update>
-      </pen>
-      <pen interval="1.0" mode="0" display="coastals" color="-1184463" legend="true">
-        <setup></setup>
-        <update>if any? coastals [ plot mean [ accumProfitThisYear ] of coastals ]</update>
-      </pen>
-      <pen interval="1.0" mode="0" display="trawlers" color="-5825686" legend="true">
-        <setup></setup>
-        <update>if any? trawlers [ plot mean [ accumProfitThisYear ] of trawlers ]</update>
-      </pen>
-      <pen interval="1.0" mode="2" display="Zero-line" color="-3026479" legend="false">
-        <setup></setup>
-        <update>plot 0</update>
-      </pen>
-    </plot>
-    <plot x="1045" autoPlotX="true" yMax="1.0" autoPlotY="true" y="45" xMin="0.0" height="217" legend="true" xMax="1.0" yMin="0.0" width="245" display="Satisfaction fishers">
+    <switch x="195" y="10" height="40" on="true" variable="layout" display="layout" width="90" sizeVersion="0"></switch>
+    <slider x="10" step="1" y="62" max="50" display="end-of-sim-in-years" height="50" min="0" direction="Horizontal" default="30.0" variable="end-of-sim-in-years" width="172" sizeVersion="0"></slider>
+    <slider x="10" step="1" y="119" max="250" display="archipelago-fisher" height="50" min="0" direction="Horizontal" default="20.0" variable="archipelago-fisher" width="177" sizeVersion="0"></slider>
+    <monitor x="1058" precision="17" y="744" height="60" fontSize="11" display="meanCatch" width="100" sizeVersion="0">precision (mean [ catch ] of fishers) 2</monitor>
+    <monitor x="953" precision="17" y="809" height="60" fontSize="11" display="goodSpotHitters" width="100" sizeVersion="0">numFishersWgoodSpot</monitor>
+    <monitor x="1058" precision="17" y="809" height="60" fontSize="11" display="goodSpotHittersPerc" width="137" sizeVersion="0">precision percFishersWgoodSpot 2</monitor>
+    <monitor x="953" precision="17" y="744" height="60" fontSize="11" display="catchBtickly" width="100" sizeVersion="0">catchBtickly</monitor>
+    <plot x="1045" autoPlotX="true" yMax="1.0" autoPlotY="true" y="45" xMin="0.0" height="219" legend="true" xMax="1.0" yMin="0.0" display="Satisfaction fishers" width="245" sizeVersion="0">
       <setup></setup>
       <update></update>
       <pen interval="1.0" mode="0" display="archipelago" color="-13840069" legend="true">
@@ -1088,33 +1068,13 @@ end]]></code>
         <update>if any? trawlers [ plot mean [ satisfaction ] of trawlers]</update>
       </pen>
     </plot>
-    <slider x="200" step="0.1" y="630" max="1" width="165" display="home-satisf-threshold" height="50" min="0" direction="Horizontal" default="0.5" variable="home-satisf-threshold"></slider>
+    <slider x="200" step="0.1" y="630" max="1" display="home-satisf-threshold" height="50" min="0" direction="Horizontal" default="0.5" variable="home-satisf-threshold" width="165" sizeVersion="0"></slider>
     <note x="320" y="607" backgroundDark="0" fontSize="11" width="60" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Coastals</note>
-    <plot x="780" autoPlotX="true" yMax="10.0" autoPlotY="true" y="267" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="260" display="Catch (accumulated per year)">
-      <setup></setup>
-      <update></update>
-      <pen interval="1.0" mode="0" display="archipelagos" color="-13840069" legend="true">
-        <setup></setup>
-        <update>if any? archipelagos [ plot sum [ accumCatchThisYear ] of archipelagos]</update>
-      </pen>
-      <pen interval="1.0" mode="0" display="coastals" color="-1184463" legend="true">
-        <setup></setup>
-        <update>if any? coastals [ plot sum [ accumCatchThisYear ] of coastals]</update>
-      </pen>
-      <pen interval="1.0" mode="0" display="trawlers" color="-5825686" legend="true">
-        <setup></setup>
-        <update>if any? trawlers [ plot sum [ accumCatchThisYear ] of trawlers]</update>
-      </pen>
-      <pen interval="1.0" mode="2" display="total" color="-7500403" legend="false">
-        <setup></setup>
-        <update>plot accumCatchYearly</update>
-      </pen>
-    </plot>
-    <monitor x="530" precision="17" y="724" height="60" fontSize="11" width="100" display="num fishers">count fishers</monitor>
+    <monitor x="530" precision="17" y="728" height="60" fontSize="11" display="num fishers" width="100" sizeVersion="0">count fishers</monitor>
     <note x="10" y="872" backgroundDark="0" fontSize="14" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Sensitivity controls</note>
-    <monitor x="638" precision="17" y="724" height="60" fontSize="11" width="115" display="accumCatchYearly">accumCatchYearly</monitor>
-    <monitor x="758" precision="17" y="802" height="60" fontSize="11" width="122">accumProfitYearly</monitor>
-    <plot x="1113" autoPlotX="true" yMax="10.0" autoPlotY="true" y="267" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="245" display="Profit (accumulated per year)">
+    <monitor x="638" precision="17" y="728" height="60" fontSize="11" display="accumCatchYearly" width="115" sizeVersion="0">accumCatchYearly</monitor>
+    <monitor x="758" precision="17" y="809" height="60" fontSize="11" width="122" sizeVersion="0">accumProfitYearly</monitor>
+    <plot x="1113" autoPlotX="true" yMax="10.0" autoPlotY="true" y="269" xMin="0.0" height="219" legend="true" xMax="10.0" yMin="0.0" display="Profit (accumulated per year)" width="245" sizeVersion="0">
       <setup></setup>
       <update></update>
       <pen interval="1.0" mode="2" display="trawlers" color="-5825686" legend="true">
@@ -1134,7 +1094,7 @@ end]]></code>
         <update>plot accumProfitYearly</update>
       </pen>
     </plot>
-    <plot x="1168" autoPlotX="true" yMax="30.0" autoPlotY="true" y="489" xMin="0.0" height="217" legend="true" xMax="10.0" yMin="0.0" width="245" display="Not fishing reasons">
+    <plot x="1168" autoPlotX="true" yMax="30.0" autoPlotY="true" y="493" xMin="0.0" height="219" legend="true" xMax="10.0" yMin="0.0" display="Not fishing reasons" width="245" sizeVersion="0">
       <setup></setup>
       <update></update>
       <pen interval="1.0" mode="0" display="#scarity" color="-2674135" legend="true">
@@ -1150,7 +1110,47 @@ end]]></code>
         <update>plot numLowCapital</update>
       </pen>
     </plot>
-    <slider x="10" step="0.1" y="991" max="1" width="172" display="sd-carcap" height="50" min="0" direction="Horizontal" default="0.0" variable="sd-carcap"></slider>
+    <slider x="10" step="0.1" y="991" max="1" display="sd-carcap" height="50" min="0" direction="Horizontal" default="0.0" variable="sd-carcap" width="172" sizeVersion="0"></slider>
+    <plot x="780" autoPlotX="true" yMax="1.0" autoPlotY="true" y="45" xMin="0.0" height="220" legend="true" xMax="10.0" yMin="0.0" display="Profit (mean per year)" width="260" sizeVersion="0">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="archipelagos" color="-13840069" legend="true">
+        <setup></setup>
+        <update>if any? archipelagos [ plot mean [ accumProfitThisYear ] of archipelagos]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="coastals" color="-1184463" legend="true">
+        <setup></setup>
+        <update>if any? coastals [ plot mean [ accumProfitThisYear ] of coastals ]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="trawlers" color="-5825686" legend="true">
+        <setup></setup>
+        <update>if any? trawlers [ plot mean [ accumProfitThisYear ] of trawlers ]</update>
+      </pen>
+      <pen interval="1.0" mode="2" display="Zero-line" color="-3026479" legend="false">
+        <setup></setup>
+        <update>plot 0</update>
+      </pen>
+    </plot>
+    <plot x="780" autoPlotX="true" yMax="10.0" autoPlotY="true" y="269" xMin="0.0" height="220" legend="true" xMax="10.0" yMin="0.0" display="Catch (accumulated per year)" width="325" sizeVersion="0">
+      <setup></setup>
+      <update></update>
+      <pen interval="1.0" mode="0" display="archipelagos" color="-13840069" legend="true">
+        <setup></setup>
+        <update>if any? archipelagos [ plot sum [ accumCatchThisYear ] of archipelagos]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="coastals" color="-1184463" legend="true">
+        <setup></setup>
+        <update>if any? coastals [ plot sum [ accumCatchThisYear ] of coastals]</update>
+      </pen>
+      <pen interval="1.0" mode="0" display="trawlers" color="-5825686" legend="true">
+        <setup></setup>
+        <update>if any? trawlers [ plot sum [ accumCatchThisYear ] of trawlers]</update>
+      </pen>
+      <pen interval="1.0" mode="2" display="total" color="-7500403" legend="false">
+        <setup></setup>
+        <update>plot accumCatchYearly</update>
+      </pen>
+    </plot>
   </widgets>
   <info>## WHAT IS IT?
 

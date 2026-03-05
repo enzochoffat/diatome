@@ -14,8 +14,8 @@ from pathlib import Path
 # Add parent directory to path to import code module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from code.model import FisheryModel
-from code.loader import load_config
+from src.model import FisheryModel
+from src.loader import load_config
 
 def run_from_config(config_path, run_id=0):
     """

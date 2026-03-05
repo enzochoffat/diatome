@@ -35,7 +35,7 @@ GRID_HEIGHT = 56
 # =============================================================================
 
 # High-density fishing spots (coordinates [x, y])
-HOTSPOTS_A = [[7, 3], [16, 3], [3, 3], [10, 7]]
+HOTSPOTS_A = [[7, 3], [16, 3]]
 HOTSPOTS_B = [[3, 19], [8, 11], [19, 11], [15, 19]]
 HOTSPOTS_C = [
     [4, 51], [21, 51], [13, 45], [3, 39], 
@@ -66,7 +66,7 @@ GROWTH_RATE = 0.1  # 10% per year
 # Carrying capacities by density level (fish per patch)
 LOW_CARRYING_CAPACITY = 4           # Poor patch
 MEDIUM_CARRYING_CAPACITY = 3276     # Medium patch
-HIGH_CARRYING_CAPACITY = 873600     # Rich patch (hotspot)
+HIGH_CARRYING_CAPACITY = 8736     # Rich patch (hotspot)
 
 # Regional carrying capacities (total fish)
 # NOTE: These are recalculated at model init based on actual patch distribution
@@ -80,10 +80,10 @@ CARRYING_CAPACITY_D_INITIAL = 876000    # Open sea
 # =============================================================================
 
 # Fish market price (SEK per fish)
-FISH_PRICE = 10.0
+FISH_PRICE = 1.0
 
 # Initial capital for all fisher types (SEK)
-INITIAL_CAPITAL = 1000.0
+INITIAL_CAPITAL = 0
 
 # Age range for fishers
 MIN_AGE = 18
@@ -115,7 +115,7 @@ ARCHIPELAGO_MAX_GOOD_SPOTS = 5        # Memory capacity for good spots
 COASTAL_COST_EXISTENCE = 1.0          # Daily existence cost (SEK)
 COASTAL_COST_ACTIVITY = 1.0           # Fishing activity cost (SEK)
 COASTAL_CATCHABILITY = 10             # Fish caught per day
-COASTAL_ACCESSIBLE_REGIONS = ["A", "B"]
+COASTAL_ACCESSIBLE_REGIONS = ["B"]
 COASTAL_MAX_GOOD_SPOTS = 3            # Memory capacity for good spots
 
 # =============================================================================
@@ -125,7 +125,7 @@ COASTAL_MAX_GOOD_SPOTS = 3            # Memory capacity for good spots
 TRAWLER_COST_EXISTENCE = 5.0          # Daily existence cost (SEK)
 TRAWLER_COST_ACTIVITY = 5.0           # Fishing activity cost (SEK)
 TRAWLER_CATCHABILITY = 50             # Fish caught per day
-TRAWLER_ACCESSIBLE_REGIONS = ["A", "B", "C", "D"]
+TRAWLER_ACCESSIBLE_REGIONS = ["C", "D"]
 TRAWLER_MAX_GOOD_SPOTS = 2            # Memory capacity for good spots
 TRAWLER_STORAGE_CAPACITY = 5000       # Fish storage capacity
 
@@ -149,19 +149,19 @@ TRAVEL_COST_PER_UNIT = 1.0
 # =============================================================================
 
 # Memory settings
-DEFAULT_MEMORY_SIZE = 10              # Remember last N fishing trips
-SPATIAL_MEMORY_MAX_AGE = 365 * 2      # Forget spots after 2 years
+DEFAULT_MEMORY_SIZE = 20              # Remember last N fishing trips
+SPATIAL_MEMORY_MAX_AGE = 365 * 1      # Forget spots after 2 years
 
-# Decision thresholds (archipelago)
+# Decision thresholds (coastal)
 SATISFACTION_HOME_THRESHOLD = 0.5
-SATISFACTION_GROWTH_THRESHOLD = 0.6
+SATISFACTION_GROWTH_THRESHOLD = 0.5
 SCARCE_PERCEPTION_THRESHOLD = -0.05
 
 # Good spot criteria
 GOOD_SPOT_EFFICIENCY_THRESHOLD = 0.7  # Catch must be 70% of expected
 
 # Simple decision probability (for testing)
-SIMPLE_FISHING_PROBABILITY = 0.7      # Probability to fish in simple mode
+SIMPLE_FISHING_PROBABILITY = 0.5    # Probability to fish in simple mode
 
 # Memory windows for perception
 MEMORY_RECENT_WINDOW = 5              # Last N trips for recent catches
@@ -178,7 +178,7 @@ SCARCITY_MIN_MEMORY = 10              # Minimum trips needed to perceive scarcit
 EXPLORATION_PHASE_TRIPS = 5           # Number of trips before normal decision-making
 
 
-TRAWLER_PROFIT_THRESHOLD_DAYS = 3
+TRAWLER_PROFIT_THRESHOLD_DAYS = 1
 # =============================================================================
 # WEATHER PARAMETERS
 # =============================================================================
@@ -188,6 +188,13 @@ BAD_WEATHER_PROBABILITY = 0.1         # 10% chance of bad weather per day
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+# Social attributes
+PARTNER_PROBABILITY = 0.5 
+
+SD_CARCAP = 0.1
+HOTSPOT_HIGH_RADIUS = 1.5
+HOTSPOT_MEDIUM_RADIUS = 3.0
 
 def get_region_initial_capacity(region_name):
     """
