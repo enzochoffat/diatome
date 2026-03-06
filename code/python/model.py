@@ -3,7 +3,8 @@ from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
 from agent import FisherAgent
 import random
-from ecospace_outputs import export_data_outputs
+from ecospace_outputs import pop_evol_over_time
+
 
 class FisheryModel(Model):
     def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler):
