@@ -79,13 +79,59 @@ def pop_evol_over_time():
                 'dates' : date, 
                 'map' : maps}}
 
-    print(len(dic_tot['maps']['map']))
-    print(len(dic_tot['maps']['dates']))
-    print(dic_tot['maps']['dates'])
+    print(len(dic_tot['maps']['map'][0][0][0][0]))
+    #print(len(dic_tot['maps']['dates']))
+    #print(dic_tot['maps']['map'])
 
     return dic_tot
 
 pop_evol_over_time()
 
+def masks():
+    """
+    Lit un fichier CSV et retourne une matrice (liste de listes) servant de masque.
+    - Ignore la première ligne (en-tête).
+    - Ignore la première colonne de chaque ligne.
+    - Si la valeur est 0, le masque contient 0 (ou None/False selon besoin).
+    - Si la valeur est non nulle, le masque contient cette valeur.
+    """
+    masks = []
+    names = []
+    file_paths = choose_csv_file()
+    for fichier in file_paths : 
+        name_file = os.path.basename(fichier).split('/')[-1]
+        names.append(name_file)
+        mask_file = []
+        
+        with open(fichier, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f, delimiter=',')
+            
+            # Ignorer la première ligne (en-tête)
+            next(reader, None)
+            
+            for row in reader:
+                # Ignorer la première colonne 
+                ligne_masque = []
+                for cell in row[1:]:
+                    if cell : 
+                        val = safe_float(cell)
+                        ligne_masque.append(val)
+
+                mask_file.append(ligne_masque)
+        masks.append(mask_file)
+    
+    named_masks = {
+        'name of the masks' : names ,
+        'masks' : masks
+    }
+
+    return named_masks
+
+#masks()
+    
+
 
 ### pour ajouter ces informations au code initial, il faut changer la fonction update_fish_stock 
+## on fais un masque grace à la vraie carte étudiée donnée par le fichier ecospace baie de seine 
+# pour chaque espèce on peut alors rassembler certaines cases d'écospace pour faire correspondre avec 
+# la carte du modèle, en prenant la moyenne des concentrations de poissons dans chaque case de la grille finale
