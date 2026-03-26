@@ -15,7 +15,7 @@
   "agents": {
     "num_archipelago": 10,
     "num_coastal": 10,
-    "num_trawler": 10
+    "num_trawler": 5
   },
   
   "output": {
@@ -27,7 +27,8 @@
   "parameters": {
     "fish_dynamics": {
       "growth_rate": 0.1,
-      "initial_stock_ratio": 0.5
+      "initial_stock_ratio": 0.5,
+      "initial_stock_size": "halfCarryingCap"
     },
     "economics": {
       "fish_price": 1.0,

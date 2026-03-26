@@ -168,10 +168,26 @@ class ConfigLoader:
         
         params = self.loaded_config["parameters"]
         
-        if "fish_dynamics" in params:
-            fish_params = params["fish_dynamics"]
-            if "growth_rate" in fish_params:
-                model.GROWTH_RATE = fish_params["growth_rate"]
+        fish_dynamics = params.get("fish_dynamics", {})
+
+        if "growth_rate" in fish_dynamics:
+            default_config.config.GROWTH_RATE = fish_dynamics["growth_rate"]
+
+        if "initial_stock_size" in fish_dynamics:
+            allowed_values = {
+                "random",
+                "carryingCap",
+                "halfCarryingCap",
+                "quartCarryingCap",
+            }
+            value = fish_dynamics["initial_stock_size"]
+            if value not in allowed_values:
+                raise ValueError(
+                    f"Invalid initial_stock_size '{value}'. "
+                    f"Allowed values: {sorted(allowed_values)}"
+                )
+            default_config.config.INIT_STOCK_SIZE = value
+            model.init_stock_size = value
                 
         if "economics" in params:
             eco_params = params["economics"]

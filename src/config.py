@@ -61,7 +61,7 @@ LOW_MEDIUM = "low_medium"
 # =============================================================================
 
 # Growth rate (annual logistic growth)
-GROWTH_RATE = 0.1  # 10% per year
+GROWTH_RATE = 1.0  # 10% per year
 
 # Carrying capacities by density level (fish per patch)
 LOW_CARRYING_CAPACITY = 4           # Poor patch
@@ -75,6 +75,8 @@ CARRYING_CAPACITY_B_INITIAL = 438000    # Coastal 1
 CARRYING_CAPACITY_C_INITIAL = 876000    # Coastal 2
 CARRYING_CAPACITY_D_INITIAL = 876000    # Open sea
 
+INIT_STOCK_SIZE = "halfCarryingCap"
+
 # =============================================================================
 # ECONOMIC PARAMETERS
 # =============================================================================
@@ -83,7 +85,7 @@ CARRYING_CAPACITY_D_INITIAL = 876000    # Open sea
 FISH_PRICE = 1.0
 
 # Initial capital for all fisher types (SEK)
-INITIAL_CAPITAL = 0
+INITIAL_CAPITAL = 1000
 
 # Age range for fishers
 MIN_AGE = 18
@@ -115,7 +117,7 @@ ARCHIPELAGO_MAX_GOOD_SPOTS = 5        # Memory capacity for good spots
 COASTAL_COST_EXISTENCE = 1.0          # Daily existence cost (SEK)
 COASTAL_COST_ACTIVITY = 1.0           # Fishing activity cost (SEK)
 COASTAL_CATCHABILITY = 10             # Fish caught per day
-COASTAL_ACCESSIBLE_REGIONS = ["B"]
+COASTAL_ACCESSIBLE_REGIONS = ["A", "B"]
 COASTAL_MAX_GOOD_SPOTS = 3            # Memory capacity for good spots
 
 # =============================================================================
@@ -125,7 +127,7 @@ COASTAL_MAX_GOOD_SPOTS = 3            # Memory capacity for good spots
 TRAWLER_COST_EXISTENCE = 5.0          # Daily existence cost (SEK)
 TRAWLER_COST_ACTIVITY = 5.0           # Fishing activity cost (SEK)
 TRAWLER_CATCHABILITY = 50             # Fish caught per day
-TRAWLER_ACCESSIBLE_REGIONS = ["C", "D"]
+TRAWLER_ACCESSIBLE_REGIONS = ["B", "C", "D"]
 TRAWLER_MAX_GOOD_SPOTS = 2            # Memory capacity for good spots
 TRAWLER_STORAGE_CAPACITY = 5000       # Fish storage capacity
 
@@ -360,6 +362,7 @@ def validate_config():
     assert 0 <= SIMPLE_FISHING_PROBABILITY <= 1, "Fishing probability must be in [0,1]"
     assert 0 <= NEGATIVE_CAPITAL_LAYLOW_PROBABILITY <= 1, "Laylow probability must be in [0,1]"
     
+    assert INIT_STOCK_SIZE in {"random", "halfCarryingCap", "carryingCap", "quartCarryingCap"}, "Invalid initial stock size option"
     print("Configuration validated successfully")
 
 

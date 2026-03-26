@@ -417,7 +417,7 @@ class MainWindow(QMainWindow):
             
             self.progress_bar.setMaximum(duration)
             
-        self.timer.start(10)  # 10ms entre chaque step
+        self.timer.start(1)  # 10ms entre chaque step
         self.start_btn.setEnabled(False)
         self.pause_btn.setEnabled(True)
         self.export_btn.setEnabled(False)

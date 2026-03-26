@@ -97,11 +97,11 @@ class FisheryModel(Model):
         
         self.FISH_PRICE = config.FISH_PRICE
         
+        self.init_stock_size = config.INIT_STOCK_SIZE
+        
         # Initialize spatial grid(50x56)
         self.grid = MultiGrid(config.GRID_WIDTH, config.GRID_HEIGHT, torus=False)
         
-        self.has_partner = random.random() < config.PARTNER_PROBABILITY
-
         # Initialize patches with fish stocks
         self.init_patches()
         
@@ -221,6 +221,9 @@ class FisheryModel(Model):
         )
         
         self.yearly_data = []
+
+        # NetLogo-like: avoir un état collecté dès le setup (tick 0)
+        self.datacollector.collect(self)
     
     def _create_agents(self):
         """Create fisher agents of different types"""
@@ -229,16 +232,40 @@ class FisheryModel(Model):
         
         for _ in range(self.num_archipelago):
             agent = FisherAgent(agent_id, self, "archipelago")
+            start_pos = self._get_random_position_in_region("A")
+            if start_pos:
+                self.grid.place_agent(agent, start_pos)
+                agent.current_location = start_pos
+                agent.current_region = "A"
+                agent.region_preference = "A"
             agent_id += 1
             
         for _ in range(self.num_coastal):
             agent = FisherAgent(agent_id, self, "coastal")
+            region = self.random.choice(["A", "B"])
+            start_pos = self._get_random_position_in_region(region)
+            if start_pos:
+                self.grid.place_agent(agent, start_pos)
+                agent.current_location = start_pos
+                agent.current_region = region
             agent_id += 1
             
         for _ in range(self.num_trawler):
             agent = FisherAgent(agent_id, self, "trawler")
+            region = self.random.choice(config.TRAWLER_ACCESSIBLE_REGIONS)
+            start_pos = self._get_random_position_in_region(region)
+            if start_pos:
+                self.grid.place_agent(agent, start_pos)
+                agent.current_location = start_pos
+                agent.current_region = region
             agent_id += 1
-       
+    
+    def _get_random_position_in_region(self, region):
+        """Get a random valid patch position in a region"""
+        candidates = [pos for pos, patch in self.patches.items() 
+                     if patch['region'] == region]
+        return random.choice(candidates) if candidates else None
+    
     def init_patches(self):
         """Initialize all patches with region, density, and fish stock information"""
         # Dictionary to store patch attributes
@@ -249,8 +276,8 @@ class FisheryModel(Model):
             for y in range(self.grid.height):
                 region = self.get_region(x, y)
                 density = self.get_density(x, y, region)
-                fish_stock = self.get_initial_fish_stock(x, y, region, density)
                 carrying_capacity = self.get_carrying_capacity(region, density)
+                fish_stock = self.get_initial_fish_stock(carrying_capacity, region)
                 
                 # Store patch attributes
                 self.patches[(x, y)] = {
@@ -374,14 +401,25 @@ class FisheryModel(Model):
                 print(f"  MEDIUM: {medium_count:3d} patches ({medium_count/total*100:5.1f}%)")
                 print(f"  LOW:    {low_count:3d} patches ({low_count/total*100:5.1f}%)")
             
-    def get_initial_fish_stock(self, x, y, region, density):
-        """Calculate initial fish stock for a patch"(half of carrying capacity MSY)"""
-        if region == "LAND" or region == "NULL":
+    def get_initial_fish_stock(self, carrying_capacity, region):
+        """NetLogo-aligned init-stock-size behavior."""
+        if region in ["LAND", "NULL"]:
             return 0
+
+        # Read from config module directly (not self.init_stock_size)
+        mode = config.INIT_STOCK_SIZE
+
+        if mode == "random":
+            return self.random.randrange(carrying_capacity) if carrying_capacity > 0 else 0
+        if mode == "carryingCap":
+            return round(carrying_capacity)
+        if mode == "halfCarryingCap":
+            return round(0.5 * carrying_capacity)
+        if mode == "quartCarryingCap":
+            return round(0.25 * carrying_capacity)
+
+        raise ValueError(f"Invalid initial stock size mode: {mode}")
         
-        carrying_capacity = self.get_carrying_capacity(region, density)
-        return round(carrying_capacity / 2)
-    
     def get_region_stock(self, region_name):
         """Calculate total fish stock in a specific region"""
         total = 0
@@ -451,21 +489,21 @@ class FisheryModel(Model):
 
     def update_fish_stock_yearly(self):
         """Régénération annuelle (comme NetLogo)"""
-        density_factor = {
-            self.HIGH: 2.0,
-            self.MEDIUM: 1.25,
-            self.LOW: 1.0,
-        }
-        
         for pos, patch in self.patches.items():
-            if patch['region'] not in ["LAND", "NULL"]:
-                current_stock = patch['fish_stock']
-                K = patch['carrying_capacity']
-                factor = density_factor.get(patch['density'], 1.0)
-                
-                # Croissance logistique ANNUELLE
-                growth = current_stock * self.GROWTH_RATE * factor * (1 - current_stock / K)
-                patch['fish_stock'] = min(K, current_stock + growth)         
+            if patch['region'] in ["LAND", "NULL"]:
+                continue
+            
+            current_stock = patch['fish_stock']
+            carrying_capacity = patch['carrying_capacity']
+            
+            regen_amount = round(
+                current_stock * self.GROWTH_RATE * (1 - (current_stock / carrying_capacity))
+            )
+            
+            patch['regen_amount'] = regen_amount
+            patch['fish_stock'] = current_stock + regen_amount
+            patch['patch_stock_after_regrowth'] = patch['fish_stock']
+                        
     def get_patch_info(self, x, y):
         """Get information about a specific patch"""
         return self.patches.get((x, y), None)
@@ -483,15 +521,15 @@ class FisheryModel(Model):
         Daily execution order:
         1. Determine weather
         2. Agents make decisions and execute actions
-        3. Collect data
-        4. (If end of year) Fish stock regeneration
+        3. Collect data (every tick)
+        4. (If end of year) Fish stock regeneration / yearly summaries
         5. Check simulation end condition
         """
         
         # Determine weather
         self.determine_weather()
         
-        #Yearly action
+        # Yearly action
         if self.current_step % self.YEAR == 0 and self.current_step > 0:
             self.update_fish_stock_yearly()
             
@@ -524,58 +562,39 @@ class FisheryModel(Model):
             
             yearly_summary = self.collect_yearly_data()    
             
-                # Store catches at START of year to calculate yearly increment
             if not hasattr(self, 'last_year_catches'):
                 self.last_year_catches = {}
-            
+
             current_catches = {a.unique_id: a.total_catch for a in self.agents}
-            
-            # Calculate yearly catch increment
             yearly_catch = sum(
                 current_catches[aid] - self.last_year_catches.get(aid, 0)
                 for aid in current_catches
             )
-            
-            # Update for next year
             self.last_year_catches = current_catches
         
-        # All agent act
+        # All agents act
         for agent in self.agents:
             agent.step()
-            
-        
-        
-        
-        # Collect daily data
-                
-        # Collect yearly data
+
+        # Tickly collection (alignement NetLogo update-response-vars-tickly)
+        self.datacollector.collect(self)
+
+        # Collect yearly logs/prints
         if self.current_step % self.YEAR == 0 and self.current_step > 0:
-            self.datacollector.collect(self)
             if self.verbose:
                 year = self.current_step // self.YEAR
                 print(f"\n{'='*60}")
                 print(f"YEAR {year} COMPLETED")
                 print(f"{'='*60}")
                 print(f"Stocks: A={yearly_summary['stock_A']:,.0f} ({yearly_summary['stock_A_pct_K']:.1%}), "
-                    f"B={yearly_summary['stock_B']:,.0f} ({yearly_summary['stock_B_pct_K']:.1%})")
-                print(f"Yearly catch: {yearly_catch:,.0f}")  # ← Capture de l'année
+                      f"B={yearly_summary['stock_B']:,.0f} ({yearly_summary['stock_B_pct_K']:.1%})")
+                print(f"Yearly catch: {yearly_catch:,.0f}")
                 print(f"Total catch: {yearly_summary['total_catch_all']:,.0f}")
                 print(f"Avg capital: {yearly_summary['total_capital']/len(list(self.agents)):,.2f}")
                 print(f"Gini capital: {yearly_summary['gini_capital']:.3f}")
                 print(f"Success rate: {yearly_summary['avg_success_rate']:.1%}")
                 print(f"{'='*60}\n")
-                
-                total = sum(agent.total_catch for agent in self.agents)
-                print(f"Year {self.current_step//365}: Real total_catch = {total}")
-                
-                # Debug par type
-                for ftype in ["archipelago", "coastal", "trawler"]:
-                    agents = [a for a in self.agents if a.fisher_type == ftype]
-                    if agents:
-                        catch = sum(a.total_catch for a in agents)
-                        print(f"  {ftype}: {len(agents)} agents, {catch} total catch")
-        
-                
+
         # Increment step counter
         self.current_step += 1
         
