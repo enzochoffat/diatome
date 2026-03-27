@@ -129,7 +129,7 @@ TRAWLER_COST_ACTIVITY = 5.0           # Fishing activity cost (SEK)
 TRAWLER_CATCHABILITY = 50             # Fish caught per day
 TRAWLER_ACCESSIBLE_REGIONS = ["B", "C", "D"]
 TRAWLER_MAX_GOOD_SPOTS = 2            # Memory capacity for good spots
-TRAWLER_STORAGE_CAPACITY = 5000       # Fish storage capacity
+TRAWLER_STORAGE_CAPACITY = 50       # Fish storage capacity
 
 # =============================================================================
 # TRAVEL COSTS
@@ -151,8 +151,8 @@ TRAVEL_COST_PER_UNIT = 1.0
 # =============================================================================
 
 # Memory settings
-DEFAULT_MEMORY_SIZE = 20              # Remember last N fishing trips
-SPATIAL_MEMORY_MAX_AGE = 365 * 1      # Forget spots after 2 years
+DEFAULT_MEMORY_SIZE = 365              # Remember last N fishing trips
+SPATIAL_MEMORY_MAX_AGE = 365 * 1      # Forget spots after 1 years
 
 # Decision thresholds (coastal)
 SATISFACTION_HOME_THRESHOLD = 0.5
