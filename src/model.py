@@ -352,9 +352,9 @@ class FisheryModel(Model):
             distance = ((x - hs[0])**2 + (y - hs[1])**2)**0.5
             min_distance = min(min_distance, distance)
             
-        if min_distance <= 1.5:
+        if min_distance <= 3:
             return self.HIGH
-        elif min_distance <= 3.0:
+        elif min_distance <= 5:
             return self.MEDIUM
         else:
             return self.LOW

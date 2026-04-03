@@ -15,6 +15,7 @@ sys.path.insert(0, str(project_root))
 
 from src.ecospace_outputs import masks
 from src.ecospace_outputs import get_ecospace_data
+from src import ecospace_outputs
 
 # =============================================================================
 # TIME CONSTANTS
@@ -33,9 +34,59 @@ YEAR = 365
 # Grid dimensions
 GRID_WIDTH = 101
 GRID_HEIGHT = 70
-TOPOLOGY = masks(file = True)['masks'][0]
+TOPOLOGY = masks(topology=True, windfarm=False)['masks'][0]
 # Regional boundaries [x_range, y_range]
 LAND = [row for row in [[val for val in row if val < 1e-29] for row in TOPOLOGY] if row]
+
+def add_windfarm_to_topology():
+    """
+    Load Wind Farm topology and merge it with existing TOPOLOGY.
+    Updates LAND zones to include Wind Farm areas.
+    Also recalculates REGION_A/B/C/D with new topology.
+    """
+    global TOPOLOGY, LAND, WATER, y_min_water, REGION_A, REGION_B, REGION_C, REGION_D
+    try:
+        # Load Wind Farm topology
+        windfarm_data = masks(topology=False, windfarm=True)
+        windfarm_topology = windfarm_data['masks'][0]
+        
+        # Merge: if either TOPOLOGY or WINDFARM is LAND (value < 1e-29), result is LAND
+        merged_topology = []
+        for y in range(len(TOPOLOGY)):
+            row = []
+            for x in range(len(TOPOLOGY[y])):
+                topo_val = TOPOLOGY[y][x]
+                wind_val = windfarm_topology[y][x] if y < len(windfarm_topology) and x < len(windfarm_topology[y]) else topo_val
+                
+                # If either is LAND, result is LAND
+                if topo_val < 1e-29 or wind_val == 1:
+                    row.append(1e-30)  # LAND (small value < 1e-29)
+                else:
+                    row.append(topo_val)  # Water
+            merged_topology.append(row)
+        
+        # Update global TOPOLOGY
+        TOPOLOGY = merged_topology
+        LAND = [row for row in [[val for val in row if val < 1e-29] for row in TOPOLOGY] if row]
+        
+        # Recalculate WATER and y_min_water
+        WATER = [row for row in [[val for val in row if val >= 1e-29] for row in TOPOLOGY] if row]
+        y_min_water = int(min(WATER[-1])) if WATER else 0
+        
+        # Recalculate regions with new topology
+        REGION_A = define_region('A')
+        REGION_B = define_region('B')
+        REGION_C = define_region('C')
+        REGION_D = define_region('D')
+        
+        return merged_topology
+    
+    except Exception as e:
+        print(f"Error loading Wind Farm topology: {e}")
+        return TOPOLOGY
+
+
+
 WATER = [row for row in [[val for val in row if val >= 1e-29] for row in TOPOLOGY] if row]
 single_slice = GRID_HEIGHT//4
 y_min_water = int(min(WATER[-1]))
@@ -74,12 +125,24 @@ def get_hotspots_for_step(step, region_name):
     Retourne les 2 hotspots avec la plus haute concentration pour une région à un step donné.
     Chaque date Ecospace = 30 steps du modèle.
     La première date Ecospace correspond à step 0.
-    Retourne les hotspots par défaut si les données Ecospace ne sont pas disponibles.
+    Utilise les hotspots par défaut si les données Ecospace n'ont pas été chargées.
     """
+    # Hotspots par défaut si Ecospace n'est pas disponible
+    default_hotspots = {
+        'A': [[7, 3], [16, 3]],
+        'B': [[3, 19], [8, 11]],
+        'C': [[4, 51], [21, 51]],
+        'D': [[30, 51], [47, 51]]
+    }
+    
+    # Si ecospace_data n'a jamais été chargé (cache is None), utiliser les defaults
+    if ecospace_outputs._ecospace_data_cache is None:
+        return default_hotspots.get(region_name, [])
+    
     try:
-        ecospace_data = get_ecospace_data()
+        ecospace_data = ecospace_outputs._ecospace_data_cache
         if ecospace_data is None or 'maps' not in ecospace_data:
-            raise ValueError("Données Ecospace non disponibles")
+            return default_hotspots.get(region_name, [])
         
         date_index = step // 30
         
@@ -103,17 +166,7 @@ def get_hotspots_for_step(step, region_name):
             top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)[:3]
             return top_coords
     except Exception as e:
-        print(f"Avertissement: Impossible de charger les hotspots dynamiques - {e}")
-        # Retourner les hotspots par défaut
         pass
-    
-    # Hotspots par défaut si Ecospace n'est pas disponible
-    default_hotspots = {
-        'A': [[7, 3], [16, 3]],
-        'B': [[3, 19], [8, 11]],
-        'C': [[4, 51], [21, 51]],
-        'D': [[30, 51], [47, 51]]
-    }
     
     return default_hotspots.get(region_name, [])
 

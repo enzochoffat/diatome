@@ -120,7 +120,7 @@ def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la 
 
     return dic_tot
 
-def masks(file = False):
+def masks(topology = False, windfarm = False):
     """
     Lit un fichier CSV et retourne une matrice (liste de listes) servant de masque.
     - Ignore la première ligne (en-tête).
@@ -133,44 +133,32 @@ def masks(file = False):
     """
     masks = []
     names = []
-    if not file :
+    if topology : 
+        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Depth.csv')]
+    elif windfarm : 
+        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Wind_Farm_100%.csv')]
+    else:
         file_paths = choose_csv_file()
-    else : 
-        file_paths = str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Depth.csv')
     for fichier in file_paths : 
         name_file = os.path.basename(fichier).split('/')[-1]
         names.append(name_file)
         mask_file = []
         
-        if not file :
-            with open(fichier, 'r', newline='', encoding='utf-8') as f:
-                reader = csv.reader(f, delimiter=',')
-                next(reader, None)
-            
-                for row in reader:
-                    # Ignorer la première colonne 
-                    ligne_masque = []
-                    for cell in row[1:]:
-                        if cell : 
-                            val = safe_float(cell)
-                            ligne_masque.append(val)
-
-                    mask_file.append(ligne_masque)
-        else : 
-            with open(file_paths, 'r', newline='', encoding='utf-8') as f:
-                reader = csv.reader(f, delimiter=',')
-                # Ignorer la première ligne (en-tête)
-                next(reader, None)
-            
-                for row in reader:
-                    # Ignorer la première colonne 
-                    ligne_masque = []
-                    for cell in row[1:]:
-                        if cell : 
-                            val = safe_float(cell)
-                            ligne_masque.append(val)
-
-                    mask_file.append(ligne_masque)
+        with open(fichier, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f, delimiter=',')
+            # Ignorer la première ligne (en-tête)
+            next(reader, None)
+        
+            for row in reader:
+                # Ignorer la première colonne 
+                ligne_masque = []
+                for cell in row[1:]:
+                    if cell : 
+                        val = safe_float(cell)
+                        ligne_masque.append(val)
+                
+                mask_file.append(ligne_masque)
+        
         masks.append(mask_file)
     
     named_masks = {
