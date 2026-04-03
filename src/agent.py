@@ -7,14 +7,14 @@ from collections import Counter
 
 class FisherAgent(Agent):
     
-    def __init__(self, unique_id, model, fisher_type):
+    def __init__(self, unique_id, model, fisher_type, initial_capital=None):
         super().__init__(model)
         self.fisher_type = fisher_type # "archipelago", "coastal", "trawler"
         self.unique_id = unique_id
         
         # Basic attributes
         self.wealth = 0
-        self.capital = config.INITIAL_CAPITAL
+        self.capital = config.INITIAL_CAPITAL if initial_capital is None else float(initial_capital)
         self.age = random.randint(config.MIN_AGE, config.MAX_AGE)
         self.days_at_sea = 0
         self.total_catch = 0
@@ -311,8 +311,8 @@ class FisherAgent(Agent):
         """
         
         # Remove from current position if exists
-        if self.current_location:
-            self.model.grid.remove_agent(self)
+        #if self.current_location:
+        #    self.model.grid.remove_agent(self)
         
         # Place at new position
         self.model.grid.place_agent(self, (x, y))
@@ -422,7 +422,7 @@ class FisherAgent(Agent):
                 travel_cost = self.get_travel_cost(current_region)
             else:
                 if self.jumped:
-                    travel_cost = self.get_travel_cost(current_region) / 8
+                    travel_cost = self.get_travel_cost(current_region) / 2
                     self.jumped = False
                 else:
                     travel_cost = 0
@@ -682,10 +682,10 @@ class FisherAgent(Agent):
             'total_catch': self.total_catch,
             'profitable_trips': self.profitable_trip,
             'unprofitable_trips': self.unprofitable_trip,
-            'total_tripd': total_trips,
+            'total_trips': total_trips,
             'success_rate': self.profitable_trip / total_trips if total_trips > 0 else 0,
             'avg_profit_per_trip': self.total_profit / total_trips if total_trips > 0 else 0,
-            'bankrupt': self.b
+            'bankrupt': self.bankrupt,
         }
     
     def stay_home(self, pay_existence_cost=False):
@@ -736,9 +736,8 @@ class FisherAgent(Agent):
         self.current_region = None
         self.current_location = None
         
-        if hasattr(self, 'pos') and self.pos:
+        if getattr(self, 'pos', None) is not None:
             self.model.grid.remove_agent(self)
-            self.pos = None
             
         self.accumulated_catch = 0
         self.trip_cost = 0
@@ -817,15 +816,15 @@ class FisherAgent(Agent):
     def can_afford_trip(self, cost):
         """
         Check if agent can afford a fishing trip.
-        
-        Args:
-            estimated_cost (float): Estimated cost of trip
-            
-        Returns:
-            bool: True if agent can afford
+
+        NetLogo alignment:
+        - Trawlers are not blocked by an upfront affordability gate.
+        - Other fisher types keep the safety buffer check.
         """
+        if self.fisher_type == "trawler":
+            return True
+
         safety_buffer = config.get_safety_buffer(self.cost_existence)
-        
         return self.capital + safety_buffer >= cost
     
     def estimate_trip_cost( self, location):
@@ -1021,86 +1020,132 @@ class FisherAgent(Agent):
             self.expect_no_profit = True
         
 # ==================== TRAWLER DECISION ====================
+    def _is_beginning_season(self):
+        """
+        NetLogo equivalent of beginning-season:
+        True during first month of the current year.
+        """
+        first_month_of_year = self.model.current_step % self.model.YEAR
+        return first_month_of_year < self.model.MONTH
 
     def optimise_growth(self):
         """
-       Trawler decision model: Pure profit maximization
-       Multi-day trips with storage capacity
-       """
-        if len(self.memory) < config.EXPLORATION_PHASE_TRIPS:
-            self.will_fish = not self.model.bad_weather
+        Trawler decision model aligned with NetLogo timing:
+        - At home: memory-based expectations only after first week
+        and outside beginning-season.
+        - Otherwise: random exploration over B/C/D.
+        - At sea: use _decide_while_at_sea().
+        """
+        if self.gone_fishing:
+            self._decide_while_at_sea()
+            return
+
+        # Not at sea (NetLogo branch: not(goneFishing))
+        use_memory_expectations = (
+            (self.model.current_step > self.model.WEEK)
+            and (not self._is_beginning_season())
+        )
+
+        if use_memory_expectations:
+            self._decide_while_at_home()
+        else:
+            # NetLogo random region choice at beginning of run/year
+            self.region_preference = random.choice(self.accessible_regions)
+
+            expected_catch = self.catchability
+            expected_income = expected_catch * self.model.FISH_PRICE
+            expected_cost = (
+                self.cost_activity
+                + self.cost_existence
+                + self.get_travel_cost(self.region_preference)
+            )
+
+            expected_profit_go = expected_income - expected_cost
+            expected_profit_stay = -self.cost_existence
+
+            self.will_fish = expected_profit_go > expected_profit_stay
             if self.will_fish:
-                self.region_preference = self.accessible_regions[0]
                 self.fish_onboard = 0
                 self.days_at_sea_current_trip = 0
                 self.jumped = False
-            return
-        
-        if self.gone_fishing:
-            self._decide_while_at_sea()
-        else:
-            self._decide_while_at_home()
 
             
     def _decide_while_at_sea(self):
-        """Decision logic when trawler is already at sea"""
+        """Decision logic when trawler is already at sea (NetLogo-aligned)."""
         current_region = self.current_region if self.current_region else self.region_preference
-        
         fish_wish = self.storing_capacity - self.fish_onboard
-        
+
+        # NetLogo: fish at current patch + patches in radius 1
+        fish_vicinity = 0
         if self.current_location:
             patch = self.model.get_patch_info(*self.current_location)
             fish_vicinity = patch['fish_stock'] if patch else 0
-            
+
             neighbors = self.get_neighbor_positions_in_radius(self.current_location, radius=1)
             for neighbor_pos in neighbors:
                 neighbor_patch = self.model.get_patch_info(*neighbor_pos)
                 if neighbor_patch and neighbor_patch['region'] == current_region:
                     fish_vicinity += neighbor_patch['fish_stock']
-                    
-        else:
-            fish_vicinity = 0
-            
+
+        expected_travel_cost = 0
+
+        # NetLogo branch 1: enough fish nearby
         if fish_vicinity >= fish_wish:
             expected_catch = fish_wish
             self.region_preference = current_region
-            expected_travel_cost = 0
+
         else:
-            expected_catch = fish_wish
-            
+            # Compute expected catches in other regions from memory
             other_regions = [r for r in self.accessible_regions if r != current_region]
             expected_catches = {}
             travel_costs = {}
-            
+
             for region in other_regions:
                 expected_catches[region] = self._estimate_catch(region)
                 travel_costs[region] = self.get_travel_cost_between_regions(current_region, region)
-                
-            best_switch_profit = float('-inf')
-            best_switch_region = None
-            
-            for region in other_regions:
-                revenue = expected_catches[region] * config.FISH_PRICE
-                profit = revenue - self.cost_activity - travel_costs[region]
-                if profit > best_switch_profit:
-                    best_switch_profit = profit
-                    best_switch_region = region
-                    
-            stay_profit = fish_vicinity * config.FISH_PRICE - self.cost_activity
-            
-            if best_switch_profit > stay_profit:
-                self.region_preference = best_switch_region
-                expected_travel_cost = travel_costs[best_switch_region]
-                self.jumped = True
-            else:
+
+            # NetLogo equivalent:
+            # if max(expected catches) < fishWish:
+            #   expected-catch = fishVicinity
+            #   expected-travel-cost = getTravelCost(currentRegion)/2
+            #   regionPref = currentRegion
+            best_expected_other = max(expected_catches.values()) if expected_catches else 0
+
+            if best_expected_other < fish_wish:
+                expected_catch = fish_vicinity
+                expected_travel_cost = self.get_travel_cost(current_region) / 2
                 self.region_preference = current_region
-                expected_travel_cost = self.get_travel_cost(current_region) / 8
-                
+
+            else:
+                # NetLogo equivalent:
+                # expected-catch = fishWish, then choose region via expected travel cost/profit tradeoff
+                expected_catch = fish_wish
+
+                best_switch_profit = float('-inf')
+                best_switch_region = None
+
+                for region in other_regions:
+                    revenue = expected_catches[region] * self.model.FISH_PRICE
+                    profit = revenue - self.cost_activity - travel_costs[region]
+                    if profit > best_switch_profit:
+                        best_switch_profit = profit
+                        best_switch_region = region
+
+                stay_profit = fish_vicinity * self.model.FISH_PRICE - self.cost_activity
+
+                if best_switch_region is not None and best_switch_profit > stay_profit:
+                    self.region_preference = best_switch_region
+                    expected_travel_cost = travel_costs[best_switch_region]
+                    self.jumped = True
+                else:
+                    self.region_preference = current_region
+                    expected_travel_cost = self.get_travel_cost(current_region) / 2
+
         expected_cost = self.cost_activity + self.cost_existence + expected_travel_cost
-        expected_income = expected_catch * config.FISH_PRICE
+        expected_income = expected_catch * self.model.FISH_PRICE
         expected_profit_go = expected_income - expected_cost
         expected_profit_stay = -self.cost_existence
-        
+
         if expected_profit_go > expected_profit_stay:
             self.will_fish = True
         else:
@@ -1139,7 +1184,7 @@ class FisherAgent(Agent):
             recent = region_memory[-10:]
             return statistics.mean(trip['catch'] for trip in recent)
         else:
-            return self.catchability * 0.8
+            return self.catchability
         
     def land_fish(self):
         """
@@ -1175,43 +1220,79 @@ class FisherAgent(Agent):
 
     def decide_fishSpot(self, region):
         """
-        Main spot selection method
-        Routes to different strategies based on agent type and strategy
+        NetLogo-aligned spot selection.
+        - Multi-day trawler at sea: evaluate stayPut after local technology scan.
+        - Otherwise choose spot via social rule or knowledge, then optional uphill.
         """
         if not region:
             return None
-        
-        # Trawler already at sea with technology → check current spot first (stayPut)
-        if (self.fisher_type == "trawler" 
-                and self.gone_fishing 
-                and self.has_technologie 
-                and self.current_location):
-            
-            patch = self.model.get_patch_info(*self.current_location)
+
+        stay_put = False
+        fishing_spot = None
+
+        # NetLogo multi-day branch (gonefishing)
+        if self.fisher_type == "trawler" and self.gone_fishing:
+            if self.has_technologie and self.current_location:
+                current_spot = self.current_location
+                uphill_spot = self.get_fishSpot_uphill_climbing(region)
+
+                # Keep current spot if uphill crosses to another region
+                if uphill_spot:
+                    uphill_patch = self.model.get_patch_info(*uphill_spot)
+                    current_patch = self.model.get_patch_info(*current_spot)
+                    if (uphill_patch and current_patch
+                            and uphill_patch['region'] == current_patch['region']):
+                        self.current_location = uphill_spot
+
+            # NetLogo literal condition:
+            # if fish-stock < (storingcapacity - fish-onboard) then stayPut = true
+            patch_here = self.model.get_patch_info(*self.current_location) if self.current_location else None
+            fish_here = patch_here['fish_stock'] if patch_here else 0
             fish_wish = self.storing_capacity - self.fish_onboard
-            
-            if patch and patch['fish_stock'] >= fish_wish:
-                # Enough fish here → stay put (NetLogo: stayPut = true)
-                return self.current_location
-            else:
-                # Not enough → uphill climbing to best neighbor
-                self.jumped = True
-                return self.get_fishSpot_uphill_climbing(region)
-        
-        # Trawler with technology moving to new spot
-        if self.fisher_type == "trawler" and self.has_technologie:
-            return self.get_fishSpot_uphill_climbing(region)
-        
-        # Social influence routing (coastal + trawler with colleagues)
-        if self.has_colleagues:
+            if fish_here < fish_wish:
+                stay_put = True
+
+        # NetLogo: if not stayPut, select/move
+        if not stay_put:
+            self.jumped = True
+
             social_strategy = getattr(self.model, 'social_influence', 'expertise')
-            if social_strategy == 'expertise':
-                return self.get_fishSpot_expertise(region)
-            elif social_strategy == 'descriptiveNorm':
-                return self.get_fishSpot_descriptive_norm(region)
-        
-        # Default: knowledge-based
-        return self.get_fishSpot_knowledge(region)
+            follow_social = (
+                social_strategy != "none"
+                and self.has_colleagues
+                and random.randint(0, 10) < 8
+            )
+
+            if follow_social:
+                if social_strategy == "descriptiveNorm":
+                    fishing_spot = self.get_fishSpot_descriptive_norm(region)
+                else:
+                    fishing_spot = self.get_fishSpot_expertise(region)
+
+                if fishing_spot is None:
+                    fishing_spot = self.get_fishSpot_knowledge(region)
+            else:
+                fishing_spot = self.get_fishSpot_knowledge(region)
+
+            if fishing_spot is None:
+                return self.explore_random_spot(region)
+
+            # Move to chosen spot
+            self.current_location = fishing_spot
+
+            # NetLogo second uphill pass after moving
+            if self.fisher_type == "trawler" and self.has_technologie:
+                current_spot = self.current_location
+                uphill_spot = self.get_fishSpot_uphill_climbing(region)
+                if uphill_spot:
+                    uphill_patch = self.model.get_patch_info(*uphill_spot)
+                    current_patch = self.model.get_patch_info(*current_spot)
+                    if (uphill_patch and current_patch
+                            and uphill_patch['region'] == current_patch['region']):
+                        self.current_location = uphill_spot
+
+        self.at_sea = True
+        return self.current_location
         
     def get_fishSpot_knowledge(self, region):
         """Select spot from memory (knowledge-based)"""

@@ -9,8 +9,21 @@ from datetime import datetime
 import os
 import numpy as np
 
+from src.config import get_hotspots_for_step
+
 class FisheryModel(Model):
-    def __init__(self, end_of_sim, num_archipelago, num_coastal, num_trawler, verbose=True):
+    def __init__(
+        self,
+        end_of_sim,
+        num_archipelago,
+        num_coastal,
+        num_trawler,
+        verbose=True,
+        growth_rate=None,
+        fish_price=None,
+        bad_weather_probability=None,
+        initial_capital=None,
+    ):
         super().__init__()
         
         self.verbose = verbose
@@ -31,7 +44,11 @@ class FisheryModel(Model):
         
         # Weather tracking
         self.bad_weather = False
-        self.bad_weather_probability = config.BAD_WEATHER_PROBABILITY
+        self.bad_weather_probability = (
+            config.BAD_WEATHER_PROBABILITY
+            if bad_weather_probability is None
+            else float(bad_weather_probability)
+        )
 
         # Define spatial constants
         self.REGION_A = config.REGION_A
@@ -87,15 +104,16 @@ class FisheryModel(Model):
         self.CATCHABILITY_TRAWLER = config.TRAWLER_CATCHABILITY # trawler
 
         # Define patchs 
-        self.HOTSPOTS_A = config.HOTSPOTS_A # high density spots in region A
-        self.HOTSPOTS_B = config.HOTSPOTS_B # high density spots in region B
-        self.HOTSPOTS_C = config.HOTSPOTS_C # high density spots in region C
-        self.HOTSPOTS_D = config.HOTSPOTS_D # high density spots in region D
+        self.HOTSPOTS_A = get_hotspots_for_step(0, 'A')
+        self.HOTSPOTS_B = get_hotspots_for_step(0, 'B')
+        self.HOTSPOTS_C = get_hotspots_for_step(0, 'C')
+        self.HOTSPOTS_D = get_hotspots_for_step(0, 'D')
 
         # Define growth rate
-        self.GROWTH_RATE = config.GROWTH_RATE # 10% per year
+        self.GROWTH_RATE = config.GROWTH_RATE if growth_rate is None else float(growth_rate)
         
-        self.FISH_PRICE = config.FISH_PRICE
+        self.FISH_PRICE = config.FISH_PRICE if fish_price is None else float(fish_price)
+        self.initial_capital = config.INITIAL_CAPITAL if initial_capital is None else float(initial_capital)
         
         self.init_stock_size = config.INIT_STOCK_SIZE
         
@@ -231,7 +249,7 @@ class FisheryModel(Model):
         agent_id = 0
         
         for _ in range(self.num_archipelago):
-            agent = FisherAgent(agent_id, self, "archipelago")
+            agent = FisherAgent(agent_id, self, "archipelago", initial_capital=self.initial_capital)
             start_pos = self._get_random_position_in_region("A")
             if start_pos:
                 self.grid.place_agent(agent, start_pos)
@@ -241,7 +259,7 @@ class FisheryModel(Model):
             agent_id += 1
             
         for _ in range(self.num_coastal):
-            agent = FisherAgent(agent_id, self, "coastal")
+            agent = FisherAgent(agent_id, self, "coastal", initial_capital=self.initial_capital)
             region = self.random.choice(["A", "B"])
             start_pos = self._get_random_position_in_region(region)
             if start_pos:
@@ -251,7 +269,7 @@ class FisheryModel(Model):
             agent_id += 1
             
         for _ in range(self.num_trawler):
-            agent = FisherAgent(agent_id, self, "trawler")
+            agent = FisherAgent(agent_id, self, "trawler", initial_capital=self.initial_capital)
             region = self.random.choice(config.TRAWLER_ACCESSIBLE_REGIONS)
             start_pos = self._get_random_position_in_region(region)
             if start_pos:
@@ -266,7 +284,7 @@ class FisheryModel(Model):
                      if patch['region'] == region]
         return random.choice(candidates) if candidates else None
     
-    def init_patches(self):
+    def init_patches(self): #modifier ces quatre fonctions  
         """Initialize all patches with region, density, and fish stock information"""
         # Dictionary to store patch attributes
         self.patches = {}
@@ -292,21 +310,17 @@ class FisheryModel(Model):
         }
     
     def get_region(self, x, y):
-        """Determine which region a coordinate belongs to"""
-        # Region A: x[0,25], y[0,8]
-        if 0 <= x < 25 and 0 <= y < 8:
+        """Determine which region a coordinate belongs to using config definitions"""
+        # Check if coordinates are in any of the defined regions
+        if [x, y] in self.REGION_A:
             return 'A'
-        # Region B: x[0,25], y[8,24]
-        elif 0 <= x < 25 and 8 <= y < 24:
+        elif [x, y] in self.REGION_B:
             return 'B'
-        # Region C: x[0,25], y[24,56]
-        elif 0 <= x < 25 and 24 <= y < 56:
+        elif [x, y] in self.REGION_C:
             return 'C'
-        # Region D: x[25,50], y[24,56]
-        elif 25 <= x < 50 and 24 <= y < 56:
+        elif [x, y] in self.REGION_D:
             return 'D'
-        # Land: x[25,50], y[0,24]
-        elif 25 <= x < 50 and 0 <= y < 24:
+        elif [x, y] in self.LAND:
             return 'LAND'
         else:
             return 'NULL'
@@ -603,6 +617,12 @@ class FisheryModel(Model):
             self.running = False
             if self.verbose:
                 self.print_final_summary()
+
+        if self.current_step % 30 == 0:
+            self.HOTSPOTS_A = get_hotspots_for_step(self.current_step, 'A')
+            self.HOTSPOTS_B = get_hotspots_for_step(self.current_step, 'B')
+            self.HOTSPOTS_C = get_hotspots_for_step(self.current_step, 'C')
+            self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
             
     def print_final_summary(self):
         """Print comprehensive summary at end of simulation"""

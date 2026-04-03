@@ -5,6 +5,17 @@ This module centralizes all model parameters, making them easy to modify
 for experiments and sensitivity analysis.
 """
 
+import sys 
+from pathlib import Path
+import numpy as np 
+
+# Add the project root to Python path so we can import from src
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.ecospace_outputs import masks
+from src.ecospace_outputs import get_ecospace_data
+
 # =============================================================================
 # TIME CONSTANTS
 # =============================================================================
@@ -19,32 +30,93 @@ YEAR = 365
 # SPATIAL DEFINITIONS
 # =============================================================================
 
-# Regional boundaries [x_range, y_range]
-REGION_A = [[0, 25], [0, 8]]      # Archipelago zone
-REGION_B = [[0, 25], [8, 24]]     # Coastal zone 1
-REGION_C = [[0, 25], [24, 56]]    # Coastal zone 2
-REGION_D = [[25, 50], [24, 56]]   # Open sea
-LAND = [[25, 50], [0, 24]]        # Non-fishing area
-
 # Grid dimensions
-GRID_WIDTH = 50
-GRID_HEIGHT = 56
+GRID_WIDTH = 101
+GRID_HEIGHT = 70
+TOPOLOGY = masks(file = True)['masks'][0]
+# Regional boundaries [x_range, y_range]
+LAND = [row for row in [[val for val in row if val < 1e-29] for row in TOPOLOGY] if row]
+WATER = [row for row in [[val for val in row if val >= 1e-29] for row in TOPOLOGY] if row]
+single_slice = GRID_HEIGHT//4
+y_min_water = int(min(WATER[-1]))
+
+def define_region(REGION_NAME) :
+    REGION = []
+    if REGION_NAME == 'A' : 
+        max_slice = single_slice
+    elif REGION_NAME == 'B' : 
+        max_slice = 2*single_slice
+    elif REGION_NAME == 'C' : 
+        max_slice = 3*single_slice
+    elif REGION_NAME == 'D' : 
+        max_slice = 4*single_slice
+    for y in range(y_min_water, max_slice):
+        for x in range(GRID_WIDTH):
+            if y < len(TOPOLOGY) and x < len(TOPOLOGY[y]) and TOPOLOGY[y][x] > 0:
+                REGION.append([x, y])
+    return REGION
+
+REGION_A = define_region('A')    #Archipelagos 
+REGION_B = define_region('B')    # Coastal zone 1
+REGION_C = define_region('C')    # Coastal zone 2
+REGION_D = define_region('D')   # Open sea
+
+
 
 # =============================================================================
 # HOTSPOT LOCATIONS
 # =============================================================================
 
 # High-density fishing spots (coordinates [x, y])
-HOTSPOTS_A = [[7, 3], [16, 3]]
-HOTSPOTS_B = [[3, 19], [8, 11], [19, 11], [15, 19]]
-HOTSPOTS_C = [
-    [4, 51], [21, 51], [13, 45], [3, 39], 
-    [12, 36], [22, 40], [7, 27], [19, 27]
-]
-HOTSPOTS_D = [
-    [30, 51], [47, 51], [37, 45], [29, 39], 
-    [46, 39], [37, 33], [31, 27], [44, 27]
-]
+
+def get_hotspots_for_step(step, region_name):
+    """
+    Retourne les 2 hotspots avec la plus haute concentration pour une région à un step donné.
+    Chaque date Ecospace = 30 steps du modèle.
+    La première date Ecospace correspond à step 0.
+    Retourne les hotspots par défaut si les données Ecospace ne sont pas disponibles.
+    """
+    try:
+        ecospace_data = get_ecospace_data()
+        if ecospace_data is None or 'maps' not in ecospace_data:
+            raise ValueError("Données Ecospace non disponibles")
+        
+        date_index = step // 30
+        
+        # Gestion des limites
+        if date_index >= len(ecospace_data['maps']['map']):
+            date_index = len(ecospace_data['maps']['map']) - 1
+        
+        fish_map = np.array(ecospace_data['maps']['map'][date_index][0])
+        
+        # Sélectionner la région
+        region_map = {
+            'A': REGION_A,
+            'B': REGION_B,
+            'C': REGION_C,
+            'D': REGION_D
+        }
+        region = region_map.get(region_name, [])
+        
+        # Trouver les 3 plus hautes concentrations
+        if region:
+            top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)[:3]
+            return top_coords
+    except Exception as e:
+        print(f"Avertissement: Impossible de charger les hotspots dynamiques - {e}")
+        # Retourner les hotspots par défaut
+        pass
+    
+    # Hotspots par défaut si Ecospace n'est pas disponible
+    default_hotspots = {
+        'A': [[7, 3], [16, 3]],
+        'B': [[3, 19], [8, 11]],
+        'C': [[4, 51], [21, 51]],
+        'D': [[30, 51], [47, 51]]
+    }
+    
+    return default_hotspots.get(region_name, [])
+
 
 # =============================================================================
 # DENSITY LEVELS
@@ -129,7 +201,7 @@ TRAWLER_COST_ACTIVITY = 5.0           # Fishing activity cost (SEK)
 TRAWLER_CATCHABILITY = 50             # Fish caught per day
 TRAWLER_ACCESSIBLE_REGIONS = ["B", "C", "D"]
 TRAWLER_MAX_GOOD_SPOTS = 2            # Memory capacity for good spots
-TRAWLER_STORAGE_CAPACITY = 5000       # Fish storage capacity
+TRAWLER_STORAGE_CAPACITY = 50       # Fish storage capacity
 
 # =============================================================================
 # TRAVEL COSTS
@@ -151,8 +223,8 @@ TRAVEL_COST_PER_UNIT = 1.0
 # =============================================================================
 
 # Memory settings
-DEFAULT_MEMORY_SIZE = 20              # Remember last N fishing trips
-SPATIAL_MEMORY_MAX_AGE = 365 * 1      # Forget spots after 2 years
+DEFAULT_MEMORY_SIZE = 365              # Remember last N fishing trips
+SPATIAL_MEMORY_MAX_AGE = 365 * 1      # Forget spots after 1 years
 
 # Decision thresholds (coastal)
 SATISFACTION_HOME_THRESHOLD = 0.5
@@ -197,6 +269,8 @@ PARTNER_PROBABILITY = 0.5
 SD_CARCAP = 0.1
 HOTSPOT_HIGH_RADIUS = 1.5
 HOTSPOT_MEDIUM_RADIUS = 3.0
+
+
 
 def get_region_initial_capacity(region_name):
     """
