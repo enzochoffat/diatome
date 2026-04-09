@@ -311,8 +311,11 @@ class FisheryModel(Model):
     
     def get_region(self, x, y):
         """Determine which region a coordinate belongs to using config definitions"""
-        # Check if coordinates are in any of the defined regions
-        if [x, y] in self.REGION_A:
+        # Check LAND FIRST to catch windfarm areas before region check
+        if [x, y] in self.LAND:
+            return 'LAND'
+        # Then check defined regions
+        elif [x, y] in self.REGION_A:
             return 'A'
         elif [x, y] in self.REGION_B:
             return 'B'
@@ -320,8 +323,6 @@ class FisheryModel(Model):
             return 'C'
         elif [x, y] in self.REGION_D:
             return 'D'
-        elif [x, y] in self.LAND:
-            return 'LAND'
         else:
             return 'NULL'
     

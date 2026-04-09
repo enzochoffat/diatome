@@ -35,9 +35,21 @@ YEAR = 365
 # Grid dimensions
 GRID_WIDTH = 101
 GRID_HEIGHT = 70
+
+def compute_land_coordinates(topo_matrix):
+    """Compute list of [x, y] coordinates for all LAND cells"""
+    land_coords = []
+    for y in range(len(topo_matrix)):
+        for x in range(len(topo_matrix[y])):
+            if topo_matrix[y][x] == 0 or topo_matrix[y][x] < 1e-29:
+                land_coords.append([x, y])
+    return land_coords
+
 TOPOLOGY = masks(topology=True, windfarm=False)['masks'][0]
+ORIGINAL_TOPOLOGY = [row[:] for row in TOPOLOGY]  # Deep copy of original topology before windfarm
+
 # Regional boundaries [x_range, y_range]
-LAND = [row for row in [[val for val in row if val < 1e-29] for row in TOPOLOGY] if row]
+LAND = compute_land_coordinates(TOPOLOGY)
 WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
 
 def add_windfarm_to_topology():
@@ -67,19 +79,23 @@ def add_windfarm_to_topology():
                     row.append(topo_val)  # Water
             merged_topology.append(row)
         
-        # Update global TOPOLOGY
+        # Update global TOPOLOGY for fisher navigation (prevents access to windfarm areas)
         TOPOLOGY = merged_topology
-        LAND = [row for row in [[val for val in row if val < 0] for row in TOPOLOGY] if row]
+        LAND = compute_land_coordinates(TOPOLOGY)
         
         # Recalculate WATER and y_min_water
         WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
         y_min_water = int(min(WATER[-1])) if WATER else 0
         
-        # Recalculate regions with new topology
-        REGION_A = define_region('A')
-        REGION_B = define_region('B')
-        REGION_C = define_region('C')
-        REGION_D = define_region('D')
+        # Recalculate regions using ORIGINAL_TOPOLOGY (so regions and hotspots don't change)
+        REGION_A = define_region('A', topology_matrix=ORIGINAL_TOPOLOGY)
+        REGION_B = define_region('B', topology_matrix=ORIGINAL_TOPOLOGY)
+        REGION_C = define_region('C', topology_matrix=ORIGINAL_TOPOLOGY)
+        REGION_D = define_region('D', topology_matrix=ORIGINAL_TOPOLOGY)
+        
+        # Remove overlaps from region C
+        region_d_set = set(tuple(cell) for cell in REGION_D)
+        REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
         
         return merged_topology
     
@@ -189,7 +205,10 @@ def get_neighbors_by_euclidean_distance_as_xy(matrix, center_value, radius=7):
 
 
 
-def define_region(REGION_NAME) :
+def define_region(REGION_NAME, topology_matrix=None) :
+    if topology_matrix is None:
+        topology_matrix = TOPOLOGY
+    
     if REGION_NAME == 'A' : 
         center_value = min_depth
         radius = 20
@@ -211,7 +230,7 @@ def define_region(REGION_NAME) :
     print(f"  center_value = {center_value} (type: {type(center_value).__name__})")
     print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
     
-    result_indices, result_values = get_neighbors_by_euclidean_distance_as_xy(TOPOLOGY, center_value, radius = radius)
+    result_indices, result_values = get_neighbors_by_euclidean_distance_as_xy(topology_matrix, center_value, radius = radius)
     
     print(f"  Found {len(result_indices)} cells in the region")
     if result_indices:

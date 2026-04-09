@@ -132,6 +132,8 @@ class GridCanvas(FigureCanvas):
             "B": "#c6ebbf",
             "C": "#ffe6a7",
             "D": "#ffc9a8",
+            "LAND": "#ffffff",  # White for land/windfarm areas
+            "NULL": "#e0e0e0",  # Light grey for null areas
         }
 
         # Dessiner les patches selon densite
@@ -139,61 +141,31 @@ class GridCanvas(FigureCanvas):
             region = patch.get("region")
             density = patch.get("density")
 
-            if region in ["LAND", "NULL"] or density is None:
-                continue
+            # Draw LAND and NULL regions with full opacity
+            if region in ["LAND", "NULL"]:
+                color = region_color.get(region, "grey")
+                ax.add_patch(plt.Rectangle(
+                    (x, y), 1, 1,
+                    alpha=1.0,
+                    color=color,
+                    linewidth=0
+                ))
+            elif region in region_color and density is not None:
+                alpha = density_alpha.get(density, 0.1)
+                color = region_color.get(region, "grey")
 
-            alpha = density_alpha.get(density, 0.1)
-            color = region_color.get(region, "grey")
-
-            ax.add_patch(plt.Rectangle(
-                (x, y), 1, 1,
-                alpha=alpha,
-                color=color,
-                linewidth=0
-            ))
-
-        # Collecter positions des agents
-        archipelago_pos = []
-        coastal_pos = []
-        trawler_pos = []
-
-        for agent in model.agents:
-            if agent.current_location and agent.gone_fishing:
-                pos = agent.current_location
-            elif agent.display_location and agent.gone_fishing:
-                pos = agent.display_location
-            else:
-                pos = self._home_position(agent)
-
-            if agent.fisher_type == "archipelago":
-                archipelago_pos.append(pos)
-            elif agent.fisher_type == "coastal":
-                coastal_pos.append(pos)
-            elif agent.fisher_type == "trawler":
-                trawler_pos.append(pos)
-
-        # Dessiner les agents
-        if archipelago_pos:
-            ax.scatter(*zip(*archipelago_pos), c="#0f4c81", marker="o",
-                      s=55, alpha=0.8, label=f"Archipelago ({len(archipelago_pos)})",
-                      zorder=5)
-
-        if coastal_pos:
-            ax.scatter(*zip(*coastal_pos), c="#1b7f79", marker="s",
-                      s=55, alpha=0.8, label=f"Coastal ({len(coastal_pos)})",
-                      zorder=5)
-
-        if trawler_pos:
-            ax.scatter(*zip(*trawler_pos), c="#cc3a3b", marker="^",
-                      s=65, alpha=0.9, label=f"Trawler ({len(trawler_pos)})",
-                      zorder=5)
+                ax.add_patch(plt.Rectangle(
+                    (x, y), 1, 1,
+                    alpha=alpha,
+                    color=color,
+                    linewidth=0
+                ))
 
         ax.set_xlim(0, config.GRID_WIDTH)
         ax.set_ylim(config.GRID_HEIGHT, 0)
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
-        ax.set_title(f"Positions des pecheurs (Jour {model.current_step})")
-        ax.legend(loc="upper right", fontsize=8)
+        ax.set_title(f"Map View (Jour {model.current_step})")
         ax.grid(True, alpha=0.3)
         ax.set_aspect("equal")
 
