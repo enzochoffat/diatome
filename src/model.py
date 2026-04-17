@@ -1,4 +1,4 @@
-from mesa import Model
+from mesa import Model, agent
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
 from .agent import FisherAgent
@@ -131,6 +131,10 @@ class FisheryModel(Model):
         self._recalculate_regional_capacities()
         
         self._create_agents()
+        
+        self.num_fishing_midday = sum(1 for a in self.agents if a.gone_fishing)
+        self.num_at_home_midday = sum(1 for a in self.agents if a.at_home)
+        self.num_fished_today = 0
         # Data collector
         self.datacollector = DataCollector(
             model_reporters={
@@ -150,8 +154,9 @@ class FisheryModel(Model):
                 "num_archipelago": lambda m: sum(1 for a in m.agents if a.fisher_type == "archipelago"),
                 "num_coastal": lambda m: sum(1 for a in m.agents if a.fisher_type == "coastal"),
                 "num_trawler": lambda m: sum(1 for a in m.agents if a.fisher_type == "trawler"),
-                "num_fishing": lambda m: sum(1 for a in m.agents if a.gone_fishing),
-                "num_at_home": lambda m: sum(1 for a in m.agents if a.at_home),
+                "num_fishing": lambda m: m.num_fishing_midday,
+                "num_at_home": lambda m: m.num_at_home_midday,
+                "num_fished_today": lambda m: m.num_fished_today,
                 "num_bankrupt": lambda m: sum(1 for a in m.agents if a.bankrupt),
                 
                 # Catches
@@ -221,6 +226,7 @@ class FisheryModel(Model):
                 "unprofitable_trips": "unprofitable_trip",
                 "at_home": "at_home",
                 "gone_fishing": "gone_fishing",
+                "fished_today": "fished_today",
                 "at_sea": "at_sea",
                 
                 # Decision-making
@@ -588,12 +594,22 @@ class FisheryModel(Model):
             )
             self.last_year_catches = current_catches
         
+        for agent in self.agents:
+            agent.reset_daily_flags()
+
         # All agents act
         for agent in self.agents:
             agent.step()
 
+
+        self.num_fishing_midday = sum(1 for a in self.agents if a.gone_fishing)
+        self.num_at_home_midday = sum(1 for a in self.agents if a.at_home)
+        self.num_fished_today = sum(1 for a in self.agents if a.fished_today)
         # Tickly collection (alignement NetLogo update-response-vars-tickly)
         self.datacollector.collect(self)
+        
+        for agent in self.agents:
+            agent.finalize_day()
 
         # Collect yearly logs/prints
         if self.current_step % self.YEAR == 0 and self.current_step > 0:
@@ -840,8 +856,9 @@ class FisheryModel(Model):
             'current_year': self.current_step // self.YEAR,
             'current_day': self.current_step % self.YEAR,
             'num_agents': num_agents,
-            'num_fishing': sum(1 for a in agents_list if a.gone_fishing),
-            'num_at_home': sum(1 for a in agents_list if a.at_home),
+            'num_fishing': self.num_fishing_midday,
+            'num_at_home': self.num_at_home_midday,
+            'num_fished_today': self.num_fished_today,
             'total_stock': self.get_total_stock(),
             'stock_A': self.get_region_stock("A"),
             'stock_B': self.get_region_stock("B"),

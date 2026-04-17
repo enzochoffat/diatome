@@ -153,9 +153,9 @@ class GridCanvas(FigureCanvas):
         trawler_pos = []
 
         for agent in model.agents:
-            if agent.current_location and agent.gone_fishing:
+            if agent.current_location and (agent.gone_fishing or getattr(agent, "fished_today", False)):
                 pos = agent.current_location
-            elif agent.display_location and agent.gone_fishing:
+            elif agent.display_location and getattr(agent, "fished_today", False):
                 pos = agent.display_location
             else:
                 pos = self._home_position(agent)
@@ -638,7 +638,7 @@ class MainWindow(QMainWindow):
             self.update_stats()
 
             # Mise a jour graphiques tous les 15 jours
-            if self.model.current_step % 15 == 0:
+            if self.model.current_step % 1 == 0:
                 self.update_graphs()
 
             # Fin de simulation
@@ -687,6 +687,7 @@ Annee: {summary['current_year']}
 === AGENTS ===
 Total: {summary['num_agents']}
 En mer: {summary['num_fishing']}
+A peche aujourd'hui: {summary.get('num_fished_today', 0)}
 A la maison: {summary['num_at_home']}
 
 === STOCKS ===
