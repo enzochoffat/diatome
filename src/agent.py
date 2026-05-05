@@ -44,6 +44,7 @@ class FisherAgent(Agent):
         self.at_home = True
         self.at_sea = False
         self.gone_fishing = False
+        self.fished_today = False
         self.lay_low = False
         self.lay_low_counter = 0
         
@@ -635,6 +636,7 @@ class FisherAgent(Agent):
                 # Go fishing
                 self.move_to(target_spot[0], target_spot[1])
                 trip_result = self.go_fish(target_spot)
+                self.fished_today = True
                 
                 # Memory
                 trip_info = {
@@ -649,9 +651,6 @@ class FisherAgent(Agent):
                 }
                 self.update_memory(trip_info)
                 
-                # Return home (unless trawler multi-day)
-                if not (self.fisher_type == "trawler" and self.gone_fishing):
-                    self.return_home()
             else:
                 self.stay_home(pay_existence_cost=True)
         else:
@@ -663,7 +662,19 @@ class FisherAgent(Agent):
         self.gone_fishing = False
         self.at_sea = False
         self.will_fish = False
-            
+    
+    def reset_daily_flags(self):
+        """Reset flags that should be cleared at the end of the day"""
+        self.fished_today = False
+    
+    def finalize_day(self):
+        """
+        End-of-day state transition.
+        Archipelago and coastal trips are day trips: return home after midday snapshot.
+        """
+        if self.fisher_type in ("archipelago", "coastal") and self.fished_today:
+            self.return_home()
+       
     def get_financial_summary(self):
         """
         Get summary of agent's financial state.
@@ -1582,6 +1593,7 @@ class FisherAgent(Agent):
             'at_home': self.at_home,
             'at_sea': self.at_sea,
             'gone_fishing': self.gone_fishing,
+            'fished_today': self.fished_today,
             'lay_low': self.lay_low,
             'current_region': self.current_region,
             

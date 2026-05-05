@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QGridLayout, QTabWidget, QDoubleSpinBox, QFileDialog, QMessageBox,
     QFrame
 )
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -166,6 +166,61 @@ class GridCanvas(FigureCanvas):
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_title(f"Map View (Jour {model.current_step})")
+            if region in ["LAND", "NULL"] or density is None:
+                continue
+
+            alpha = density_alpha.get(density, 0.1)
+            color = region_color.get(region, "grey")
+
+            ax.add_patch(plt.Rectangle(
+                (x, y), 1, 1,
+                alpha=alpha,
+                color=color,
+                linewidth=0
+            ))
+
+        # Collecter positions des agents
+        archipelago_pos = []
+        coastal_pos = []
+        trawler_pos = []
+
+        for agent in model.agents:
+            if agent.current_location and (agent.gone_fishing or getattr(agent, "fished_today", False)):
+                pos = agent.current_location
+            elif agent.display_location and getattr(agent, "fished_today", False):
+                pos = agent.display_location
+            else:
+                pos = self._home_position(agent)
+
+            if agent.fisher_type == "archipelago":
+                archipelago_pos.append(pos)
+            elif agent.fisher_type == "coastal":
+                coastal_pos.append(pos)
+            elif agent.fisher_type == "trawler":
+                trawler_pos.append(pos)
+
+        # Dessiner les agents
+        if archipelago_pos:
+            ax.scatter(*zip(*archipelago_pos), c="#0f4c81", marker="o",
+                       s=55, alpha=0.8, label=f"Archipelago ({len(archipelago_pos)})",
+                       zorder=5)
+
+        if coastal_pos:
+            ax.scatter(*zip(*coastal_pos), c="#1b7f79", marker="s",
+                       s=55, alpha=0.8, label=f"Coastal ({len(coastal_pos)})",
+                       zorder=5)
+
+        if trawler_pos:
+            ax.scatter(*zip(*trawler_pos), c="#cc3a3b", marker="^",
+                       s=65, alpha=0.9, label=f"Trawler ({len(trawler_pos)})",
+                       zorder=5)
+
+        ax.set_xlim(0, config.GRID_WIDTH)
+        ax.set_ylim(0, config.GRID_HEIGHT)
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_title(f"Positions des pecheurs (Jour {model.current_step})")
+        ax.legend(loc="upper right", fontsize=8)
         ax.grid(True, alpha=0.3)
         ax.set_aspect("equal")
 
@@ -183,7 +238,7 @@ class MainWindow(QMainWindow):
             "stock_A": [], "stock_B": [], "stock_C": [], "stock_D": [],
             "total_catch": [], "avg_capital": []
         }
-        
+
         self.init_ui()
 
     def init_ui(self):
@@ -274,12 +329,15 @@ class MainWindow(QMainWindow):
 
         # Parametres dynamiques appliques avant creation du modele
         params_layout.addWidget(QLabel("Taux de croissance:"), 6, 0)
+        # Parametres dynamiques appliques avant creation du modele
+        params_layout.addWidget(QLabel("Taux de croissance:"), 4, 0)
         self.growth_spin = QDoubleSpinBox()
         self.growth_spin.setRange(0.0, 1.0)
         self.growth_spin.setSingleStep(0.01)
         self.growth_spin.setDecimals(3)
         self.growth_spin.setValue(config.GROWTH_RATE)
         params_layout.addWidget(self.growth_spin, 6, 1)
+        params_layout.addWidget(self.growth_spin, 4, 1)
 
         params_layout.addWidget(QLabel("Prix du poisson:"), 7, 0)
         self.price_spin = QDoubleSpinBox()
@@ -288,6 +346,7 @@ class MainWindow(QMainWindow):
         self.price_spin.setDecimals(2)
         self.price_spin.setValue(config.FISH_PRICE)
         params_layout.addWidget(self.price_spin, 7, 1)
+        params_layout.addWidget(self.price_spin, 5, 1)
 
         params_layout.addWidget(QLabel("Capital initial:"), 8, 0)
         self.capital_spin = QDoubleSpinBox()
@@ -296,6 +355,7 @@ class MainWindow(QMainWindow):
         self.capital_spin.setDecimals(2)
         self.capital_spin.setValue(config.INITIAL_CAPITAL)
         params_layout.addWidget(self.capital_spin, 8, 1)
+        params_layout.addWidget(self.capital_spin, 6, 1)
 
         params_layout.addWidget(QLabel("Prob. mauvais temps:"), 9, 0)
         self.weather_spin = QDoubleSpinBox()
@@ -306,12 +366,17 @@ class MainWindow(QMainWindow):
         params_layout.addWidget(self.weather_spin, 9, 1)
 
         params_layout.addWidget(QLabel("Vitesse (ms/step):"), 10, 0)
+        params_layout.addWidget(self.weather_spin, 7, 1)
+
+        params_layout.addWidget(QLabel("Vitesse (ms/step):"), 8, 0)
         self.speed_spin = QSpinBox()
         self.speed_spin.setRange(1, 500)
         self.speed_spin.setValue(20)
         self.speed_spin.setSingleStep(1)
         self.speed_spin.valueChanged.connect(self.update_speed)
         params_layout.addWidget(self.speed_spin, 10, 1)
+        params_layout.addWidget(self.speed_spin, 8, 1)
+
         params_group.setLayout(params_layout)
         left_layout.addWidget(params_group)
 
@@ -661,6 +726,7 @@ class MainWindow(QMainWindow):
 
             # Mise a jour graphiques tous les 15 jours
             if self.model.current_step % 15 == 0:
+            if self.model.current_step % 1 == 0:
                 self.update_graphs()
 
             # Fin de simulation
@@ -709,6 +775,7 @@ Annee: {summary['current_year']}
 === AGENTS ===
 Total: {summary['num_agents']}
 En mer: {summary['num_fishing']}
+A peche aujourd'hui: {summary.get('num_fished_today', 0)}
 A la maison: {summary['num_at_home']}
 
 === STOCKS ===
