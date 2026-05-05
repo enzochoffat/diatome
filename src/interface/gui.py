@@ -166,19 +166,7 @@ class GridCanvas(FigureCanvas):
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_title(f"Map View (Jour {model.current_step})")
-            if region in ["LAND", "NULL"] or density is None:
-                continue
-
-            alpha = density_alpha.get(density, 0.1)
-            color = region_color.get(region, "grey")
-
-            ax.add_patch(plt.Rectangle(
-                (x, y), 1, 1,
-                alpha=alpha,
-                color=color,
-                linewidth=0
-            ))
-
+        
         # Collecter positions des agents
         archipelago_pos = []
         coastal_pos = []
@@ -726,7 +714,6 @@ class MainWindow(QMainWindow):
 
             # Mise a jour graphiques tous les 15 jours
             if self.model.current_step % 15 == 0:
-            if self.model.current_step % 1 == 0:
                 self.update_graphs()
 
             # Fin de simulation
