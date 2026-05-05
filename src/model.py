@@ -9,6 +9,8 @@ from datetime import datetime
 import os
 import numpy as np
 
+from src.config import get_hotspots_for_step
+
 class FisheryModel(Model):
     def __init__(
         self,
@@ -102,10 +104,10 @@ class FisheryModel(Model):
         self.CATCHABILITY_TRAWLER = config.TRAWLER_CATCHABILITY # trawler
 
         # Define patchs 
-        self.HOTSPOTS_A = config.HOTSPOTS_A # high density spots in region A
-        self.HOTSPOTS_B = config.HOTSPOTS_B # high density spots in region B
-        self.HOTSPOTS_C = config.HOTSPOTS_C # high density spots in region C
-        self.HOTSPOTS_D = config.HOTSPOTS_D # high density spots in region D
+        self.HOTSPOTS_A = get_hotspots_for_step(0, 'A')
+        self.HOTSPOTS_B = get_hotspots_for_step(0, 'B')
+        self.HOTSPOTS_C = get_hotspots_for_step(0, 'C')
+        self.HOTSPOTS_D = get_hotspots_for_step(0, 'D')
 
         # Define growth rate
         self.GROWTH_RATE = config.GROWTH_RATE if growth_rate is None else float(growth_rate)
@@ -288,7 +290,7 @@ class FisheryModel(Model):
                      if patch['region'] == region]
         return random.choice(candidates) if candidates else None
     
-    def init_patches(self):
+    def init_patches(self): #modifier ces quatre fonctions  
         """Initialize all patches with region, density, and fish stock information"""
         # Dictionary to store patch attributes
         self.patches = {}
@@ -314,22 +316,19 @@ class FisheryModel(Model):
         }
     
     def get_region(self, x, y):
-        """Determine which region a coordinate belongs to"""
-        # Region A: x[0,25], y[0,8]
-        if 0 <= x < 25 and 0 <= y < 8:
-            return 'A'
-        # Region B: x[0,25], y[8,24]
-        elif 0 <= x < 25 and 8 <= y < 24:
-            return 'B'
-        # Region C: x[0,25], y[24,56]
-        elif 0 <= x < 25 and 24 <= y < 56:
-            return 'C'
-        # Region D: x[25,50], y[24,56]
-        elif 25 <= x < 50 and 24 <= y < 56:
-            return 'D'
-        # Land: x[25,50], y[0,24]
-        elif 25 <= x < 50 and 0 <= y < 24:
+        """Determine which region a coordinate belongs to using config definitions"""
+        # Check LAND FIRST to catch windfarm areas before region check
+        if [x, y] in self.LAND:
             return 'LAND'
+        # Then check defined regions
+        elif [x, y] in self.REGION_A:
+            return 'A'
+        elif [x, y] in self.REGION_B:
+            return 'B'
+        elif [x, y] in self.REGION_C:
+            return 'C'
+        elif [x, y] in self.REGION_D:
+            return 'D'
         else:
             return 'NULL'
     
@@ -360,9 +359,9 @@ class FisheryModel(Model):
             distance = ((x - hs[0])**2 + (y - hs[1])**2)**0.5
             min_distance = min(min_distance, distance)
             
-        if min_distance <= 1.5:
+        if min_distance <= 3:
             return self.HIGH
-        elif min_distance <= 3.0:
+        elif min_distance <= 5:
             return self.MEDIUM
         else:
             return self.LOW
@@ -635,6 +634,12 @@ class FisheryModel(Model):
             self.running = False
             if self.verbose:
                 self.print_final_summary()
+
+        if self.current_step % 30 == 0:
+            self.HOTSPOTS_A = get_hotspots_for_step(self.current_step, 'A')
+            self.HOTSPOTS_B = get_hotspots_for_step(self.current_step, 'B')
+            self.HOTSPOTS_C = get_hotspots_for_step(self.current_step, 'C')
+            self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
             
     def print_final_summary(self):
         """Print comprehensive summary at end of simulation"""

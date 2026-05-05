@@ -1,6 +1,11 @@
 import sys
 import json
 from pathlib import Path
+
+# Add the project root to Python path so we can import from src
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QSpinBox, QProgressBar, QTextEdit, QGroupBox,
@@ -14,6 +19,8 @@ import matplotlib.pyplot as plt
 from src.model import FisheryModel
 import src.config as config
 import random
+
+
 
 
 class SimulationCanvas(FigureCanvas):
@@ -125,6 +132,8 @@ class GridCanvas(FigureCanvas):
             "B": "#c6ebbf",
             "C": "#ffe6a7",
             "D": "#ffc9a8",
+            "LAND": "#ffffff",  # White for land/windfarm areas
+            "NULL": "#e0e0e0",  # Light grey for null areas
         }
 
         # Dessiner les patches selon densite
@@ -132,6 +141,31 @@ class GridCanvas(FigureCanvas):
             region = patch.get("region")
             density = patch.get("density")
 
+            # Draw LAND and NULL regions with full opacity
+            if region in ["LAND", "NULL"]:
+                color = region_color.get(region, "grey")
+                ax.add_patch(plt.Rectangle(
+                    (x, y), 1, 1,
+                    alpha=1.0,
+                    color=color,
+                    linewidth=0
+                ))
+            elif region in region_color and density is not None:
+                alpha = density_alpha.get(density, 0.1)
+                color = region_color.get(region, "grey")
+
+                ax.add_patch(plt.Rectangle(
+                    (x, y), 1, 1,
+                    alpha=alpha,
+                    color=color,
+                    linewidth=0
+                ))
+
+        ax.set_xlim(0, config.GRID_WIDTH)
+        ax.set_ylim(config.GRID_HEIGHT, 0)
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_title(f"Map View (Jour {model.current_step})")
             if region in ["LAND", "NULL"] or density is None:
                 continue
 
@@ -279,6 +313,22 @@ class MainWindow(QMainWindow):
         self.trawl_spin.setValue(5)
         params_layout.addWidget(self.trawl_spin, 3, 1)
 
+        # Ecospace data loading button
+        self.ecospace_btn = QPushButton("Charger Données Ecospace")
+        self.ecospace_btn.clicked.connect(self.load_ecospace_data)
+        params_layout.addWidget(self.ecospace_btn, 4, 0)
+        self.ecospace_status = QLabel("Non chargées")
+        params_layout.addWidget(self.ecospace_status, 4, 1)
+
+        # Wind Farm button
+        self.wind_farm_btn = QPushButton("Ajout Wind Farm")
+        self.wind_farm_btn.clicked.connect(self.add_wind_farm)
+        params_layout.addWidget(self.wind_farm_btn, 5, 0)
+        self.wind_farm_status = QLabel("Non activé")
+        params_layout.addWidget(self.wind_farm_status, 5, 1)
+
+        # Parametres dynamiques appliques avant creation du modele
+        params_layout.addWidget(QLabel("Taux de croissance:"), 6, 0)
         # Parametres dynamiques appliques avant creation du modele
         params_layout.addWidget(QLabel("Taux de croissance:"), 4, 0)
         self.growth_spin = QDoubleSpinBox()
@@ -286,30 +336,36 @@ class MainWindow(QMainWindow):
         self.growth_spin.setSingleStep(0.01)
         self.growth_spin.setDecimals(3)
         self.growth_spin.setValue(config.GROWTH_RATE)
+        params_layout.addWidget(self.growth_spin, 6, 1)
         params_layout.addWidget(self.growth_spin, 4, 1)
 
-        params_layout.addWidget(QLabel("Prix du poisson:"), 5, 0)
+        params_layout.addWidget(QLabel("Prix du poisson:"), 7, 0)
         self.price_spin = QDoubleSpinBox()
         self.price_spin.setRange(0.0, 100.0)
         self.price_spin.setSingleStep(0.1)
         self.price_spin.setDecimals(2)
         self.price_spin.setValue(config.FISH_PRICE)
+        params_layout.addWidget(self.price_spin, 7, 1)
         params_layout.addWidget(self.price_spin, 5, 1)
 
-        params_layout.addWidget(QLabel("Capital initial:"), 6, 0)
+        params_layout.addWidget(QLabel("Capital initial:"), 8, 0)
         self.capital_spin = QDoubleSpinBox()
         self.capital_spin.setRange(0.0, 1000000.0)
         self.capital_spin.setSingleStep(100.0)
         self.capital_spin.setDecimals(2)
         self.capital_spin.setValue(config.INITIAL_CAPITAL)
+        params_layout.addWidget(self.capital_spin, 8, 1)
         params_layout.addWidget(self.capital_spin, 6, 1)
 
-        params_layout.addWidget(QLabel("Prob. mauvais temps:"), 7, 0)
+        params_layout.addWidget(QLabel("Prob. mauvais temps:"), 9, 0)
         self.weather_spin = QDoubleSpinBox()
         self.weather_spin.setRange(0.0, 1.0)
         self.weather_spin.setSingleStep(0.01)
         self.weather_spin.setDecimals(2)
         self.weather_spin.setValue(config.BAD_WEATHER_PROBABILITY)
+        params_layout.addWidget(self.weather_spin, 9, 1)
+
+        params_layout.addWidget(QLabel("Vitesse (ms/step):"), 10, 0)
         params_layout.addWidget(self.weather_spin, 7, 1)
 
         params_layout.addWidget(QLabel("Vitesse (ms/step):"), 8, 0)
@@ -318,6 +374,7 @@ class MainWindow(QMainWindow):
         self.speed_spin.setValue(20)
         self.speed_spin.setSingleStep(1)
         self.speed_spin.valueChanged.connect(self.update_speed)
+        params_layout.addWidget(self.speed_spin, 10, 1)
         params_layout.addWidget(self.speed_spin, 8, 1)
 
         params_group.setLayout(params_layout)
@@ -543,6 +600,38 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de charger le fichier :\n{e}")
 
+    def load_ecospace_data(self):
+        """Load Ecospace data from user-selected CSV files."""
+        try:
+            # Call get_ecospace_data which will show the file selection dialog
+            ecospace_data = config.get_ecospace_data()
+            
+            if ecospace_data is not None:
+                # Update status
+                self.ecospace_status.setText("✓ Chargées")
+                self.ecospace_status.setStyleSheet("color: green; font-weight: bold;")
+                self.ecospace_btn.setEnabled(False)
+                QMessageBox.information(self, "Succès", "Données Ecospace chargées avec succès!\nLes hotspots dynamiques seront utilisés à partir de la prochaine simulation.")
+            else:
+                QMessageBox.warning(self, "Erreur", "Impossible de charger les données Ecospace")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement des données Ecospace:\n{e}")
+
+    def add_wind_farm(self):
+        """Add Wind Farm topology to the current topology."""
+        try:
+            # Load and merge wind farm - this also updates TOPOLOGY, LAND, and REGIONS in config
+            config.add_windfarm_to_topology()
+            
+            # Update status
+            self.wind_farm_status.setText("✓ Activé")
+            self.wind_farm_status.setStyleSheet("color: green; font-weight: bold;")
+            self.wind_farm_btn.setEnabled(False)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'ajout du parc à éolienne:\n{e}")
+
     def start_simulation(self):
         """Demarrer ou reprendre la simulation."""
         if self.model is None:
@@ -636,6 +725,7 @@ class MainWindow(QMainWindow):
             self.update_stats()
 
             # Mise a jour graphiques tous les 15 jours
+            if self.model.current_step % 15 == 0:
             if self.model.current_step % 1 == 0:
                 self.update_graphs()
 

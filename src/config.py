@@ -5,6 +5,19 @@ This module centralizes all model parameters, making them easy to modify
 for experiments and sensitivity analysis.
 """
 
+import sys 
+from pathlib import Path
+import numpy as np 
+import math
+
+# Add the project root to Python path so we can import from src
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.ecospace_outputs import masks
+from src.ecospace_outputs import get_ecospace_data
+from src import ecospace_outputs
+
 # =============================================================================
 # TIME CONSTANTS
 # =============================================================================
@@ -19,32 +32,276 @@ YEAR = 365
 # SPATIAL DEFINITIONS
 # =============================================================================
 
-# Regional boundaries [x_range, y_range]
-REGION_A = [[0, 25], [0, 8]]      # Archipelago zone
-REGION_B = [[0, 25], [8, 24]]     # Coastal zone 1
-REGION_C = [[0, 25], [24, 56]]    # Coastal zone 2
-REGION_D = [[25, 50], [24, 56]]   # Open sea
-LAND = [[25, 50], [0, 24]]        # Non-fishing area
-
 # Grid dimensions
-GRID_WIDTH = 50
-GRID_HEIGHT = 56
+GRID_WIDTH = 101
+GRID_HEIGHT = 70
+
+def compute_land_coordinates(topo_matrix):
+    """Compute list of [x, y] coordinates for all LAND cells"""
+    land_coords = []
+    for y in range(len(topo_matrix)):
+        for x in range(len(topo_matrix[y])):
+            if topo_matrix[y][x] == 0 or topo_matrix[y][x] < 1e-29:
+                land_coords.append([x, y])
+    return land_coords
+
+TOPOLOGY = masks(topology=True, windfarm=False)['masks'][0]
+ORIGINAL_TOPOLOGY = [row[:] for row in TOPOLOGY]  # Deep copy of original topology before windfarm
+
+# Regional boundaries [x_range, y_range]
+LAND = compute_land_coordinates(TOPOLOGY)
+WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
+
+def add_windfarm_to_topology():
+    """
+    Load Wind Farm topology and merge it with existing TOPOLOGY.
+    Updates LAND zones to include Wind Farm areas.
+    Also recalculates REGION_A/B/C/D with new topology.
+    """
+    global TOPOLOGY, LAND, WATER, y_min_water, REGION_A, REGION_B, REGION_C, REGION_D
+    try:
+        # Load Wind Farm topology
+        windfarm_data = masks(topology=False, windfarm=True)
+        windfarm_topology = windfarm_data['masks'][0]
+        
+        # Merge: if either TOPOLOGY or WINDFARM is LAND (value < 1e-29), result is LAND
+        merged_topology = []
+        for y in range(len(TOPOLOGY)):
+            row = []
+            for x in range(len(TOPOLOGY[y])):
+                topo_val = TOPOLOGY[y][x]
+                wind_val = windfarm_topology[y][x] if y < len(windfarm_topology) and x < len(windfarm_topology[y]) else topo_val
+                
+                # If either is LAND, result is LAND
+                if topo_val == 0 or wind_val == 1:
+                    row.append(0)  # LAND
+                else:
+                    row.append(topo_val)  # Water
+            merged_topology.append(row)
+        
+        # Update global TOPOLOGY for fisher navigation (prevents access to windfarm areas)
+        TOPOLOGY = merged_topology
+        LAND = compute_land_coordinates(TOPOLOGY)
+        
+        # Recalculate WATER and y_min_water
+        WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
+        y_min_water = int(min(WATER[-1])) if WATER else 0
+        
+        # Recalculate regions using ORIGINAL_TOPOLOGY (so regions and hotspots don't change)
+        REGION_A = define_region('A', topology_matrix=ORIGINAL_TOPOLOGY)
+        REGION_B = define_region('B', topology_matrix=ORIGINAL_TOPOLOGY)
+        REGION_C = define_region('C', topology_matrix=ORIGINAL_TOPOLOGY)
+        REGION_D = define_region('D', topology_matrix=ORIGINAL_TOPOLOGY)
+        
+        # Remove overlaps from region C
+        region_d_set = set(tuple(cell) for cell in REGION_D)
+        REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
+        
+        return merged_topology
+    
+    except Exception as e:
+        print(f"Error loading Wind Farm topology: {e}")
+        return TOPOLOGY
+
+
+single_slice = GRID_HEIGHT//4
+y_min_water = int(min(WATER[-1]))
+
+# Calculate min and max depth, excluding land (0)
+all_water_depths = [val for row in TOPOLOGY for val in row if val > 0]
+max_depth = np.max(all_water_depths) if all_water_depths else 0
+min_depth = np.min(all_water_depths) if all_water_depths else 0
+
+# For region D: use percentile 95 instead of absolute max to avoid outliers
+percentile_90_depth = np.percentile(all_water_depths, 95) if all_water_depths else max_depth
+
+print(f"[DEBUG] Depth calculation:")
+print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
+print(f"  percentile_90_depth = {percentile_90_depth}")
+print(f"  Total water cells: {len(all_water_depths)}")
+
+
+import numpy as np
+
+def get_neighbors_by_euclidean_distance(matrix, center_value, radius=7):
+    """
+    Récupère les valeurs et coordonnées des cellules situées à une distance 
+    euclidienne <= radius de n'importe quelle occurrence de center_value.
+    
+    Paramètres :
+    - matrix : Liste de listes (matrice)
+    - center_value : La valeur numérique à rechercher
+    - radius : Rayon du cercle (ex: 7)
+    
+    Retourne :
+    - indices : Liste de tuples (ligne, colonne)
+    - values : Liste des valeurs correspondantes
+    """
+    
+    # 1. Trouver toutes les coordonnées (l, c) où la valeur est égale à center_value
+    centers = []
+    for i, row in enumerate(matrix):
+        for j, val in enumerate(row):
+            if val == center_value:
+                centers.append((i, j))
+    
+    print(f"    [get_neighbors] Looking for center_value={center_value}, found {len(centers)} centers")
+    
+    if not centers:
+        print(f"    [get_neighbors] WARNING: No centers found! Unique values in TOPOLOGY: {sorted(set([v for row in matrix for v in row if v > 0]))[:10]}...")
+        return [], []
+
+    # 2. Initialiser un tableau de distances infinies pour chaque cellule
+    # On stocke la distance minimale trouvée pour chaque cellule
+    rows_count = len(matrix)
+    cols_count = len(matrix[0]) if rows_count > 0 else 0
+    
+    # On crée une structure pour stocker la distance minimale actuelle pour chaque (i, j)
+    # Initialisée à l'infini
+    min_distances = [[float('inf') for _ in range(cols_count)] for _ in range(rows_count)]
+    
+    # 3. Pour chaque cellule de la matrice, calculer la distance vers LE PLUS PROCHE centre
+    # Optimisation : on parcourt chaque cellule et on calcule la distance vers chaque centre
+    # (Pour une matrice très grande et des milliers de centers, une approche vectorielle ou k-d tree serait préférable,
+    # mais pour des tailles courantes, cette boucle imbriquée est claire et fonctionnelle).
+    
+    for r in range(rows_count):
+        for c in range(cols_count):
+            # On cherche la distance minimale vers n'importe quel centre
+            current_min_dist = float('inf')
+            
+            for cr, cc in centers:
+                # Distance euclidienne : sqrt((r - cr)^2 + (c - cc)^2)
+                dist = math.sqrt((r - cr)**2 + (c - cc)**2)
+                if dist < current_min_dist:
+                    current_min_dist = dist
+            
+            min_distances[r][c] = current_min_dist
+
+    # 4. Filtrer : distance <= radius ET la valeur n'est PAS center_value
+    result_indices = []
+    result_values = []
+    
+    for r in range(rows_count):
+        for c in range(cols_count):
+            # On vérifie la condition de distance et on exclut la valeur 'center' elle-même
+            if min_distances[r][c] <= radius and matrix[r][c] != center_value:
+                if matrix[r][c] > 0 : #water zone
+                            result_indices.append([r, c])
+                            result_values.append(matrix[r][c])
+    
+    return result_indices, result_values
+
+
+def get_neighbors_by_euclidean_distance_as_xy(matrix, center_value, radius=7):
+    """
+    Wrapper that returns coordinates in (x, y) format instead of (row, col) format.
+    x = column, y = row
+    """
+    indices, values = get_neighbors_by_euclidean_distance(matrix, center_value, radius)
+    # Convert from [row, col] to [x, y] which is [col, row]
+    indices_xy = [[col, row] for row, col in indices]
+    return indices_xy, values
+
+
+
+def define_region(REGION_NAME, topology_matrix=None) :
+    if topology_matrix is None:
+        topology_matrix = TOPOLOGY
+    
+    if REGION_NAME == 'A' : 
+        center_value = min_depth
+        radius = 20
+    elif REGION_NAME == 'B' : 
+        center_value = (max_depth - min_depth)/4 + min_depth
+        radius = 20
+    elif REGION_NAME == 'C' : 
+        center_value = 3*(max_depth - min_depth)/4 + min_depth
+        radius = 30
+    elif REGION_NAME == 'D' : 
+       center_value = percentile_90_depth
+       radius = 20
+    
+    # Convert to int to match TOPOLOGY values
+    center_value = int(round(center_value))
+    
+    # DEBUG: Print center value details
+    print(f"\n[DEBUG] Region {REGION_NAME}:")
+    print(f"  center_value = {center_value} (type: {type(center_value).__name__})")
+    print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
+    
+    result_indices, result_values = get_neighbors_by_euclidean_distance_as_xy(topology_matrix, center_value, radius = radius)
+    
+    print(f"  Found {len(result_indices)} cells in the region")
+    if result_indices:
+        print(f"  Values in region: min={min(result_values)}, max={max(result_values)}")
+    
+    return result_indices
+
+REGION_A = define_region('A')    #Archipelagos 
+REGION_B = define_region('B')    # Coastal zone 1
+REGION_C = define_region('C')    # Coastal zone 2
+REGION_D = define_region('D')   # Open sea
+
+# Remove cells from C that are also in D (to avoid overlaps)
+region_d_set = set(tuple(cell) for cell in REGION_D)
+REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
+
+print(f"\n[DEBUG] After removing overlaps:")
+print(f"  REGION_C: {len(REGION_C)} cells (after removing {len([cell for cell in define_region('C') if tuple(cell) in region_d_set])} overlapping cells)")
+print(f"  REGION_D: {len(REGION_D)} cells")
+
+
 
 # =============================================================================
 # HOTSPOT LOCATIONS
 # =============================================================================
 
 # High-density fishing spots (coordinates [x, y])
-HOTSPOTS_A = [[7, 3], [16, 3]]
-HOTSPOTS_B = [[3, 19], [8, 11], [19, 11], [15, 19]]
-HOTSPOTS_C = [
-    [4, 51], [21, 51], [13, 45], [3, 39], 
-    [12, 36], [22, 40], [7, 27], [19, 27]
-]
-HOTSPOTS_D = [
-    [30, 51], [47, 51], [37, 45], [29, 39], 
-    [46, 39], [37, 33], [31, 27], [44, 27]
-]
+
+def get_hotspots_for_step(step, region_name):
+    """
+    Retourne les 2 hotspots avec la plus haute concentration pour une région à un step donné.
+    Chaque date Ecospace = 30 steps du modèle.
+    La première date Ecospace correspond à step 0.
+    Si Ecospace n'est pas disponible, utilise les valeurs de TOPOLOGY pour trouver les hotspots.
+    """
+    # Sélectionner la région
+    region_map = {
+        'A': REGION_A,
+        'B': REGION_B,
+        'C': REGION_C,
+        'D': REGION_D
+    }
+    region = region_map.get(region_name, [])
+    
+    if not region:
+        return []
+    
+    # Essayer d'utiliser Ecospace si disponible
+    if ecospace_outputs._ecospace_data_cache is not None:
+        try:
+            ecospace_data = ecospace_outputs._ecospace_data_cache
+            if ecospace_data and 'maps' in ecospace_data:
+                date_index = step // 30
+                
+                # Gestion des limites
+                if date_index >= len(ecospace_data['maps']['map']):
+                    date_index = len(ecospace_data['maps']['map']) - 1
+                
+                fish_map = np.array(ecospace_data['maps']['map'][date_index][0])
+                
+                # Trouver les 2 points avec les plus hautes concentrations
+                top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)[:2]
+                if len(top_coords) == 2:
+                    return top_coords
+        except Exception as e:
+            pass
+    
+    # Fallback: utiliser les valeurs TOPOLOGY pour trouver les hotspots
+    top_coords = sorted(region, key=lambda xy: TOPOLOGY[xy[1]][xy[0]], reverse=True)[:2]
+    return top_coords
+
 
 # =============================================================================
 # DENSITY LEVELS
@@ -197,6 +454,8 @@ PARTNER_PROBABILITY = 0.5
 SD_CARCAP = 0.1
 HOTSPOT_HIGH_RADIUS = 1.5
 HOTSPOT_MEDIUM_RADIUS = 3.0
+
+
 
 def get_region_initial_capacity(region_name):
     """

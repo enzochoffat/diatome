@@ -7,6 +7,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
 
+_ecospace_data_cache = None
+
 def choose_csv_file():
     """
     Ouvre une fenêtre pour sélectionner un ou plusieurs fichiers CSV.
@@ -32,13 +34,31 @@ def safe_float(s):
         return float(s)
     except (ValueError, TypeError):
         return s
+    
 
-def pop_evol_over_time():
+
+def get_ecospace_data():
+    """Charge les données Ecospace une seule fois et les met en cache"""
+    global _ecospace_data_cache
+    if _ecospace_data_cache is None:
+        _ecospace_data_cache = pop_evol_over_time()
+    return _ecospace_data_cache
+
+def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la somme des cartes de toutes les espèces (avoir la concentration totale de poissons)
     """
-    Utilise choose_csv_file() pour obtenir la liste des fichiers que l'utilisateur veut étudier
-    Retourne un dictionnaire de dictionnaire contenant en premier item le nom des espèces étudiées
-    et en deuxième item un dictionnaire contenant en premier item les dates associées aux maps qui
-    sont dans le deuxième item 
+    Selects CSV files from user and extracts population evolution data over time.
+    
+    Returns:
+        dict: Dictionary with structure:
+        {
+            'species': [list of species filenames],
+            'maps': {
+                'dates': [[year, month], ...] for each species,
+                'map': [[[matrix for each date]], ...] for each species
+            }
+        }
+        
+        Each matrix has dimensions [MapRows][width] and contains concentration values in g/L
     """
     file_paths = choose_csv_file()
     esp = []
@@ -67,37 +87,58 @@ def pop_evol_over_time():
                         month = row[2]
                     else : 
                         month = 0
-                    species_dates.append([year] + [month])
+                    species_dates.append([year, month])
                     species_maps.append([rows[start: start + maps_row]])
 
         date.append(species_dates)
         maps.append(species_maps)
         esp.append(name_file)
 
-    dic_tot = {'species' : esp, 
-                'maps' : {
-                'dates' : date, 
-                'map' : maps}}
-
-    print(len(dic_tot['maps']['map'][0][0][0][0]))
-    #print(len(dic_tot['maps']['dates']))
-    #print(dic_tot['maps']['map'])
+    # Sommer les concentrations par date (somme toutes espèces)
+    if maps:  # Vérifier qu'on a des données
+        num_dates = len(maps[0])  # Nombre de dates (supposé identique pour toutes espèces)
+        summed_maps = []
+        summed_dates = maps[0][:num_dates]  # Utiliser les dates de la première espèce
+        
+        for date_idx in range(num_dates):
+            summed_map = None
+            for species_idx in range(len(maps)):
+                current_map = np.array(maps[species_idx][date_idx][0])
+                if summed_map is None:
+                    summed_map = current_map.copy()
+                else:
+                    summed_map = summed_map + current_map
+            summed_maps.append([summed_map])
+        
+        dic_tot = {
+            'species': esp,
+            'maps': {
+                'dates': summed_dates,
+                'map': summed_maps
+            }
+        }
 
     return dic_tot
 
-pop_evol_over_time()
-
-def masks():
+def masks(topology = False, windfarm = False):
     """
     Lit un fichier CSV et retourne une matrice (liste de listes) servant de masque.
     - Ignore la première ligne (en-tête).
     - Ignore la première colonne de chaque ligne.
-    - Si la valeur est 0, le masque contient 0 (ou None/False selon besoin).
+    - Si la valeur est 0, le masque contient 0.
     - Si la valeur est non nulle, le masque contient cette valeur.
+    Renvoie un dictionnaire contenant une matrice et le fichier étudié  
+
+    This is used for topology maps
     """
     masks = []
     names = []
-    file_paths = choose_csv_file()
+    if topology : 
+        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Depth.csv')]
+    elif windfarm : 
+        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Wind_Farm_100%.csv')]
+    else:
+        file_paths = choose_csv_file()
     for fichier in file_paths : 
         name_file = os.path.basename(fichier).split('/')[-1]
         names.append(name_file)
@@ -105,10 +146,9 @@ def masks():
         
         with open(fichier, 'r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f, delimiter=',')
-            
             # Ignorer la première ligne (en-tête)
             next(reader, None)
-            
+        
             for row in reader:
                 # Ignorer la première colonne 
                 ligne_masque = []
@@ -116,8 +156,9 @@ def masks():
                     if cell : 
                         val = safe_float(cell)
                         ligne_masque.append(val)
-
+                
                 mask_file.append(ligne_masque)
+        
         masks.append(mask_file)
     
     named_masks = {
@@ -127,8 +168,36 @@ def masks():
 
     return named_masks
 
-#masks()
+def plot_masks():
+    """
+    Affiche les masques en tant qu'heatmaps (images).
+    Chaque masque est affiché dans un subplot séparé.
+    """
+    result = masks()
+    mask_list = result['masks']
+    names = result['name of the masks']
     
+    # Convertir les listes de listes en arrays numpy pour le plotting
+    mask_arrays = [np.array(mask) for mask in mask_list]
+    
+    # Créer un subplot pour chaque masque
+    num_masks = len(mask_arrays)
+    fig, axes = plt.subplots(1, num_masks, figsize=(5*num_masks, 5))
+    
+    # Si un seul masque, axes n'est pas un array
+    if num_masks == 1:
+        axes = [axes]
+    
+    for idx, (mask_array, name) in enumerate(zip(mask_arrays, names)):
+        im = axes[idx].imshow(mask_array, cmap='viridis', aspect='auto')
+        axes[idx].set_title(name)
+        axes[idx].set_xlabel('Longitude')
+        axes[idx].set_ylabel('Latitude')
+        plt.colorbar(im, ax=axes[idx])
+    
+    plt.tight_layout()
+    plt.show()
+
 
 
 ### pour ajouter ces informations au code initial, il faut changer la fonction update_fish_stock 
