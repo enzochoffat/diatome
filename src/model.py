@@ -1,4 +1,4 @@
-from mesa import Model, agent
+from mesa import Model
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
 from .agent import FisherAgent

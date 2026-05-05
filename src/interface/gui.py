@@ -7,15 +7,13 @@ from PyQt6.QtWidgets import (
     QGridLayout, QTabWidget, QDoubleSpinBox, QFileDialog, QMessageBox,
     QFrame
 )
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from src.model import FisheryModel
 import src.config as config
 import random
-
-
 
 
 class SimulationCanvas(FigureCanvas):
@@ -170,18 +168,18 @@ class GridCanvas(FigureCanvas):
         # Dessiner les agents
         if archipelago_pos:
             ax.scatter(*zip(*archipelago_pos), c="#0f4c81", marker="o",
-                      s=55, alpha=0.8, label=f"Archipelago ({len(archipelago_pos)})",
-                      zorder=5)
+                       s=55, alpha=0.8, label=f"Archipelago ({len(archipelago_pos)})",
+                       zorder=5)
 
         if coastal_pos:
             ax.scatter(*zip(*coastal_pos), c="#1b7f79", marker="s",
-                      s=55, alpha=0.8, label=f"Coastal ({len(coastal_pos)})",
-                      zorder=5)
+                       s=55, alpha=0.8, label=f"Coastal ({len(coastal_pos)})",
+                       zorder=5)
 
         if trawler_pos:
             ax.scatter(*zip(*trawler_pos), c="#cc3a3b", marker="^",
-                      s=65, alpha=0.9, label=f"Trawler ({len(trawler_pos)})",
-                      zorder=5)
+                       s=65, alpha=0.9, label=f"Trawler ({len(trawler_pos)})",
+                       zorder=5)
 
         ax.set_xlim(0, config.GRID_WIDTH)
         ax.set_ylim(0, config.GRID_HEIGHT)
@@ -206,7 +204,7 @@ class MainWindow(QMainWindow):
             "stock_A": [], "stock_B": [], "stock_C": [], "stock_D": [],
             "total_catch": [], "avg_capital": []
         }
-        
+
         self.init_ui()
 
     def init_ui(self):
@@ -321,7 +319,7 @@ class MainWindow(QMainWindow):
         self.speed_spin.setSingleStep(1)
         self.speed_spin.valueChanged.connect(self.update_speed)
         params_layout.addWidget(self.speed_spin, 8, 1)
-        
+
         params_group.setLayout(params_layout)
         left_layout.addWidget(params_group)
 
