@@ -64,8 +64,15 @@
       "bad_weather_probability": 0.1
     }
   },
+  "maps": {
+    "spatial_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Depth.csv",
+    "wind_farm_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
+    "species_map": {
+      "cod": ".\\Ecospace_outputs\\biomass\\EEC_NS_Mmermaid-fish_atlantic_cod.csv"
+    }
+  },
   "execution": {
-    "timestamp": "2026-05-13T15:46:59.355734",
+    "timestamp": "2026-05-13T17:02:49.094176",
     "config_loader_version": "1.0"
   }
 }

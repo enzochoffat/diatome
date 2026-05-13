@@ -29,6 +29,7 @@ def run_from_config(config_path, run_id=0):
         FisheryModel: Completed model instance
     """
     loader = load_config(config_path)
+    loader.apply_map_configuration()
     metadata = loader.get_metadata()
     model_params = loader.get_model_params()
     output_params = loader.get_output_params()

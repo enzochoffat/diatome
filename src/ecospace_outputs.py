@@ -8,6 +8,24 @@ import tkinter as tk
 from tkinter import filedialog
 
 _ecospace_data_cache = None
+_PROJECT_ROOT = Path(__file__).parent.parent
+TOPOLOGY_MAP_PATH = str(_PROJECT_ROOT / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Depth.csv')
+WINDFARM_MAP_PATH = str(_PROJECT_ROOT / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Windfarms.csv')
+SPECIES_MAP_PATHS = None
+
+
+def configure_sources(topology_map_path=None, wind_farm_map_path=None, species_map_paths=None):
+    """Configure the CSV sources used by the module."""
+    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, _ecospace_data_cache
+
+    if topology_map_path is not None:
+        TOPOLOGY_MAP_PATH = str(topology_map_path)
+    if wind_farm_map_path is not None:
+        WINDFARM_MAP_PATH = str(wind_farm_map_path)
+    if species_map_paths is not None:
+        SPECIES_MAP_PATHS = [str(path) for path in species_map_paths]
+
+    _ecospace_data_cache = None
 
 def choose_csv_file():
     """
@@ -60,10 +78,22 @@ def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la 
         
         Each matrix has dimensions [MapRows][width] and contains concentration values in g/L
     """
-    file_paths = choose_csv_file()
+    file_paths = SPECIES_MAP_PATHS if SPECIES_MAP_PATHS is not None else choose_csv_file()
     esp = []
     date = []
     maps = []
+
+    dic_tot = {
+        'species': [],
+        'maps': {
+            'dates': [],
+            'map': []
+        },
+        'maps_per_species': {}
+    }
+
+    if not file_paths:
+        return dic_tot
     
     for fichier in file_paths:
         name_file = os.path.basename(fichier).split('/')[-1]
@@ -140,9 +170,9 @@ def masks(topology = False, windfarm = False):
     masks = []
     names = []
     if topology : 
-        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Depth.csv')]
+        file_paths = [TOPOLOGY_MAP_PATH]
     elif windfarm : 
-        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Windfarms.csv')]
+        file_paths = [WINDFARM_MAP_PATH]
     else:
         file_paths = choose_csv_file()
     for fichier in file_paths : 

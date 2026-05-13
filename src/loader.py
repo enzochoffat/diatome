@@ -5,6 +5,7 @@ from datetime import datetime
 from tkinter.font import names
 from typing import Dict, Any, Optional
 from . import config as default_config
+from src import ecospace_outputs
  
 class ConfigLoader:
     """Load and validate experiment configuration from JSON files"""
@@ -19,6 +20,7 @@ class ConfigLoader:
         
         self.config_dir = Path(config_dir)
         self.loaded_config = None
+        self.config_path = None
         
     def load(self, config_path):
         """
@@ -35,13 +37,21 @@ class ConfigLoader:
             json.JSONDecodeError: If JSON is invalid
         """
         
-        if not os.path.isabs(config_path):
-            config_path = self.config_dir / config_path
-            
         config_path = Path(config_path)
+
+        if not config_path.is_absolute():
+            candidate_paths = [config_path, self.config_dir / config_path]
+            for candidate in candidate_paths:
+                if candidate.exists():
+                    config_path = candidate
+                    break
+            else:
+                config_path = self.config_dir / config_path
         
         if not config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+        self.config_path = config_path.resolve()
         
         with open(config_path, 'r') as f:
             config_data = json.load(f)
@@ -121,6 +131,45 @@ class ConfigLoader:
                         config[section][key] = default_value
         
         return config
+
+    def _resolve_config_path(self, relative_path):
+        """Resolve a path from the JSON configuration file location."""
+        if relative_path is None:
+            return None
+
+        path = Path(relative_path)
+        if path.is_absolute():
+            return str(path)
+
+        candidates = []
+        if self.config_path is not None:
+            candidates.append(self.config_path.parent / path)
+            candidates.append(self.config_path.parent.parent / path)
+
+        candidates.append(Path.cwd() / path)
+
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate.resolve())
+
+        return str(candidates[0].resolve()) if candidates else str(path.resolve())
+
+    def get_map_params(self):
+        """Extract map-related configuration parameters."""
+        if self.loaded_config is None:
+            raise ValueError("No configuration loaded. Call load() first.")
+
+        maps = self.loaded_config.get("maps", {})
+        species_map = maps.get("species_map", {}) or {}
+
+        return {
+            "topology_map": self._resolve_config_path(maps.get("spatial_map")),
+            "wind_farm_map": self._resolve_config_path(maps.get("wind_farm_map")),
+            "species_map": {
+                species_name: self._resolve_config_path(species_path)
+                for species_name, species_path in species_map.items()
+            },
+        }
     
     def get_model_params(self):
         """
@@ -205,6 +254,25 @@ class ConfigLoader:
             if "bad_weather_probability" in weather_params:
                 default_config.BAD_WEATHER_PROBABILITY = weather_params["bad_weather_probability"]
                 model.bad_weather_probability = weather_params["bad_weather_probability"]
+
+    def apply_map_configuration(self):
+        """Apply map sources from the loaded configuration."""
+        if self.loaded_config is None:
+            return
+
+        map_params = self.get_map_params()
+        species_paths = list(map_params["species_map"].values()) or None
+
+        ecospace_outputs.configure_sources(
+            topology_map_path=map_params["topology_map"],
+            wind_farm_map_path=map_params["wind_farm_map"],
+            species_map_paths=species_paths,
+        )
+        default_config.reload_spatial_configuration(
+            topology_map_path=map_params["topology_map"],
+            windfarm_map_path=map_params["wind_farm_map"],
+            apply_windfarm=map_params["wind_farm_map"] is not None,
+        )
                 
     def save_config(self, output_path):
         """

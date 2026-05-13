@@ -38,5 +38,14 @@
     "weather": {
       "bad_weather_probability": 0.1
     }
+  },
+  "maps": {
+      "spatial_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Depth.csv",
+      "wind_farm_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
+      "species_map": 
+      {
+          "cod": ".\\Ecospace_outputs\\biomass\\EEC_NS_Mmermaid-fish_atlantic_cod.csv"
+      }
+
   }
 }

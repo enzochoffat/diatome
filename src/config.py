@@ -45,16 +45,22 @@ def compute_land_coordinates(topo_matrix):
                 land_coords.append([x, y])
     return land_coords
 
-TOPOLOGY = masks(topology=True, windfarm=False)['masks'][0]
-ORIGINAL_TOPOLOGY = [row[:] for row in TOPOLOGY]  # Deep copy of original topology before windfarm
-
-# Regional boundaries [x_range, y_range]
-LAND = compute_land_coordinates(TOPOLOGY)
-WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
-
-GRID_HEIGHT = len(TOPOLOGY)
-GRID_WIDTH = len(TOPOLOGY[0]) if GRID_HEIGHT > 0 else 0
-print(f"[DEBUG] Loaded topology: GRID_WIDTH={GRID_WIDTH}, GRID_HEIGHT={GRID_HEIGHT}")
+TOPOLOGY = []
+ORIGINAL_TOPOLOGY = []
+LAND = []
+WATER = []
+GRID_HEIGHT = 0
+GRID_WIDTH = 0
+single_slice = 0
+y_min_water = 0
+all_water_depths = []
+max_depth = 0
+min_depth = 0
+percentile_90_depth = 0
+REGION_A = []
+REGION_B = []
+REGION_C = []
+REGION_D = []
 
 def add_windfarm_to_topology():
     """
@@ -62,66 +68,12 @@ def add_windfarm_to_topology():
     Updates LAND zones to include Wind Farm areas.
     Also recalculates REGION_A/B/C/D with new topology.
     """
-    global TOPOLOGY, LAND, WATER, y_min_water, REGION_A, REGION_B, REGION_C, REGION_D
     try:
-        # Load Wind Farm topology
-        windfarm_data = masks(topology=False, windfarm=True)
-        windfarm_topology = windfarm_data['masks'][0]
-        
-        # Merge: if either TOPOLOGY or WINDFARM is LAND (value < 1e-29), result is LAND
-        merged_topology = []
-        for y in range(len(TOPOLOGY)):
-            row = []
-            for x in range(len(TOPOLOGY[y])):
-                topo_val = TOPOLOGY[y][x]
-                wind_val = windfarm_topology[y][x] if y < len(windfarm_topology) and x < len(windfarm_topology[y]) else topo_val
-                
-                # If either is LAND, result is LAND
-                if topo_val == 0 or wind_val == 1:
-                    row.append(0)  # LAND
-                else:
-                    row.append(topo_val)  # Water
-            merged_topology.append(row)
-        
-        # Update global TOPOLOGY for fisher navigation (prevents access to windfarm areas)
-        TOPOLOGY = merged_topology
-        LAND = compute_land_coordinates(TOPOLOGY)
-        
-        # Recalculate WATER and y_min_water
-        WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
-        y_min_water = int(min(WATER[-1])) if WATER else 0
-        
-        # Recalculate regions using ORIGINAL_TOPOLOGY (so regions and hotspots don't change)
-        REGION_A = define_region('A', topology_matrix=ORIGINAL_TOPOLOGY)
-        REGION_B = define_region('B', topology_matrix=ORIGINAL_TOPOLOGY)
-        REGION_C = define_region('C', topology_matrix=ORIGINAL_TOPOLOGY)
-        REGION_D = define_region('D', topology_matrix=ORIGINAL_TOPOLOGY)
-        
-        # Remove overlaps from region C
-        region_d_set = set(tuple(cell) for cell in REGION_D)
-        REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
-        
-        return merged_topology
+        reload_spatial_configuration(apply_windfarm=True)
+        return TOPOLOGY
     
     except Exception as e:
         print(f"Error loading Wind Farm topology: {e}")
-        return TOPOLOGY
-
-
-single_slice = GRID_HEIGHT//4
-y_min_water = int(min(WATER[-1]))
-
-# Calculate min and max depth, excluding land (0)
-all_water_depths = [val for row in TOPOLOGY for val in row if val > 0]
-max_depth = np.max(all_water_depths) if all_water_depths else 0
-min_depth = np.min(all_water_depths) if all_water_depths else 0
-
-# For region D: use percentile 95 instead of absolute max to avoid outliers
-percentile_90_depth = np.percentile(all_water_depths, 95) if all_water_depths else max_depth
-
-print(f"[DEBUG] Depth calculation:")
-print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
-print(f"  percentile_90_depth = {percentile_90_depth}")
 print(f"  Total water cells: {len(all_water_depths)}")
 
 
@@ -208,6 +160,71 @@ def get_neighbors_by_euclidean_distance_as_xy(matrix, center_value, radius=7):
     return indices_xy, values
 
 
+def reload_spatial_configuration(topology_map_path=None, windfarm_map_path=None, apply_windfarm=False):
+    """Reload all spatial globals from the configured CSV sources."""
+    global TOPOLOGY, ORIGINAL_TOPOLOGY, LAND, WATER, GRID_HEIGHT, GRID_WIDTH
+    global single_slice, y_min_water, all_water_depths, max_depth, min_depth, percentile_90_depth
+    global REGION_A, REGION_B, REGION_C, REGION_D
+
+    if topology_map_path is not None or windfarm_map_path is not None:
+        ecospace_outputs.configure_sources(
+            topology_map_path=topology_map_path,
+            wind_farm_map_path=windfarm_map_path,
+        )
+
+    base_topology = masks(topology=True, windfarm=False)['masks'][0]
+    original_topology = [row[:] for row in base_topology]
+
+    if apply_windfarm:
+        windfarm_data = masks(topology=False, windfarm=True)
+        windfarm_topology = windfarm_data['masks'][0]
+
+        merged_topology = []
+        for y in range(len(base_topology)):
+            row = []
+            for x in range(len(base_topology[y])):
+                topo_val = base_topology[y][x]
+                wind_val = windfarm_topology[y][x] if y < len(windfarm_topology) and x < len(windfarm_topology[y]) else topo_val
+                if topo_val == 0 or wind_val == 1:
+                    row.append(0)
+                else:
+                    row.append(topo_val)
+            merged_topology.append(row)
+
+        base_topology = merged_topology
+
+    TOPOLOGY = base_topology
+    ORIGINAL_TOPOLOGY = original_topology
+    LAND = compute_land_coordinates(TOPOLOGY)
+    WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
+
+    GRID_HEIGHT = len(TOPOLOGY)
+    GRID_WIDTH = len(TOPOLOGY[0]) if GRID_HEIGHT > 0 else 0
+    single_slice = GRID_HEIGHT // 4
+    y_min_water = int(min(WATER[-1])) if WATER else 0
+
+    all_water_depths = [val for row in TOPOLOGY for val in row if val > 0]
+    max_depth = np.max(all_water_depths) if all_water_depths else 0
+    min_depth = np.min(all_water_depths) if all_water_depths else 0
+    percentile_90_depth = np.percentile(all_water_depths, 95) if all_water_depths else max_depth
+
+    REGION_A = define_region('A', topology_matrix=ORIGINAL_TOPOLOGY)
+    REGION_B = define_region('B', topology_matrix=ORIGINAL_TOPOLOGY)
+    REGION_C = define_region('C', topology_matrix=ORIGINAL_TOPOLOGY)
+    REGION_D = define_region('D', topology_matrix=ORIGINAL_TOPOLOGY)
+
+    region_d_set = set(tuple(cell) for cell in REGION_D)
+    REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
+
+    print(f"[DEBUG] Loaded topology: GRID_WIDTH={GRID_WIDTH}, GRID_HEIGHT={GRID_HEIGHT}")
+    print(f"[DEBUG] Depth calculation:")
+    print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
+    print(f"  percentile_90_depth = {percentile_90_depth}")
+    print(f"  Total water cells: {len(all_water_depths)}")
+
+    return TOPOLOGY
+
+
 
 def define_region(REGION_NAME, topology_matrix=None) :
     if topology_matrix is None:
@@ -242,17 +259,10 @@ def define_region(REGION_NAME, topology_matrix=None) :
     
     return result_indices
 
-REGION_A = define_region('A')    #Archipelagos 
-REGION_B = define_region('B')    # Coastal zone 1
-REGION_C = define_region('C')    # Coastal zone 2
-REGION_D = define_region('D')   # Open sea
-
-# Remove cells from C that are also in D (to avoid overlaps)
-region_d_set = set(tuple(cell) for cell in REGION_D)
-REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
+reload_spatial_configuration()
 
 print(f"\n[DEBUG] After removing overlaps:")
-print(f"  REGION_C: {len(REGION_C)} cells (after removing {len([cell for cell in define_region('C') if tuple(cell) in region_d_set])} overlapping cells)")
+print(f"  REGION_C: {len(REGION_C)} cells")
 print(f"  REGION_D: {len(REGION_D)} cells")
 
 
