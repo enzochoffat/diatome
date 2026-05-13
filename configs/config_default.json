@@ -7,7 +7,7 @@
   },
   
   "simulation": {
-    "duration_years": 25,
+    "duration_years": 2,
     "verbose": true,
     "random_seed": null
   },
@@ -15,11 +15,12 @@
   "agents": {
     "num_archipelago": 10,
     "num_coastal": 10,
-    "num_trawler": 5
+    "num_trawler": 5,
+    "names": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y"]
   },
   
   "output": {
-    "export_data": false,
+    "export_data": true,
     "filename_prefix": "test",
     "export_interval_years": 1
   },

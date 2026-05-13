@@ -7,10 +7,11 @@ from collections import Counter
 
 class FisherAgent(Agent):
     
-    def __init__(self, unique_id, model, fisher_type, initial_capital=None):
+    def __init__(self, unique_id, model, fisher_type, initial_capital=None, name=None):
         super().__init__(model)
         self.fisher_type = fisher_type # "archipelago", "coastal", "trawler"
         self.unique_id = unique_id
+        self.name = name
         
         # Basic attributes
         self.wealth = 0

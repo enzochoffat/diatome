@@ -46,6 +46,7 @@ desktop.ini
 results/temp/
 results/**/*.csv
 !results/examples/
+results/
 
 # Notebooks
 .ipynb_checkpoints/

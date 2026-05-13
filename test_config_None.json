@@ -6,15 +6,42 @@
     "created": "2026-01-25"
   },
   "simulation": {
-    "duration_years": 25,
+    "duration_years": 2,
     "verbose": true,
     "random_seed": null,
     "repetitions": 1
   },
   "agents": {
-    "num_archipelago": 20,
+    "num_archipelago": 10,
     "num_coastal": 10,
-    "num_trawler": 5
+    "num_trawler": 5,
+    "names": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j",
+      "k",
+      "l",
+      "m",
+      "n",
+      "o",
+      "p",
+      "q",
+      "r",
+      "s",
+      "t",
+      "u",
+      "v",
+      "w",
+      "x",
+      "y"
+    ]
   },
   "output": {
     "export_data": true,
@@ -26,10 +53,11 @@
   "parameters": {
     "fish_dynamics": {
       "growth_rate": 0.1,
-      "initial_stock_ratio": 0.5
+      "initial_stock_ratio": 0.5,
+      "initial_stock_size": "halfCarryingCap"
     },
     "economics": {
-      "fish_price": 10.0,
+      "fish_price": 1.0,
       "initial_capital": 1000.0
     },
     "weather": {
@@ -37,7 +65,7 @@
     }
   },
   "execution": {
-    "timestamp": "2026-02-12T18:33:21.792111",
+    "timestamp": "2026-05-13T15:46:59.355734",
     "config_loader_version": "1.0"
   }
 }

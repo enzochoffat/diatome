@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime
+from tkinter.font import names
 from typing import Dict, Any, Optional
 from . import config as default_config
  
@@ -133,13 +134,17 @@ class ConfigLoader:
             raise ValueError("No configuration loaded. Call load() first.")
         
         config = self.loaded_config
-        
+        names = config["agents"]["names"]        
+
         return{
             "end_of_sim": config["simulation"]["duration_years"] * 365,
             "num_archipelago": config["agents"]["num_archipelago"],
             "num_coastal": config["agents"]["num_coastal"],
             "num_trawler": config["agents"]["num_trawler"],
-            "verbose": config["simulation"]["verbose"]
+            "verbose": config["simulation"]["verbose"],
+            "archipelago_names": names[:config["agents"]["num_archipelago"]],
+            "coastal_names": names[config["agents"]["num_archipelago"]:config["agents"]["num_archipelago"] + config["agents"]["num_coastal"]],
+            "trawler_names": names[config["agents"]["num_archipelago"] + config["agents"]["num_coastal"]:],
         }
     
     def get_output_params(self):
@@ -171,7 +176,7 @@ class ConfigLoader:
         fish_dynamics = params.get("fish_dynamics", {})
 
         if "growth_rate" in fish_dynamics:
-            default_config.config.GROWTH_RATE = fish_dynamics["growth_rate"]
+            default_config.GROWTH_RATE = fish_dynamics["growth_rate"]
 
         if "initial_stock_size" in fish_dynamics:
             allowed_values = {
@@ -186,17 +191,19 @@ class ConfigLoader:
                     f"Invalid initial_stock_size '{value}'. "
                     f"Allowed values: {sorted(allowed_values)}"
                 )
-            default_config.config.INIT_STOCK_SIZE = value
+            default_config.INIT_STOCK_SIZE = value
             model.init_stock_size = value
                 
         if "economics" in params:
             eco_params = params["economics"]
             if "fish_price" in eco_params:
+                default_config.FISH_PRICE = eco_params["fish_price"]
                 model.FISH_PRICE = eco_params["fish_price"]
                 
         if "weather" in params:
             weather_params = params["weather"]
             if "bad_weather_probability" in weather_params:
+                default_config.BAD_WEATHER_PROBABILITY = weather_params["bad_weather_probability"]
                 model.bad_weather_probability = weather_params["bad_weather_probability"]
                 
     def save_config(self, output_path):

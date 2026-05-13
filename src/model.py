@@ -23,6 +23,9 @@ class FisheryModel(Model):
         fish_price=None,
         bad_weather_probability=None,
         initial_capital=None,
+        archipelago_names=None,
+        coastal_names=None,
+        trawler_names=None
     ):
         super().__init__()
         
@@ -34,6 +37,10 @@ class FisheryModel(Model):
         self.num_archipelago = num_archipelago
         self.num_coastal = num_coastal
         self.num_trawler = num_trawler
+
+        self.archipelago_names = archipelago_names
+        self.coastal_names = coastal_names
+        self.trawler_names = trawler_names
 
         # Define time constants
         self.WEEK = config.WEEK
@@ -255,7 +262,7 @@ class FisheryModel(Model):
         agent_id = 0
         
         for _ in range(self.num_archipelago):
-            agent = FisherAgent(agent_id, self, "archipelago", initial_capital=self.initial_capital)
+            agent = FisherAgent(agent_id, self, "archipelago", initial_capital=self.initial_capital, name=self.archipelago_names[agent_id] if self.archipelago_names else None)
             start_pos = self._get_random_position_in_region("A")
             if start_pos:
                 self.grid.place_agent(agent, start_pos)
@@ -265,7 +272,7 @@ class FisheryModel(Model):
             agent_id += 1
             
         for _ in range(self.num_coastal):
-            agent = FisherAgent(agent_id, self, "coastal", initial_capital=self.initial_capital)
+            agent = FisherAgent(agent_id, self, "coastal", initial_capital=self.initial_capital, name=self.coastal_names[agent_id - self.num_archipelago] if self.coastal_names else None)
             region = self.random.choice(["A", "B"])
             start_pos = self._get_random_position_in_region(region)
             if start_pos:
@@ -275,7 +282,7 @@ class FisheryModel(Model):
             agent_id += 1
             
         for _ in range(self.num_trawler):
-            agent = FisherAgent(agent_id, self, "trawler", initial_capital=self.initial_capital)
+            agent = FisherAgent(agent_id, self, "trawler", initial_capital=self.initial_capital, name=self.trawler_names[agent_id - self.num_archipelago - self.num_coastal] if self.trawler_names else None)
             region = self.random.choice(config.TRAWLER_ACCESSIBLE_REGIONS)
             start_pos = self._get_random_position_in_region(region)
             if start_pos:
@@ -714,6 +721,7 @@ class FisheryModel(Model):
         if self.yearly_data:
             yearly_df = pd.DataFrame(self.yearly_data)
             yearly_df.to_csv(f"{os.path.join(directory, f"{filename_prefix}_yearly_{timestamp}.csv")}", index=False)
+            self.save_output_map(directory, f"{filename_prefix}_stock_{timestamp}.csv")
             if self.verbose:
                 print(f"Exported: {filename_prefix}_yearly_{timestamp}.csv ({len(yearly_df)} rows)")
         
@@ -1005,3 +1013,15 @@ class FisheryModel(Model):
             for aid in current_catches
         )
         return yearly_catch
+    
+    def get_output_map(self):
+        """Get a map of current fish stocks for visualization"""
+        stock_map = np.zeros((self.grid.width, self.grid.height), dtype=int)
+        for (x, y), patch in self.patches.items():
+            stock_map[x, y] = int(patch['fish_stock'])
+        return stock_map
+    
+    def save_output_map(self, directory, filename):
+        """Save current stock map as an csv"""
+        stock_map = self.get_output_map()
+        np.savetxt(f"{directory}/{filename}", stock_map, fmt='%d', delimiter=",")

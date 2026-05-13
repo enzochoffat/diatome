@@ -52,6 +52,10 @@ ORIGINAL_TOPOLOGY = [row[:] for row in TOPOLOGY]  # Deep copy of original topolo
 LAND = compute_land_coordinates(TOPOLOGY)
 WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
 
+GRID_HEIGHT = len(TOPOLOGY)
+GRID_WIDTH = len(TOPOLOGY[0]) if GRID_HEIGHT > 0 else 0
+print(f"[DEBUG] Loaded topology: GRID_WIDTH={GRID_WIDTH}, GRID_HEIGHT={GRID_HEIGHT}")
+
 def add_windfarm_to_topology():
     """
     Load Wind Farm topology and merge it with existing TOPOLOGY.
@@ -292,14 +296,14 @@ def get_hotspots_for_step(step, region_name):
                 fish_map = np.array(ecospace_data['maps']['map'][date_index][0])
                 
                 # Trouver les 2 points avec les plus hautes concentrations
-                top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)[:2]
-                if len(top_coords) == 2:
+                top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)[:3]
+                if len(top_coords) == 3:
                     return top_coords
         except Exception as e:
             pass
     
     # Fallback: utiliser les valeurs TOPOLOGY pour trouver les hotspots
-    top_coords = sorted(region, key=lambda xy: TOPOLOGY[xy[1]][xy[0]], reverse=True)[:2]
+    top_coords = sorted(region, key=lambda xy: TOPOLOGY[xy[1]][xy[0]], reverse=True)[:3]
     return top_coords
 
 

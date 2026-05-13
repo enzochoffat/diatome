@@ -109,13 +109,19 @@ def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la 
                 else:
                     summed_map = summed_map + current_map
             summed_maps.append([summed_map])
-        
+        per_species_maps = {}
+        for species_idx, species_name in enumerate(esp):
+            per_species_maps[species_name] = {
+                'dates' : maps[0][:num_dates],
+                'map' : [maps[species_idx][date_idx][0] for date_idx in range(num_dates)]
+            }
         dic_tot = {
             'species': esp,
             'maps': {
                 'dates': summed_dates,
                 'map': summed_maps
-            }
+            },
+            'maps_per_species' : per_species_maps
         }
 
     return dic_tot
@@ -134,9 +140,9 @@ def masks(topology = False, windfarm = False):
     masks = []
     names = []
     if topology : 
-        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Depth.csv')]
+        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Depth.csv')]
     elif windfarm : 
-        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Wind_Farm_100%.csv')]
+        file_paths = [str(Path(__file__).parent.parent / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Windfarms.csv')]
     else:
         file_paths = choose_csv_file()
     for fichier in file_paths : 
@@ -165,6 +171,7 @@ def masks(topology = False, windfarm = False):
         'name of the masks' : names ,
         'masks' : masks
     }
+    
 
     return named_masks
 

@@ -23,6 +23,7 @@ import random
 
 
 
+
 class SimulationCanvas(FigureCanvas):
     """Widget de visualisation des indicateurs de simulation."""
 
@@ -104,8 +105,7 @@ class GridCanvas(FigureCanvas):
     def _home_position(self, agent):
         """Position stable en zone LAND pour eviter le flicker des agents au port."""
         rng = random.Random(agent.unique_id)
-        x = rng.randint(25, config.GRID_WIDTH - 1)
-        y = rng.randint(0, 23)
+        (x,y) = rng.choice(config.LAND) if config.LAND else (0, 0)
         return (x, y)
 
     def plot_grid(self, model):
@@ -132,8 +132,8 @@ class GridCanvas(FigureCanvas):
             "B": "#c6ebbf",
             "C": "#ffe6a7",
             "D": "#ffc9a8",
-            "LAND": "#ffffff",  # White for land/windfarm areas
-            "NULL": "#e0e0e0",  # Light grey for null areas
+            "LAND": "#FFFFFF",  # White for land/windfarm areas
+            "NULL": "#ff0000",  # Light grey for null areas
         }
 
         # Dessiner les patches selon densite
@@ -162,7 +162,7 @@ class GridCanvas(FigureCanvas):
                 ))
 
         ax.set_xlim(0, config.GRID_WIDTH)
-        ax.set_ylim(config.GRID_HEIGHT, 0)
+        
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_title(f"Map View (Jour {model.current_step})")
@@ -204,7 +204,7 @@ class GridCanvas(FigureCanvas):
                        zorder=5)
 
         ax.set_xlim(0, config.GRID_WIDTH)
-        ax.set_ylim(0, config.GRID_HEIGHT)
+        ax.set_ylim(config.GRID_HEIGHT, 0)        
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_title(f"Positions des pecheurs (Jour {model.current_step})")
@@ -317,8 +317,6 @@ class MainWindow(QMainWindow):
 
         # Parametres dynamiques appliques avant creation du modele
         params_layout.addWidget(QLabel("Taux de croissance:"), 6, 0)
-        # Parametres dynamiques appliques avant creation du modele
-        params_layout.addWidget(QLabel("Taux de croissance:"), 4, 0)
         self.growth_spin = QDoubleSpinBox()
         self.growth_spin.setRange(0.0, 1.0)
         self.growth_spin.setSingleStep(0.01)
@@ -355,8 +353,6 @@ class MainWindow(QMainWindow):
 
         params_layout.addWidget(QLabel("Vitesse (ms/step):"), 10, 0)
         params_layout.addWidget(self.weather_spin, 7, 1)
-
-        params_layout.addWidget(QLabel("Vitesse (ms/step):"), 8, 0)
         self.speed_spin = QSpinBox()
         self.speed_spin.setRange(1, 500)
         self.speed_spin.setValue(20)
