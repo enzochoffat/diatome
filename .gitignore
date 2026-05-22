@@ -47,6 +47,7 @@ results/temp/
 results/**/*.csv
 !results/examples/
 results/
+test_config_None.json
 
 # Notebooks
 .ipynb_checkpoints/
@@ -55,3 +56,4 @@ notebooks/.ipynb_checkpoints/
 # Local config
 config/local.yaml
 .env
+test_config_None.json
