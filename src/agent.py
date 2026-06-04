@@ -553,10 +553,7 @@ class FisherAgent(Agent):
             # DEBUG
             if self.model.current_step < 10:
                 #print(f"    → Exploration returned: {spot}")
-                return spot
-
-            
-        
+                return spot     
    
     def explore_random_spot(self, region):
         if region == "A":

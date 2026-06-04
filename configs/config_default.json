@@ -45,6 +45,9 @@
       "species_map": 
       {
           "cod": ".\\Ecospace_outputs\\biomass\\EEC_NS_Mmermaid-fish_atlantic_cod.csv"
+      },
+      "habitat_map":{
+          "cod": ".\\Ecospace_outputs\\habitat\\EEC_NS_Mmermaid-habitat_atlantic_cod.csv"
       }
 
   }
