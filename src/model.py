@@ -647,6 +647,7 @@ class FisheryModel(Model):
             self.HOTSPOTS_B = get_hotspots_for_step(self.current_step, 'B')
             self.HOTSPOTS_C = get_hotspots_for_step(self.current_step, 'C')
             self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
+            self.save_output_map('./results/biomass', f"biomass_{self.current_step}.csv")
             
     def print_final_summary(self):
         """Print comprehensive summary at end of simulation"""
@@ -1024,4 +1025,8 @@ class FisheryModel(Model):
     def save_output_map(self, directory, filename):
         """Save current stock map as an csv"""
         stock_map = self.get_output_map()
-        np.savetxt(f"{directory}/{filename}", stock_map, fmt='%d', delimiter=",")
+        if os.path.exists(directory):
+            np.savetxt(f"{directory}/{filename}", stock_map, fmt='%d', delimiter=",")
+        else:
+            os.makedirs(directory)
+            np.savetxt(f"{directory}/{filename}", stock_map, fmt='%d', delimiter=",")
