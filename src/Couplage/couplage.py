@@ -13,7 +13,7 @@ class Couplage:
         with open(json_path, 'r') as f:
             config = json.load(f)
             species_maps = config["maps"]["species_map"]
-            step = config["simulation"]["steps"]
+            step = config["simulation"]["step"]
         # Récupérer les cartes d'écosystème à partir de la configuration
 
 
