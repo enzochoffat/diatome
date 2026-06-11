@@ -13,10 +13,11 @@ class Couplage:
         with open(json_path, 'r') as f:
             config = json.load(f)
             species_maps = config["maps"]["species_map"]
+            step = config["simulation"]["steps"]
         # Récupérer les cartes d'écosystème à partir de la configuration
 
 
-        return species_maps
+        return species_maps, step
     
     def update_biomass(self, species_maps):
         new_fish_stocks = {}

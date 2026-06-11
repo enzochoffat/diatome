@@ -1,3 +1,5 @@
+from time import sleep
+
 from mesa import Model
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
@@ -655,7 +657,11 @@ class FisheryModel(Model):
             self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
             #self.save_output_map('./results/biomass', f"biomass_{self.current_step}.csv")
             if self.coupling:
-                species_maps = Couplage.read_csv_biomass(self)
+                species_maps, step = Couplage.read_csv_biomass(self)
+                last_step = step
+                while last_step == step:
+                    sleep(0.1)
+                    species_maps, step = Couplage.read_csv_biomass(self)
                 fish = Couplage.update_biomass(self, species_maps)
                 self.update_patches(fish)
                 agent_df = self.datacollector.get_agent_vars_dataframe()
@@ -666,6 +672,7 @@ class FisheryModel(Model):
                 agent_df_filtered.to_csv(f"{os.path.join('./results/biomass', f'agent_{self.current_step}.csv')}", index=False)
                 if self.verbose:
                     print(f"Exported: agents_{self.current_step}.csv ({len(agent_df_filtered)} rows)")
+                
             
     def print_final_summary(self):
         """Print comprehensive summary at end of simulation"""
