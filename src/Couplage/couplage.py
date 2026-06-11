@@ -9,7 +9,7 @@ class Couplage:
         """Update biomass at a specific location"""
         """on va chercher les cartes dans la nouvelle config sans pour autant la run"""
 
-        json_path = "configs/config_default.json"
+        json_path = "configs/config.json"
         with open(json_path, 'r') as f:
             config = json.load(f)
             species_maps = config["maps"]["species_map"]
@@ -58,7 +58,7 @@ class Couplage:
                         #     new_fish_stocks[(x, y)] = {}
                         # new_fish_stocks[(x, y)][id] = cell
 
-                        if x == 40 and y == 169:
-                            print(f"Read fish stock for patch ({x}, {y}) species {id}: {cell}")
+                        #if x == 40 and y == 169:
+                            #print(f"Read fish stock for patch ({x}, {y}) species {id}: {cell}")
 
         return new_fish_stocks

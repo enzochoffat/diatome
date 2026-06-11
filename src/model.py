@@ -1053,7 +1053,6 @@ class FisheryModel(Model):
         """Update patch fish stocks with a provided map (for coupling)"""
         for (x, y), stock in new_fish_stocks.items():
             if (x, y) in self.patches:
-                if x == 0 and y == 0:
-                    #print(f"Updating patch at ({x}, {y}) with fish stock: {stock}")
-                    self.patches[(x, y)]['fish_stock'] = stock
-                    #print(f"Patch ({x}, {y}) new stock: {self.patches[(x, y)]['fish_stock']}")
+                #print(f"Updating patch at ({x}, {y}) with fish stock: {stock}")
+                self.patches[(x, y)]['fish_stock'] = stock
+                #print(f"Patch ({x}, {y}) new stock: {self.patches[(x, y)]['fish_stock']}")
