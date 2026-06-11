@@ -321,6 +321,8 @@ class FisherAgent(Agent):
         #    self.model.grid.remove_agent(self)
         
         # Place at new position
+        if self.pos is not None:
+            self.model.grid.remove_agent(self)
         self.model.grid.place_agent(self, (x, y))
         self.current_location = (x, y)
         self.display_location = (x, y)

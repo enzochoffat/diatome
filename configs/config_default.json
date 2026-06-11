@@ -4,12 +4,14 @@
     "description": "Standard 25-year simulation with balanced fisher composition",
     "version": "1.0",
     "created": "2026-01-25"
+    
   },
   
   "simulation": {
     "duration_years": 2,
     "verbose": true,
-    "random_seed": null
+    "random_seed": null,
+    "coupling": true
   },
   
   "agents": {
@@ -44,7 +46,8 @@
       "wind_farm_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
       "species_map": 
       {
-          "cod": ".\\Ecospace_outputs\\biomass\\EEC_NS_Mmermaid-fish_atlantic_cod.csv"
+          "cod": ".\\Ecospace_outputs\\biomass\\EEC_NS_Mmermaid-fish_atlantic_cod.csv",
+          "11":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_11.csv"
       },
       "habitat_map":{
           "cod": ".\\Ecospace_outputs\\habitat\\EEC_NS_Mmermaid-habitat_atlantic_cod.csv"

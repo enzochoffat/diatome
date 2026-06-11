@@ -111,7 +111,8 @@ class ConfigLoader:
             "simulation": {
                 "verbose": True,
                 "random_seed": None,
-                "repetitions": 1
+                "repetitions": 1,
+                "coupling": False
             },
             "output": {
                 "export_data": True,
@@ -191,6 +192,7 @@ class ConfigLoader:
             "num_coastal": config["agents"]["num_coastal"],
             "num_trawler": config["agents"]["num_trawler"],
             "verbose": config["simulation"]["verbose"],
+            "coupling": config["simulation"]["coupling"],
             "archipelago_names": names[:config["agents"]["num_archipelago"]],
             "coastal_names": names[config["agents"]["num_archipelago"]:config["agents"]["num_archipelago"] + config["agents"]["num_coastal"]],
             "trawler_names": names[config["agents"]["num_archipelago"] + config["agents"]["num_coastal"]:],

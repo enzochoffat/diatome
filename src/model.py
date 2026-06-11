@@ -10,6 +10,7 @@ import os
 import numpy as np
 
 from src.config import get_hotspots_for_step
+from src.Couplage.couplage import Couplage
 
 class FisheryModel(Model):
     def __init__(
@@ -25,10 +26,12 @@ class FisheryModel(Model):
         initial_capital=None,
         archipelago_names=None,
         coastal_names=None,
-        trawler_names=None
+        trawler_names=None,
+        coupling=None,
     ):
         super().__init__()
         
+        self.coupling = coupling
         self.verbose = verbose
         
         self.current_step = 0
@@ -216,6 +219,7 @@ class FisheryModel(Model):
             },
             agent_reporters={
                 # Identity
+                "step": lambda a: a.model.current_step,
                 "unique_id": "unique_id",
                 "fisher_type": "fisher_type",
                 "age": "age",
@@ -237,6 +241,8 @@ class FisheryModel(Model):
                 "gone_fishing": "gone_fishing",
                 "fished_today": "fished_today",
                 "at_sea": "at_sea",
+                "current_location": lambda a: a.current_location if a.gone_fishing else (0, 0),
+                "catch": lambda a: a.accumulated_catch if a.gone_fishing else 0,
                 
                 # Decision-making
                 "will_fish": "will_fish",
@@ -642,12 +648,24 @@ class FisheryModel(Model):
             if self.verbose:
                 self.print_final_summary()
 
-        if self.current_step % 30 == 0:
+        if self.current_step % config.MONTH == 0:
             self.HOTSPOTS_A = get_hotspots_for_step(self.current_step, 'A')
             self.HOTSPOTS_B = get_hotspots_for_step(self.current_step, 'B')
             self.HOTSPOTS_C = get_hotspots_for_step(self.current_step, 'C')
             self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
-            self.save_output_map('./results/biomass', f"biomass_{self.current_step}.csv")
+            #self.save_output_map('./results/biomass', f"biomass_{self.current_step}.csv")
+            if self.coupling:
+                species_maps = Couplage.read_csv_biomass(self)
+                fish = Couplage.update_biomass(self, species_maps)
+                self.update_patches(fish)
+                agent_df = self.datacollector.get_agent_vars_dataframe()
+                os.makedirs('./results/biomass', exist_ok=True)
+                min_step = self.current_step - config.MONTH
+                max_step = self.current_step
+                agent_df_filtered = agent_df[(agent_df['step'] >= min_step) & (agent_df['step'] <= max_step)]
+                agent_df_filtered.to_csv(f"{os.path.join('./results/biomass', f'agent_{self.current_step}.csv')}", index=False)
+                if self.verbose:
+                    print(f"Exported: agents_{self.current_step}.csv ({len(agent_df_filtered)} rows)")
             
     def print_final_summary(self):
         """Print comprehensive summary at end of simulation"""
@@ -1030,3 +1048,12 @@ class FisheryModel(Model):
         else:
             os.makedirs(directory)
             np.savetxt(f"{directory}/{filename}", stock_map, fmt='%d', delimiter=",")
+
+    def update_patches(self, new_fish_stocks):
+        """Update patch fish stocks with a provided map (for coupling)"""
+        for (x, y), stock in new_fish_stocks.items():
+            if (x, y) in self.patches:
+                if x == 0 and y == 0:
+                    #print(f"Updating patch at ({x}, {y}) with fish stock: {stock}")
+                    self.patches[(x, y)]['fish_stock'] = stock
+                    #print(f"Patch ({x}, {y}) new stock: {self.patches[(x, y)]['fish_stock']}")
