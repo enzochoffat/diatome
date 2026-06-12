@@ -643,6 +643,7 @@ class FisheryModel(Model):
 
         # Increment step counter
         self.current_step += 1
+        print(f"Step {self.current_step} completed. Agents fishing: {self.num_fishing_midday}, at home: {self.num_at_home_midday}, fished today: {self.num_fished_today}")
         
         # Check if simulation should end
         if self.current_step >= self.end_of_sim:
@@ -657,11 +658,16 @@ class FisheryModel(Model):
             self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
             #self.save_output_map('./results/biomass', f"biomass_{self.current_step}.csv")
             if self.coupling:
-                species_maps, step = Couplage.read_csv_biomass(self)
-                last_step = step
-                while last_step == step:
-                    sleep(0.1)
-                    species_maps, step = Couplage.read_csv_biomass(self)
+                species_maps, step3 = Couplage.read_csv_biomass(self)
+                last_step = step3
+                step = last_step
+                print(f"last_step: {last_step}, step: {step}")
+                while step != last_step + 1 and self.current_step != 28: 
+                    print(f"step before update: {step}")
+                    sleep(2)
+                    species_maps, step2 = Couplage.read_csv_biomass(self)
+                    step = step2
+                    print(f"step after update: {step}")
                 fish = Couplage.update_biomass(self, species_maps)
                 self.update_patches(fish)
                 agent_df = self.datacollector.get_agent_vars_dataframe()
