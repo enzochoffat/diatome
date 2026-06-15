@@ -57,3 +57,5 @@ notebooks/.ipynb_checkpoints/
 config/local.yaml
 .env
 test_config_None.json
+read_cProfile.py
+.gitignore

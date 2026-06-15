@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 import numpy as np 
 import math
+from typing import List, Optional, Tuple
 
 # Add the project root to Python path so we can import from src
 project_root = Path(__file__).parent.parent
@@ -79,151 +80,102 @@ print(f"  Total water cells: {len(all_water_depths)}")
 
 import numpy as np
 
-def get_neighbors_by_euclidean_distance(matrix, center_value, radius=7):
-    """
-    Récupère les valeurs et coordonnées des cellules situées à une distance 
-    euclidienne <= radius de n'importe quelle occurrence de center_value.
-    
-    Paramètres :
-    - matrix : Liste de listes (matrice)
-    - center_value : La valeur numérique à rechercher
-    - radius : Rayon du cercle (ex: 7)
-    
-    Retourne :
-    - indices : Liste de tuples (ligne, colonne)
-    - values : Liste des valeurs correspondantes
-    """
-    
-    # 1. Trouver toutes les coordonnées (l, c) où la valeur est égale à center_value
-    centers = []
-    for i, row in enumerate(matrix):
-        for j, val in enumerate(row):
-            if val == center_value:
-                centers.append((i, j))
-    
+def get_neighbors_by_euclidean_distance(matrix: List[List[int]], center_value: int, radius: int = 7) -> Tuple[List[Tuple[int, int]], List[int]]:
+
+    arr = np.array(matrix)
+
+    centers = np.argwhere(arr == center_value)
     print(f"    [get_neighbors] Looking for center_value={center_value}, found {len(centers)} centers")
-    
-    if not centers:
-        print(f"    [get_neighbors] WARNING: No centers found! Unique values in TOPOLOGY: {sorted(set([v for row in matrix for v in row if v > 0]))[:10]}...")
+
+    if centers.size == 0:
+        unique_vals = sorted(set(v for row in matrix for v in row if v > 0))[:10]
+        print(f"    [get_neighbors] WARNING: No centers found! Unique values: {unique_vals}...")
         return [], []
+    
+    rows, cols = arr.shape
 
-    # 2. Initialiser un tableau de distances infinies pour chaque cellule
-    # On stocke la distance minimale trouvée pour chaque cellule
-    rows_count = len(matrix)
-    cols_count = len(matrix[0]) if rows_count > 0 else 0
-    
-    # On crée une structure pour stocker la distance minimale actuelle pour chaque (i, j)
-    # Initialisée à l'infini
-    min_distances = [[float('inf') for _ in range(cols_count)] for _ in range(rows_count)]
-    
-    # 3. Pour chaque cellule de la matrice, calculer la distance vers LE PLUS PROCHE centre
-    # Optimisation : on parcourt chaque cellule et on calcule la distance vers chaque centre
-    # (Pour une matrice très grande et des milliers de centers, une approche vectorielle ou k-d tree serait préférable,
-    # mais pour des tailles courantes, cette boucle imbriquée est claire et fonctionnelle).
-    
-    for r in range(rows_count):
-        for c in range(cols_count):
-            # On cherche la distance minimale vers n'importe quel centre
-            current_min_dist = float('inf')
-            
-            for cr, cc in centers:
-                # Distance euclidienne : sqrt((r - cr)^2 + (c - cc)^2)
-                dist = math.sqrt((r - cr)**2 + (c - cc)**2)
-                if dist < current_min_dist:
-                    current_min_dist = dist
-            
-            min_distances[r][c] = current_min_dist
+    rr, cc = np.meshgrid(np.arange(rows), np.arange(cols), indexing='ij')
 
-    # 4. Filtrer : distance <= radius ET la valeur n'est PAS center_value
-    result_indices = []
-    result_values = []
-    
-    for r in range(rows_count):
-        for c in range(cols_count):
-            # On vérifie la condition de distance et on exclut la valeur 'center' elle-même
-            if min_distances[r][c] <= radius and matrix[r][c] != center_value:
-                if matrix[r][c] > 0 : #water zone
-                            result_indices.append([r, c])
-                            result_values.append(matrix[r][c])
-    
-    return result_indices, result_values
+    dists = np.sqrt((rr[..., None] - centers[:, 0])**2 + (cc[..., None] - centers[:, 1])**2)
 
+    min_dist = np.min(dists, axis=2)
 
-def get_neighbors_by_euclidean_distance_as_xy(matrix, center_value, radius=7):
-    """
-    Wrapper that returns coordinates in (x, y) format instead of (row, col) format.
-    x = column, y = row
-    """
+    mask = (min_dist <= radius) & (arr != center_value) & (arr > 0)
+
+    indices = np.argwhere(mask)
+    values = arr[mask]
+
+    return indices.tolist(), values.tolist()
+
+def get_neighbors_by_euclidean_distance_as_xy(matrix: List[List[int]], center_value: int, radius: int = 7) -> Tuple[List[List[int]], List[int]]:
     indices, values = get_neighbors_by_euclidean_distance(matrix, center_value, radius)
-    # Convert from [row, col] to [x, y] which is [col, row]
-    indices_xy = [[col, row] for row, col in indices]
-    return indices_xy, values
+    xy_indices = [[col, row] for row, col in indices]
+    return xy_indices, values
 
 
-def reload_spatial_configuration(topology_map_path=None, windfarm_map_path=None, apply_windfarm=False):
-    """Reload all spatial globals from the configured CSV sources."""
+def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfarm_map_path: Optional[str] = None, apply_windfarm: bool = False) -> List[List[int]]:
+    
     global TOPOLOGY, ORIGINAL_TOPOLOGY, LAND, WATER, GRID_HEIGHT, GRID_WIDTH
-    global single_slice, y_min_water, all_water_depths, max_depth, min_depth, percentile_90_depth
+    global single_slice, y_min_water, all_water_depths
+    global max_depth, min_depth, percentile_90_depth
     global REGION_A, REGION_B, REGION_C, REGION_D
 
     if topology_map_path is not None or windfarm_map_path is not None:
-        ecospace_outputs.configure_sources(
-            topology_map_path=topology_map_path,
-            wind_farm_map_path=windfarm_map_path,
-        )
+        ecospace_outputs.configure_sources(topology_map_path=topology_map_path, wind_farm_map_path=windfarm_map_path)
 
-    base_topology = masks(topology=True, windfarm=False)['masks'][0]
-    original_topology = [row[:] for row in base_topology]
+    base_topology = np.array(masks(topology=True, windfarm=False)["masks"][0])
+    original_topology = base_topology.copy()
 
     if apply_windfarm:
-        windfarm_data = masks(topology=False, windfarm=True)
-        windfarm_topology = windfarm_data['masks'][0]
+        wf = np.array(masks(topology=False, windfarm=True)["masks"][0])
 
-        merged_topology = []
-        for y in range(len(base_topology)):
-            row = []
-            for x in range(len(base_topology[y])):
-                topo_val = base_topology[y][x]
-                wind_val = windfarm_topology[y][x] if y < len(windfarm_topology) and x < len(windfarm_topology[y]) else topo_val
-                if topo_val == 0 or wind_val == 1:
-                    row.append(0)
-                else:
-                    row.append(topo_val)
-            merged_topology.append(row)
+        h, w = base_topology.shape
+        wf_resized = np.zeros_like(base_topology)
 
-        base_topology = merged_topology
+        h_wf, w_wf = wf.shape
+        wf_resized[:min(h, h_wf), :min(w, w_wf)] = wf[:h, :w]
 
-    TOPOLOGY = base_topology
-    ORIGINAL_TOPOLOGY = original_topology
+        base_topology = np.where((base_topology == 0) & (wf_resized == 1), 0, base_topology)
+
+    TOPOLOGY = base_topology.tolist()
+    ORIGINAL_TOPOLOGY = original_topology.tolist()
+
+    GRID_HEIGHT, GRID_WIDTH = base_topology.shape
+    sigle_slice = GRID_HEIGHT // 4
+
+    water_mask = base_topology >= 0
+    positive_mask = base_topology > 0
+
+    WATER = [row[row >= 0].tolist() for row in base_topology if np.any(row >= 0)]
+    all_water_depths = base_topology[positive_mask]
+
+    y_min_water = int(np.min(WATER[-1])) if WATER else 0
+
+    if all_water_depths.size > 0:
+        max_depth = int(np.max(all_water_depths))
+        min_depth = int(np.min(all_water_depths))
+        percentile_90_depth = float(np.percentile(all_water_depths, 90))
+    else:
+        max_depth = min_depth = percentile_90_depth = 0
+
     LAND = compute_land_coordinates(TOPOLOGY)
-    WATER = [row for row in [[val for val in row if val >= 0] for row in TOPOLOGY] if row]
 
-    GRID_HEIGHT = len(TOPOLOGY)
-    GRID_WIDTH = len(TOPOLOGY[0]) if GRID_HEIGHT > 0 else 0
-    single_slice = GRID_HEIGHT // 4
-    y_min_water = int(min(WATER[-1])) if WATER else 0
+    REGION_A = define_region("A", ORIGINAL_TOPOLOGY)
+    REGION_B = define_region("B", ORIGINAL_TOPOLOGY)
+    REGION_C = define_region("C", ORIGINAL_TOPOLOGY)
+    REGION_D = define_region("D", ORIGINAL_TOPOLOGY)
 
-    all_water_depths = [val for row in TOPOLOGY for val in row if val > 0]
-    max_depth = np.max(all_water_depths) if all_water_depths else 0
-    min_depth = np.min(all_water_depths) if all_water_depths else 0
-    percentile_90_depth = np.percentile(all_water_depths, 95) if all_water_depths else max_depth
 
-    REGION_A = define_region('A', topology_matrix=ORIGINAL_TOPOLOGY)
-    REGION_B = define_region('B', topology_matrix=ORIGINAL_TOPOLOGY)
-    REGION_C = define_region('C', topology_matrix=ORIGINAL_TOPOLOGY)
-    REGION_D = define_region('D', topology_matrix=ORIGINAL_TOPOLOGY)
-
-    region_d_set = set(tuple(cell) for cell in REGION_D)
+    region_d_set = {tuple(cell) for cell in REGION_D}
     REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
 
     print(f"[DEBUG] Loaded topology: GRID_WIDTH={GRID_WIDTH}, GRID_HEIGHT={GRID_HEIGHT}")
-    print(f"[DEBUG] Depth calculation:")
+    print("[DEBUG] Depth calculation:")
     print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
     print(f"  percentile_90_depth = {percentile_90_depth}")
-    print(f"  Total water cells: {len(all_water_depths)}")
+    print(f"  Total water cells: {all_water_depths.size}")
 
     return TOPOLOGY
-
 
 
 def define_region(REGION_NAME, topology_matrix=None) :
@@ -240,8 +192,8 @@ def define_region(REGION_NAME, topology_matrix=None) :
         center_value = 3*(max_depth - min_depth)/4 + min_depth
         radius = 30
     elif REGION_NAME == 'D' : 
-       center_value = percentile_90_depth
-       radius = 20
+        center_value = percentile_90_depth
+        radius = 20
     
     # Convert to int to match TOPOLOGY values
     center_value = int(round(center_value))
@@ -264,8 +216,6 @@ reload_spatial_configuration()
 print(f"\n[DEBUG] After removing overlaps:")
 print(f"  REGION_C: {len(REGION_C)} cells")
 print(f"  REGION_D: {len(REGION_D)} cells")
-
-
 
 # =============================================================================
 # HOTSPOT LOCATIONS

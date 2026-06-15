@@ -9,7 +9,7 @@
     "duration_years": 2,
     "verbose": true,
     "random_seed": null,
-    "coupling": true,
+    "coupling": false,
     "repetitions": 1
   },
   "agents": {
@@ -77,7 +77,7 @@
     }
   },
   "execution": {
-    "timestamp": "2026-06-11T09:51:02.309916",
+    "timestamp": "2026-06-15T17:09:17.890019",
     "config_loader_version": "1.0"
   }
 }

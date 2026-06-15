@@ -79,9 +79,6 @@ def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la 
         Each matrix has dimensions [MapRows][width] and contains concentration values in g/L
     """
     file_paths = SPECIES_MAP_PATHS if SPECIES_MAP_PATHS is not None else choose_csv_file()
-    esp = []
-    date = []
-    maps = []
 
     dic_tot = {
         'species': [],
@@ -95,66 +92,116 @@ def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la 
     if not file_paths:
         return dic_tot
     
+    all_species_data = []
+    
     for fichier in file_paths:
         name_file = os.path.basename(fichier).split('/')[-1]
         species_maps = []
-        species_dates = []
+        dates_list = []
+        maps_list = []
 
-        with open(fichier, mode='r', newline='', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=',')
-            rows = [[safe_float(cell) for cell in row] for row in reader]
-        for row in rows : 
-            if row : 
-                if row[0] == 'MapRows' : 
-                    maps_row = int(row[1])
+        current_map_rows = 0
+        reading_map = False
+        current_map_data = []
+        rows_read_count = 0
+
+        try:
+            with open(fichier, mode='r', newline='', encoding='utf-8') as f:
+                reader = csv.reader(f, delimiter=',')
+
+                for row in reader:
+                    if not row:
+                        continue
+
+                    cell_0 = row[0].strip()
+
+                    if cell_0 == 'MapRows':
+                        current_map_rows = int(row[1])
+                        continue
+
+                    if cell_0 == 'Year':
+                        if reading_map and current_map_data:
+                            map_array = np.array(current_map_data, dtype=np.float64)
+                            maps_list.append(map_array)
+                            current_map_data = []
+                            rows_read_count = 0
+                        
+                        year = safe_float(row[1])
+                        month = safe_float(row[2]) if len(row) > 2 else 0
+                        dates_list.append([year, month])
+
+                        reading_map = True
+                        continue
+
+                    if reading_map:
+                        if rows_read_count < current_map_rows:
+                            try:
+                                line_data = [safe_float(cell) for cell in row]
+                                current_map_data.append(line_data)
+                                rows_read_count += 1
+                            except Exception as e:
+                                print(f"Error processing row in file {fichier}: {e}")
+                                continue
+                        
+                        elif rows_read_count == current_map_rows:
+                            continue
+
+                if reading_map and current_map_data:
+                    map_array = np.array(current_map_data, dtype=np.float64)
+                    maps_list.append(map_array)
+
+        except Exception as e:
+            print(f"Error reading file {fichier}: {e}")
+            continue
+
+        if maps_list and dates_list:
+            all_species_data.append({
+                'name': name_file,
+                'dates': dates_list,
+                'maps': maps_list
+            })
         
-        for nb, row in enumerate(rows) : 
-            if row : 
-                if row[0] == 'Year' : 
-                    year = row[1] 
-                    start = nb + 1
-                    if len(row) > 2 : 
-                        month = row[2]
-                    else : 
-                        month = 0
-                    species_dates.append([year, month])
-                    species_maps.append([rows[start: start + maps_row]])
+    if not all_species_data:
+        return dic_tot
+    
+    ref_dates = all_species_data[0]['dates']
+    ref_shape = all_species_data[0]['maps'][0].shape
+    num_dates = len(ref_dates)
 
-        date.append(species_dates)
-        maps.append(species_maps)
-        esp.append(name_file)
+    valid_species = []
+    for data in all_species_data:
+        if len(data['dates']) == num_dates:
+            if data['maps'][0].shape == ref_shape:
+                valid_species.append(data)
 
-    # Sommer les concentrations par date (somme toutes espèces)
-    if maps:  # Vérifier qu'on a des données
-        num_dates = len(maps[0])  # Nombre de dates (supposé identique pour toutes espèces)
-        summed_maps = []
-        summed_dates = maps[0][:num_dates]  # Utiliser les dates de la première espèce
-        
-        for date_idx in range(num_dates):
-            summed_map = None
-            for species_idx in range(len(maps)):
-                current_map = np.array(maps[species_idx][date_idx][0])
-                if summed_map is None:
-                    summed_map = current_map.copy()
-                else:
-                    summed_map = summed_map + current_map
-            summed_maps.append([summed_map])
-        per_species_maps = {}
-        for species_idx, species_name in enumerate(esp):
-            per_species_maps[species_name] = {
-                'dates' : maps[0][:num_dates],
-                'map' : [maps[species_idx][date_idx][0] for date_idx in range(num_dates)]
+    if not valid_species:
+        valid_species = [all_species_data[0]]
+
+    stack_maps = np.array([sp['maps'] for sp in valid_species])
+
+    summed_maps_array = np.sum(stack_maps, axis=0)
+
+    summed_maps_formatted = [[[m]] for m in summed_maps_array]
+    summed_dates = ref_dates
+
+    per_species_maps = {}
+    for sp in valid_species:
+            formatted_maps_sp = [[m] for m in sp['maps']]
+            per_species_maps[sp['name']] = {
+                'dates': sp['dates'],
+                'map': formatted_maps_sp
             }
-        dic_tot = {
-            'species': esp,
-            'maps': {
-                'dates': summed_dates,
-                'map': summed_maps
-            },
-            'maps_per_species' : per_species_maps
-        }
 
+    dic_tot = {
+        'species': [sp['name'] for sp in valid_species],
+        'maps': {
+            'dates': summed_dates,
+            'map': summed_maps_formatted
+        },
+        'maps_per_species': per_species_maps
+    }
     return dic_tot
+
 
 def masks(topology = False, windfarm = False):
     """
