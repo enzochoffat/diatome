@@ -1,4 +1,4 @@
-from time import sleep
+from time import sleep, time
 
 from mesa import Model
 from mesa.space import MultiGrid
@@ -658,23 +658,41 @@ class FisheryModel(Model):
             self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
             #self.save_output_map('./results/biomass', f"biomass_{self.current_step}.csv")
             if self.coupling:
-                species_maps, step3 = Couplage.read_csv_biomass(self)
-                last_step = step3
-                step = last_step
-                print(f"last_step: {last_step}, step: {step}")
-                while step != last_step + 1 and self.current_step != 28: 
-                    print(f"step before update: {step}")
-                    sleep(2)
-                    species_maps, step2 = Couplage.read_csv_biomass(self)
-                    step = step2
-                    print(f"step after update: {step}")
+                json_path = "configs/config.json"
+                last_modified_time = 0
+                species_maps, last_step  = Couplage.read_csv_biomass(self)
+                current_step_val = last_step
+
+                if os.path.exists(json_path):
+                    last_modified_time = os.path.getmtime(json_path)
+                    current_modified_time = last_modified_time
+
+                #print(f"last_step: {last_step}, step: {step}")
+                while current_modified_time <= last_modified_time and self.current_step != 28:
+                    sleep(0.5)
+                    if os.path.exists(json_path):
+                        current_modified_time = os.path.getmtime(json_path)
+                        if current_modified_time > last_modified_time:
+                            species_maps, current_step_val = Couplage.read_csv_biomass(self)
+                            #last_modified_time = current_modified_time
+                            if self.verbose:
+                                print(f"File {json_path} updated. Proceeding with biomass update for step {current_step_val}.")
+                        else:
+                            pass
+                    else:
+                        if self.verbose:
+                            print(f"File {json_path} not found. Waiting for the file to be created...")
+
                 fish = Couplage.update_biomass(self, species_maps)
                 self.update_patches(fish)
+
                 agent_df = self.datacollector.get_agent_vars_dataframe()
-                os.makedirs('./results/biomass', exist_ok=True)
+
                 min_step = self.current_step - config.MONTH
-                max_step = self.current_step
-                agent_df_filtered = agent_df[(agent_df['step'] >= min_step) & (agent_df['step'] <= max_step)]
+                mask = (agent_df['step'] >= min_step) & (agent_df['step'] <= self.current_step)
+                agent_df_filtered = agent_df.loc[mask]
+
+                os.makedirs('./results/biomass', exist_ok=True)
                 agent_df_filtered.to_csv(f"{os.path.join('./results/biomass', f'agent_{self.current_step}.csv')}", index=False)
                 if self.verbose:
                     print(f"Exported: agents_{self.current_step}.csv ({len(agent_df_filtered)} rows)")
