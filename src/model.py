@@ -1,5 +1,6 @@
 from time import sleep, time
 
+from collections import defaultdict
 from mesa import Model
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
@@ -132,8 +133,15 @@ class FisheryModel(Model):
         # Initialize spatial grid(50x56)
         self.grid = MultiGrid(config.GRID_WIDTH, config.GRID_HEIGHT, torus=False)
         
+        self._region_stock_cache = {"A": 0, "B": 0, "C": 0, "D": 0, "total": 0}
+        self._daily_agent_metrics = {}
+        self._monthly_agent_rows = []
+        self.yearly_data = []
+        self.last_year_catches = {}
+
         # Initialize patches with fish stocks
         self.init_patches()
+        self._initialize_region_stock_cache()
         
         if self.verbose:
             print("\n" + "="*60)
@@ -143,98 +151,391 @@ class FisheryModel(Model):
             print("="*60 + "\n")
         
         self._recalculate_regional_capacities()
-        
         self._create_agents()
         
         self.num_fishing_midday = sum(1 for a in self.agents if a.gone_fishing)
         self.num_at_home_midday = sum(1 for a in self.agents if a.at_home)
         self.num_fished_today = 0
         # Data collector
-        self.datacollector = DataCollector(
+
+        self.datacollector = self._build_datacollector()
+
+
+        self._build_daily_agent_metrics_cache()
+
+        self.datacollector.collect(self)  # Collect initial data at step 0
+
+    def _initialize_region_stock_cache(self):
+        cache = {"A": 0, "B": 0, "C": 0, "D": 0, "TOTAL": 0}
+
+        for patch in self.patches.values():
+            region = patch["region"]
+            fish_stock = patch["fish_stock"]
+            if region in ("A", "B", "C", "D"):
+                cache[region] += fish_stock
+                cache["TOTAL"] += fish_stock
+
+        self._region_stock_cache = cache
+
+    def _refresh_region_stocks_cache(self):
+        self._initialize_region_stock_cache()
+
+    def _set_patch_fish_stock(self, pos, new_stock):
+        """
+        Set the fish stock of one patch and update regional cache incrementally.
+        Returns the new stock.
+        """
+        patch = self.patches[pos]
+        old_stock = patch["fish_stock"]
+        new_stock = max(0, new_stock)
+        delta = new_stock - old_stock
+
+        if delta:
+            patch["fish_stock"] = new_stock
+            region = patch["region"]
+            if region in ("A", "B", "C", "D"):
+                self._region_stock_cache[region] += delta
+                self._region_stock_cache["TOTAL"] += delta
+        else:
+            patch["fish_stock"] = new_stock
+
+        return patch["fish_stock"]
+    
+    def _adjust_patch_fish_stock(self, pos, delta):
+        """
+        Add/subtract a delta to one patch and update regional cache incrementally.
+        Returns the new stock.
+        """
+        patch = self.patches[pos]
+        current_stock = patch["fish_stock"]
+        return self._set_patch_fish_stock(pos, current_stock + delta)
+
+    def _build_daily_agent_metrics_cache(self):
+        agents = list(self.agents)
+
+        capitals = []
+        wealths = []
+        catches = []
+        profits = []
+        revenues = []
+        costs = []
+        days_at_sea = []
+        growth_perceptions = []
+        memory_sizes = []
+
+        by_type_count = {
+            "archipelago": 0,
+            "coastal": 0,
+            "trawler": 0
+        }
+
+        by_region_catch = {
+            "A": 0,
+            "B": 0,
+            "C": 0,
+            "D": 0
+        }
+
+        num_bankrupt = 0   
+        total_catch_daily = 0
+        total_catch_cumulative = 0
+        total_capital = 0
+        total_profit = 0
+        total_revenue = 0
+        total_costs = 0
+        total_trips = 0
+        num_perceive_scarcity = 0
+
+
+        success_rate_sum = 0.0
+        success_rate_count = 0
+
+        min_capital = None
+        max_capital = None
+
+        for a in agents:
+            ftype = a.fisher_type
+            if ftype in by_type_count:
+                by_type_count[ftype] += 1
+
+            if a.bankrupt:
+                num_bankrupt += 1
+
+            total_catch_daily += a.accumulated_catch
+            total_catch_cumulative += a.total_catch
+            total_capital += a.capital
+            total_profit += a.total_profit
+            total_revenue += a.total_revenue
+            total_costs += a.total_cost
+
+            capitals.append(a.capital)
+            wealths.append(a.wealth)
+            catches.append(a.total_catch)
+            profits.append(a.total_profit)
+            revenues.append(a.total_revenue)
+            costs.append(a.total_cost)
+            days_at_sea.append(a.days_at_sea)
+            growth_perceptions.append(a.growth_perception)
+            memory_sizes.append(len(a.memory))
+
+            if getattr(a, "perceive_scarcity", False):
+                num_perceive_scarcity += 1
+
+            trips = a.profitable_trip + a.unprofitable_trip
+            total_trips += trips
+            if trips > 0:
+                success_rate_sum += a.profitable_trip / trips
+                success_rate_count += 1
+
+            if a.current_region in by_region_catch:
+                by_region_catch[a.current_region] += a.accumulated_catch
+
+            if min_capital is None or a.capital < min_capital:
+                min_capital = a.capital
+            if max_capital is None or a.capital > max_capital:
+                max_capital = a.capital
+
+        
+        self._daily_agent_metrics = {
+            "num_agents": len(agents),
+            "num_archipelago": by_type_count["archipelago"],
+            "num_coastal": by_type_count["coastal"],
+            "num_trawler": by_type_count["trawler"],
+            "num_bankrupt": num_bankrupt,
+
+            "total_catch_daily": total_catch_daily,
+            "total_catch_cumulative": total_catch_cumulative,
+
+            "total_capital": total_capital,
+            "avg_capital": self._safe_mean(capitals),
+            "median_capital": self._safe_median(capitals),
+            "min_capital": min_capital if min_capital is not None else 0,
+            "max_capital": max_capital if max_capital is not None else 0,
+
+            "total_profit": total_profit,
+            "avg_profit": self._safe_mean(profits),
+            "total_revenue": total_revenue,
+            "total_costs": total_costs,
+
+            "gini_capital": self.calculate_gini(capitals) if capitals else 0,
+            "gini_wealth": self.calculate_gini(wealths) if wealths else 0,
+            "gini_catch": self.calculate_gini(catches) if catches else 0,
+
+            "avg_days_at_sea": self._safe_mean(days_at_sea),
+            "total_trips": total_trips,
+            "avg_success_rate": (
+                success_rate_sum / success_rate_count if success_rate_count else 0
+            ),
+
+            "avg_growth_perception": self._safe_mean(growth_perceptions),
+            "num_perceive_scarcity": num_perceive_scarcity,
+            "avg_memory_size": self._safe_mean(memory_sizes),
+
+            "catch_region_A": by_region_catch["A"],
+            "catch_region_B": by_region_catch["B"],
+            "catch_region_C": by_region_catch["C"],
+            "catch_region_D": by_region_catch["D"],
+        }
+
+
+    def _append_daily_agent_rows_for_monthly_export(self):
+        """
+        Stocke uniquement les lignes du jour pour l'export mensuel,
+        afin d'éviter de reconstruire tout l'historique depuis DataCollector.
+        """
+        step_value = self.current_step
+
+        for a in self.agents:
+            self._monthly_agent_rows.append({
+                "step": step_value,
+                "unique_id": a.unique_id,
+                "fisher_type": a.fisher_type,
+                "age": a.age,
+
+                "capital": a.capital,
+                "wealth": a.wealth,
+                "total_profit": a.total_profit,
+                "total_revenue": a.total_revenue,
+                "total_cost": a.total_cost,
+                "bankrupt": a.bankrupt,
+
+                "total_catch": a.total_catch,
+                "days_at_sea": a.days_at_sea,
+                "profitable_trips": a.profitable_trip,
+                "unprofitable_trips": a.unprofitable_trip,
+                "at_home": a.at_home,
+                "gone_fishing": a.gone_fishing,
+                "fished_today": a.fished_today,
+                "at_sea": a.at_sea,
+                "current_location": a.current_location if a.gone_fishing else (0, 0),
+                "catch": a.accumulated_catch if a.gone_fishing else 0,
+
+                "will_fish": a.will_fish,
+                "region_preference": a.region_preference,
+                "current_region": a.current_region,
+                "growth_perception": a.growth_perception,
+                "lay_low": a.lay_low,
+
+                "memory_size": len(a.memory),
+                "good_spots_count": len(a.good_spots_memory),
+            })
+
+
+    def _export_monthly_agent_buffer(self):
+        if not self._monthly_agent_rows:
+            return
+
+        os.makedirs("./results/biomass", exist_ok=True)
+        df = pd.DataFrame(self._monthly_agent_rows)
+        output_path = os.path.join("./results/biomass", f"agent_{self.current_step}.csv")
+        df.to_csv(output_path, index=False)
+
+        if self.verbose:
+            print(f"Exported: agent_{self.current_step}.csv ({len(df)} rows)")
+
+        self._monthly_agent_rows.clear()
+
+
+    def _wait_for_coupling_update(self, json_path="configs/config.json", poll_interval=0.5):
+        """
+        Attend qu'un fichier de config soit modifié.
+        Retourne species_maps, current_step_val dès qu'une mise à jour est détectée.
+        """
+        species_maps, last_step = Couplage.read_csv_biomass(self)
+        current_step_val = last_step
+
+        last_modified_time = 0
+        current_modified_time = 0
+
+        if os.path.exists(json_path):
+            last_modified_time = os.path.getmtime(json_path)
+            current_modified_time = last_modified_time
+
+        while current_modified_time <= last_modified_time and self.current_step != 28:
+            sleep(poll_interval)
+
+            if os.path.exists(json_path):
+                current_modified_time = os.path.getmtime(json_path)
+                if current_modified_time > last_modified_time:
+                    species_maps, current_step_val = Couplage.read_csv_biomass(self)
+                    if self.verbose:
+                        print(
+                            f"File {json_path} updated. Proceeding with biomass update for step {current_step_val}."
+                        )
+            else:
+                if self.verbose:
+                    print(f"File {json_path} not found. Waiting for the file to be created...")
+
+        return species_maps, current_step_val
+
+
+    def _build_datacollector(self):
+        return DataCollector(
             model_reporters={
+                # =========================
                 # Fish stocks
-                "stock_A": lambda m: m.get_region_stock("A"),
-                "stock_B": lambda m: m.get_region_stock("B"),
-                "stock_C": lambda m: m.get_region_stock("C"),
-                "stock_D": lambda m: m.get_region_stock("D"),
-                "total_stock": lambda m: m.get_total_stock(),
-                "stock_below_MSY_A": lambda m: 1 if m.get_region_stock("A") < m.MSY_STOCK_A else 0,
-                "stock_below_MSY_B": lambda m: 1 if m.get_region_stock("B") < m.MSY_STOCK_B else 0,
-                "stock_below_MSY_C": lambda m: 1 if m.get_region_stock("C") < m.MSY_STOCK_C else 0,
-                "stock_below_MSY_D": lambda m: 1 if m.get_region_stock("D") < m.MSY_STOCK_D else 0,
-                
+                # =========================
+                "stock_A": lambda m: m._region_stock_cache["A"],
+                "stock_B": lambda m: m._region_stock_cache["B"],
+                "stock_C": lambda m: m._region_stock_cache["C"],
+                "stock_D": lambda m: m._region_stock_cache["D"],
+                "total_stock": lambda m: m._region_stock_cache["TOTAL"],
+                "stock_below_MSY_A": lambda m: 1 if m._region_stock_cache["A"] < m.MSY_STOCK_A else 0,
+                "stock_below_MSY_B": lambda m: 1 if m._region_stock_cache["B"] < m.MSY_STOCK_B else 0,
+                "stock_below_MSY_C": lambda m: 1 if m._region_stock_cache["C"] < m.MSY_STOCK_C else 0,
+                "stock_below_MSY_D": lambda m: 1 if m._region_stock_cache["D"] < m.MSY_STOCK_D else 0,
+
+                # =========================
                 # Agent counts
-                "num_agents": lambda m: len(list(m.agents)),
-                "num_archipelago": lambda m: sum(1 for a in m.agents if a.fisher_type == "archipelago"),
-                "num_coastal": lambda m: sum(1 for a in m.agents if a.fisher_type == "coastal"),
-                "num_trawler": lambda m: sum(1 for a in m.agents if a.fisher_type == "trawler"),
+                # =========================
+                "num_agents": lambda m: m._daily_agent_metrics["num_agents"],
+                "num_archipelago": lambda m: m._daily_agent_metrics["num_archipelago"],
+                "num_coastal": lambda m: m._daily_agent_metrics["num_coastal"],
+                "num_trawler": lambda m: m._daily_agent_metrics["num_trawler"],
                 "num_fishing": lambda m: m.num_fishing_midday,
                 "num_at_home": lambda m: m.num_at_home_midday,
                 "num_fished_today": lambda m: m.num_fished_today,
-                "num_bankrupt": lambda m: sum(1 for a in m.agents if a.bankrupt),
-                
+                "num_bankrupt": lambda m: m._daily_agent_metrics["num_bankrupt"],
+
+                # =========================
                 # Catches
-                "total_catch_daily": lambda m: sum(a.accumulated_catch for a in m.agents),
-                "total_catch_cumulative": lambda m: sum(a.total_catch for a in m.agents),
+                # =========================
+                "total_catch_daily": lambda m: m._daily_agent_metrics["total_catch_daily"],
+                "total_catch_cumulative": lambda m: m._daily_agent_metrics["total_catch_cumulative"],
                 "total_catch": lambda m: m.get_total_catch_all_agents(),
-                "avg_catch_per_agent": lambda m: m._safe_mean([a.total_catch for a in m.agents]),
-                "catch_region_A": lambda m: sum(a.accumulated_catch for a in m.agents if a.current_region == "A"),
-                "catch_region_B": lambda m: sum(a.accumulated_catch for a in m.agents if a.current_region == "B"),
-                "catch_region_C": lambda m: sum(a.accumulated_catch for a in m.agents if a.current_region == "C"),
-                "catch_region_D": lambda m: sum(a.accumulated_catch for a in m.agents if a.current_region == "D"),
-                
+                "avg_catch_per_agent": lambda m: (
+                    m._daily_agent_metrics["total_catch_cumulative"] / m._daily_agent_metrics["num_agents"]
+                    if m._daily_agent_metrics["num_agents"] else 0
+                ),
+                "catch_region_A": lambda m: m._daily_agent_metrics["catch_region_A"],
+                "catch_region_B": lambda m: m._daily_agent_metrics["catch_region_B"],
+                "catch_region_C": lambda m: m._daily_agent_metrics["catch_region_C"],
+                "catch_region_D": lambda m: m._daily_agent_metrics["catch_region_D"],
+
+                # =========================
                 # Economic metrics
-                "total_capital": lambda m: sum(a.capital for a in m.agents),
-                "avg_capital": lambda m: m._safe_mean([a.capital for a in m.agents]),
-                "median_capital": lambda m: m._safe_median([a.capital for a in m.agents]),
-                "min_capital": lambda m: min([a.capital for a in m.agents]) if len(list(m.agents)) > 0 else 0,
-                "max_capital": lambda m: max([a.capital for a in m.agents]) if len(list(m.agents)) > 0 else 0,
-                "total_profit": lambda m: sum(a.total_profit for a in m.agents),
-                "avg_profit": lambda m: m._safe_mean([a.total_profit for a in m.agents]),
-                "total_revenue": lambda m: sum(a.total_revenue for a in m.agents),
-                "total_costs": lambda m: sum(a.total_cost for a in m.agents),
-                
+                # =========================
+                "total_capital": lambda m: m._daily_agent_metrics["total_capital"],
+                "avg_capital": lambda m: m._daily_agent_metrics["avg_capital"],
+                "median_capital": lambda m: m._daily_agent_metrics["median_capital"],
+                "min_capital": lambda m: m._daily_agent_metrics["min_capital"],
+                "max_capital": lambda m: m._daily_agent_metrics["max_capital"],
+                "total_profit": lambda m: m._daily_agent_metrics["total_profit"],
+                "avg_profit": lambda m: m._daily_agent_metrics["avg_profit"],
+                "total_revenue": lambda m: m._daily_agent_metrics["total_revenue"],
+                "total_costs": lambda m: m._daily_agent_metrics["total_costs"],
+
+                # =========================
                 # Inequality
-                "gini_capital": lambda m: m.calculate_gini([a.capital for a in m.agents]),
-                "gini_wealth": lambda m: m.calculate_gini([a.wealth for a in m.agents]),
-                "gini_catch": lambda m: m.calculate_gini([a.total_catch for a in m.agents]),
-                
+                # =========================
+                "gini_capital": lambda m: m._daily_agent_metrics["gini_capital"],
+                "gini_wealth": lambda m: m._daily_agent_metrics["gini_wealth"],
+                "gini_catch": lambda m: m._daily_agent_metrics["gini_catch"],
+
+                # =========================
                 # Activity
-                "avg_days_at_sea": lambda m: m._safe_mean([a.days_at_sea for a in m.agents]),
-                "total_trips": lambda m: sum(a.profitable_trip + a.unprofitable_trip for a in m.agents),
-                "avg_success_rate": lambda m: m._safe_mean([
-                    a.profitable_trip / (a.profitable_trip + a.unprofitable_trip) 
-                    if (a.profitable_trip + a.unprofitable_trip) > 0 else 0 
-                    for a in m.agents
-                ]),
-                
-                # memory and perception
-                "avg_growth_perception": lambda m: m._safe_mean([a.growth_perception for a in m.agents]),
-                "num_perceive_scarcity": lambda m: sum(1 for a in m.agents if getattr(a, 'perceive_scarcity', False)),
-                "avg_memory_size": lambda m: m._safe_mean([len(a.memory) for a in m.agents]),
-                
+                # =========================
+                "avg_days_at_sea": lambda m: m._daily_agent_metrics["avg_days_at_sea"],
+                "total_trips": lambda m: m._daily_agent_metrics["total_trips"],
+                "avg_success_rate": lambda m: m._daily_agent_metrics["avg_success_rate"],
+
+                # =========================
+                # Memory and perception
+                # =========================
+                "avg_growth_perception": lambda m: m._daily_agent_metrics["avg_growth_perception"],
+                "num_perceive_scarcity": lambda m: m._daily_agent_metrics["num_perceive_scarcity"],
+                "avg_memory_size": lambda m: m._daily_agent_metrics["avg_memory_size"],
+
+                # =========================
                 # Weather and time
+                # =========================
                 "bad_weather": lambda m: 1 if m.bad_weather else 0,
                 "current_step": lambda m: m.current_step,
                 "current_year": lambda m: m.current_step // m.YEAR,
                 "current_day_of_year": lambda m: m.current_step % m.YEAR,
             },
             agent_reporters={
+                # =========================
                 # Identity
+                # =========================
                 "step": lambda a: a.model.current_step,
                 "unique_id": "unique_id",
                 "fisher_type": "fisher_type",
                 "age": "age",
-                
+
+                # =========================
                 # Financial
+                # =========================
                 "capital": "capital",
                 "wealth": "wealth",
                 "total_profit": "total_profit",
                 "total_revenue": "total_revenue",
                 "total_cost": "total_cost",
                 "bankrupt": "bankrupt",
-                
+
+                # =========================
                 # Activity
+                # =========================
                 "total_catch": "total_catch",
                 "days_at_sea": "days_at_sea",
                 "profitable_trips": "profitable_trip",
@@ -245,25 +546,25 @@ class FisheryModel(Model):
                 "at_sea": "at_sea",
                 "current_location": lambda a: a.current_location if a.gone_fishing else (0, 0),
                 "catch": lambda a: a.accumulated_catch if a.gone_fishing else 0,
-                
+
+                # =========================
                 # Decision-making
+                # =========================
                 "will_fish": "will_fish",
                 "region_preference": "region_preference",
                 "current_region": "current_region",
                 "growth_perception": "growth_perception",
                 "lay_low": "lay_low",
-                
+
+                # =========================
                 # Memory
+                # =========================
                 "memory_size": lambda a: len(a.memory),
                 "good_spots_count": lambda a: len(a.good_spots_memory),
             }
         )
-        
-        self.yearly_data = []
 
-        # NetLogo-like: avoir un état collecté dès le setup (tick 0)
-        self.datacollector.collect(self)
-    
+
     def _create_agents(self):
         """Create fisher agents of different types"""
         
@@ -543,16 +844,11 @@ class FisheryModel(Model):
         raise ValueError(f"Invalid initial stock size mode: {mode}")
         
     def get_region_stock(self, region_name):
-        """Calculate total fish stock in a specific region"""
-        total = 0
-        for pos, patch in self.patches.items():
-            if patch['region'] == region_name:
-                total += patch['fish_stock']
-        return total
+        return self._region_stock_cache.get(region_name, 0)
     
     def get_total_stock(self):
         """Calculate total fish stock across all regions"""
-        return sum(patch['fish_stock'] for patch in self.patches.values() if patch['region'] not in ["LAND", "NULL"])
+        return self._region_stock_cache["TOTAL"]
     
     def update_fish_stock(self, time_step_days=1):
         """Update fish stocks with yearly regrowth (logistic growth)"""
@@ -571,7 +867,7 @@ class FisheryModel(Model):
 
         growth_by_region = {"A": 0, "B": 0, "C": 0, "D": 0}
         
-        for pos, patch in self.patches.items():
+        for patch in self.patches.values():
             region = patch['region']
             if patch['region'] not in ["LAND", "NULL"]:
                 current_stock = patch['fish_stock']
@@ -601,12 +897,14 @@ class FisheryModel(Model):
                 for pos, patch in self.patches.items():
                     if patch['region'] == region:
                         patch['regen_amount'] = round(patch['regen_amount'] * scale_factor)
-                        patch['fish_stock'] = patch['fish_stock'] + patch['regen_amount']
+                        new_stock = patch['fish_stock'] + patch['regen_amount']
+                        self._set_patch_fish_stock(pos, new_stock)
                         patch['patch_stock_after_regrowth'] = patch['fish_stock']
             else:
                 for pos, patch in self.patches.items():
                     if patch['region'] == region:
-                        patch['fish_stock'] = patch['fish_stock'] + patch['regen_amount']
+                        new_stock = patch['fish_stock'] + patch['regen_amount']
+                        self._set_patch_fish_stock(pos, new_stock)
                         patch['patch_stock_after_regrowth'] = patch['fish_stock']
 
     def update_fish_stock_yearly(self):
@@ -623,7 +921,7 @@ class FisheryModel(Model):
             )
             
             patch['regen_amount'] = regen_amount
-            patch['fish_stock'] = current_stock + regen_amount
+            self._set_patch_fish_stock(pos, current_stock + regen_amount)
             patch['patch_stock_after_regrowth'] = patch['fish_stock']
                         
     def get_patch_info(self, x, y):
@@ -632,60 +930,74 @@ class FisheryModel(Model):
     
     def reduce_stock(self, x, y, catch_amount):
         "Reduce fish stock at a specific location due to fishing"
-        if (x, y) in self.patches:
-            patch = self.patches[(x, y)]
-            patch['fish_stock'] = max(0, patch['fish_stock'] - catch_amount)
+        pos = (x, y)
+        if pos in self.patches:
+            paatch = self.patches[pos]
+            current_stock = paatch['fish_stock']
+            actual_catch = min(catch_amount, current_stock)
+            self._set_patch_fish_stock(pos, current_stock - actual_catch)
+            return actual_catch
+        return 0
+    
     
     def step(self):
         """
         Advance the model by one step (one day).
-        
+
         Daily execution order:
         1. Determine weather
-        2. Agents make decisions and execute actions
-        3. Collect data (every tick)
-        4. (If end of year) Fish stock regeneration / yearly summaries
-        5. Check simulation end condition
+        2. If year boundary: yearly stock update + annual reset + yearly summary
+        3. Reset daily flags
+        4. Agents act
+        5. Refresh counters / caches / collect data
+        6. Finalize day
+        7. End / monthly coupling/export
         """
-        
-        # Determine weather
+        # =========================
+        # 1) Determine weather
+        # =========================
         self.determine_weather()
-        
-        # Yearly action
-        if self.current_step % self.YEAR == 0 and self.current_step > 0:
+
+        is_new_year = (self.current_step % self.YEAR == 0 and self.current_step > 0)
+
+        yearly_summary = None
+        yearly_catch = 0
+
+        # =========================
+        # 2) Yearly actions
+        # =========================
+        if is_new_year:
             self.update_fish_stock_yearly()
-            
+
             for agent in self.agents:
                 agent.reset_yearly_counters()
-            
+
             if self.verbose:
-                print(f"\n{'='*60}")
-                print(f"{'='*60}")
-                
+                print(f"\n{'=' * 60}")
+                print(f"{'=' * 60}")
+
                 active_agents = [a for a in self.agents if not a.bankrupt]
                 bankrupt_agents = [a for a in self.agents if a.bankrupt]
-                
+
                 print(f"\nAgents: {len(active_agents)} active, {len(bankrupt_agents)} bankrupt")
-                
+
                 if active_agents:
                     avg_capital = sum(a.capital for a in active_agents) / len(active_agents)
                     avg_catch = sum(a.accumulated_catch for a in active_agents) / len(active_agents)
                     print(f"Average capital: {avg_capital:.0f} SEK")
                     print(f"Average catch: {avg_catch:.0f} fish")
-                    
-                    # Per type
-                    for fisher_type in ['archipelago', 'coastal', 'trawler']:
+
+                    for fisher_type in ["archipelago", "coastal", "trawler"]:
                         agents_of_type = [a for a in active_agents if a.fisher_type == fisher_type]
                         if agents_of_type:
                             avg_cap = sum(a.capital for a in agents_of_type) / len(agents_of_type)
-                            print(f"  {fisher_type.capitalize()}: {len(agents_of_type)} agents, "
-                                f"avg capital = {avg_cap:.0f} SEK")
-                print(f"{'='*60}\n")
-            
-            yearly_summary = self.collect_yearly_data()    
-            
-            if not hasattr(self, 'last_year_catches'):
-                self.last_year_catches = {}
+                            print(
+                                f"  {fisher_type.capitalize()}: {len(agents_of_type)} agents, "
+                                f"avg capital = {avg_cap:.0f} SEK"
+                            )
+                print(f"{'=' * 60}\n")
+
+            yearly_summary = self.collect_yearly_data()
 
             current_catches = {a.unique_id: a.total_catch for a in self.agents}
             yearly_catch = sum(
@@ -693,176 +1005,241 @@ class FisheryModel(Model):
                 for aid in current_catches
             )
             self.last_year_catches = current_catches
-        
+
+        # =========================
+        # 3) Reset daily flags
+        # =========================
         for agent in self.agents:
             agent.reset_daily_flags()
 
-        # All agents act
+        # =========================
+        # 4) Agents act + direct counters
+        # =========================
+        self.num_fishing_midday = 0
+        self.num_at_home_midday = 0
+        self.num_fished_today = 0
+
         for agent in self.agents:
             agent.step()
 
+            if agent.gone_fishing:
+                self.num_fishing_midday += 1
+            if agent.at_home:
+                self.num_at_home_midday += 1
+            if agent.fished_today:
+                self.num_fished_today += 1
 
-        self.num_fishing_midday = sum(1 for a in self.agents if a.gone_fishing)
-        self.num_at_home_midday = sum(1 for a in self.agents if a.at_home)
-        self.num_fished_today = sum(1 for a in self.agents if a.fished_today)
-        # Tickly collection (alignement NetLogo update-response-vars-tickly)
+        # =========================
+        # 5) Refresh caches and collect
+        # =========================
+        self._build_daily_agent_metrics_cache()
         self.datacollector.collect(self)
-        
+
+        # Store only today's agent rows for monthly export
+        self._append_daily_agent_rows_for_monthly_export()
+
+        # =========================
+        # 6) Finalize day
+        # =========================
         for agent in self.agents:
             agent.finalize_day()
 
-        # Collect yearly logs/prints
-        if self.current_step % self.YEAR == 0 and self.current_step > 0:
+        # =========================
+        # 7) Yearly logs
+        # =========================
+        if is_new_year and yearly_summary is not None:
             if self.verbose:
                 year = self.current_step // self.YEAR
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"YEAR {year} COMPLETED")
-                print(f"{'='*60}")
-                print(f"Stocks: A={yearly_summary['stock_A']:,.0f} ({yearly_summary['stock_A_pct_K']:.1%}), "
-                      f"B={yearly_summary['stock_B']:,.0f} ({yearly_summary['stock_B_pct_K']:.1%})")
+                print(f"{'=' * 60}")
+                print(
+                    f"Stocks: A={yearly_summary['stock_A']:,.0f} ({yearly_summary['stock_A_pct_K']:.1%}), "
+                    f"B={yearly_summary['stock_B']:,.0f} ({yearly_summary['stock_B_pct_K']:.1%})"
+                )
                 print(f"Yearly catch: {yearly_catch:,.0f}")
                 print(f"Total catch: {yearly_summary['total_catch_all']:,.0f}")
-                print(f"Avg capital: {yearly_summary['total_capital']/len(list(self.agents)):,.2f}")
+                print(
+                    f"Avg capital: "
+                    f"{yearly_summary['total_capital'] / max(yearly_summary['num_agents'], 1):,.2f}"
+                )
                 print(f"Gini capital: {yearly_summary['gini_capital']:.3f}")
                 print(f"Success rate: {yearly_summary['avg_success_rate']:.1%}")
-                print(f"{'='*60}\n")
+                print(f"{'=' * 60}\n")
 
+        # =========================
         # Increment step counter
+        # =========================
         self.current_step += 1
-        print(f"Step {self.current_step} completed. Agents fishing: {self.num_fishing_midday}, at home: {self.num_at_home_midday}, fished today: {self.num_fished_today}")
-        
-        # Check if simulation should end
+
+        if self.verbose:
+            print(
+                f"Step {self.current_step} completed. "
+                f"Agents fishing: {self.num_fishing_midday}, "
+                f"at home: {self.num_at_home_midday}, "
+                f"fished today: {self.num_fished_today}"
+            )
+
+        # =========================
+        # End condition
+        # =========================
         if self.current_step >= self.end_of_sim:
             self.running = False
             if self.verbose:
                 self.print_final_summary()
 
-        if self.current_step % config.MONTH == 0:
-            self.HOTSPOTS_A = get_hotspots_for_step(self.current_step, 'A')
-            self.HOTSPOTS_B = get_hotspots_for_step(self.current_step, 'B')
-            self.HOTSPOTS_C = get_hotspots_for_step(self.current_step, 'C')
-            self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, 'D')
-            #self.save_output_map('./results/biomass', f"biomass_{self.current_step}.csv")
+        # =========================
+        # Monthly updates
+        # (same timing as your original code: AFTER increment)
+        # =========================
+        if self.current_step % self.MONTH == 0:
+            self.HOTSPOTS_A = get_hotspots_for_step(self.current_step, "A")
+            self.HOTSPOTS_B = get_hotspots_for_step(self.current_step, "B")
+            self.HOTSPOTS_C = get_hotspots_for_step(self.current_step, "C")
+            self.HOTSPOTS_D = get_hotspots_for_step(self.current_step, "D")
+
             if self.coupling:
-                json_path = "configs/config.json"
-                last_modified_time = 0
-                species_maps, last_step  = Couplage.read_csv_biomass(self)
-                current_step_val = last_step
-
-                if os.path.exists(json_path):
-                    last_modified_time = os.path.getmtime(json_path)
-                    current_modified_time = last_modified_time
-
-                #print(f"last_step: {last_step}, step: {step}")
-                while current_modified_time <= last_modified_time and self.current_step != 28:
-                    sleep(0.5)
-                    if os.path.exists(json_path):
-                        current_modified_time = os.path.getmtime(json_path)
-                        if current_modified_time > last_modified_time:
-                            species_maps, current_step_val = Couplage.read_csv_biomass(self)
-                            #last_modified_time = current_modified_time
-                            if self.verbose:
-                                print(f"File {json_path} updated. Proceeding with biomass update for step {current_step_val}.")
-                        else:
-                            pass
-                    else:
-                        if self.verbose:
-                            print(f"File {json_path} not found. Waiting for the file to be created...")
+                species_maps, current_step_val = self._wait_for_coupling_update(
+                    json_path="configs/config.json",
+                    poll_interval=0.5,
+                )
 
                 fish = Couplage.update_biomass(self, species_maps)
                 self.update_patches(fish)
 
-                agent_df = self.datacollector.get_agent_vars_dataframe()
+                # Stock changed => refresh cache for future reads
 
-                min_step = self.current_step - config.MONTH
-                mask = (agent_df['step'] >= min_step) & (agent_df['step'] <= self.current_step)
-                agent_df_filtered = agent_df.loc[mask]
+                self._export_monthly_agent_buffer()
 
-                os.makedirs('./results/biomass', exist_ok=True)
-                agent_df_filtered.to_csv(f"{os.path.join('./results/biomass', f'agent_{self.current_step}.csv')}", index=False)
-                if self.verbose:
-                    print(f"Exported: agents_{self.current_step}.csv ({len(agent_df_filtered)} rows)")
-                
+                    
             
+    
     def print_final_summary(self):
-        """Print comprehensive summary at end of simulation"""
-        print("\n" + "="*80)
+        """Print comprehensive summary at end of simulation."""
+        print("\n" + "=" * 80)
         print("SIMULATION FINALE SUMMARY")
-        print("="*80)
-        
+        print("=" * 80)
+
+        stock_a = self._region_stock_cache["A"]
+        stock_b = self._region_stock_cache["B"]
+        stock_c = self._region_stock_cache["C"]
+        stock_d = self._region_stock_cache["D"]
+        total_stock = self._region_stock_cache["TOTAL"]
+
         agents_list = list(self.agents)
-        
-        print(f"\nDuration: {self.current_step} days ({self.current_step/self.YEAR:.1f} years)")
+
+        print(f"\nDuration: {self.current_step} days ({self.current_step / self.YEAR:.1f} years)")
         print(f"Agents: {len(agents_list)} total")
-        
+
         print(f"\n--- FISH STOCKS ---")
-        print(f"Region A: {self.get_region_stock('A'):>10,.0f} / {self.CARRYING_CAPACITY_A:,.0f} ({self.get_region_stock('A')/self.CARRYING_CAPACITY_A:.1%})")
-        print(f"Region B: {self.get_region_stock('B'):>10,.0f} / {self.CARRYING_CAPACITY_B:,.0f} ({self.get_region_stock('B')/self.CARRYING_CAPACITY_B:.1%})")
-        print(f"Region C: {self.get_region_stock('C'):>10,.0f} / {self.CARRYING_CAPACITY_C:,.0f} ({self.get_region_stock('C')/self.CARRYING_CAPACITY_C:.1%})")
-        print(f"Region D: {self.get_region_stock('D'):>10,.0f} / {self.CARRYING_CAPACITY_D:,.0f} ({self.get_region_stock('D')/self.CARRYING_CAPACITY_D:.1%})")
-        print(f"TOTAL:    {self.get_total_stock():>10,.0f}")
-        
+        print(
+            f"Region A: {stock_a:>10,.0f} / {self.CARRYING_CAPACITY_A:,.0f} "
+            f"({(stock_a / self.CARRYING_CAPACITY_A if self.CARRYING_CAPACITY_A > 0 else 0):.1%})"
+        )
+        print(
+            f"Region B: {stock_b:>10,.0f} / {self.CARRYING_CAPACITY_B:,.0f} "
+            f"({(stock_b / self.CARRYING_CAPACITY_B if self.CARRYING_CAPACITY_B > 0 else 0):.1%})"
+        )
+        print(
+            f"Region C: {stock_c:>10,.0f} / {self.CARRYING_CAPACITY_C:,.0f} "
+            f"({(stock_c / self.CARRYING_CAPACITY_C if self.CARRYING_CAPACITY_C > 0 else 0):.1%})"
+        )
+        print(
+            f"Region D: {stock_d:>10,.0f} / {self.CARRYING_CAPACITY_D:,.0f} "
+            f"({(stock_d / self.CARRYING_CAPACITY_D if self.CARRYING_CAPACITY_D > 0 else 0):.1%})"
+        )
+        print(f"TOTAL:    {total_stock:>10,.0f}")
+
         print(f"\n--- ECONOMICS ---")
         total_catch = sum(a.total_catch for a in agents_list)
         total_capital = sum(a.capital for a in agents_list)
         total_profit = sum(a.total_profit for a in agents_list)
-        
+
         print(f"Total catch:   {total_catch:>12,.0f}")
         print(f"Total capital: {total_capital:>12,.2f}")
         print(f"Total profit:  {total_profit:>12,.2f}")
-        print(f"Avg capital:   {total_capital/len(agents_list):>12,.2f}")
-        
+        print(f"Avg capital:   {(total_capital / len(agents_list)) if agents_list else 0:>12,.2f}")
+
         print(f"\n--- INEQUALITY ---")
-        print(f"Gini capital: {self.calculate_gini([a.capital for a in agents_list]):.3f}")
-        print(f"Gini wealth:  {self.calculate_gini([a.wealth for a in agents_list]):.3f}")
-        print(f"Gini catch:   {self.calculate_gini([a.total_catch for a in agents_list]):.3f}")
-        
+        print(f"Gini capital: {self.calculate_gini([a.capital for a in agents_list]) if agents_list else 0:.3f}")
+        print(f"Gini wealth:  {self.calculate_gini([a.wealth for a in agents_list]) if agents_list else 0:.3f}")
+        print(f"Gini catch:   {self.calculate_gini([a.total_catch for a in agents_list]) if agents_list else 0:.3f}")
+
         print(f"\n--- BY FISHER TYPE ---")
+        by_type = {
+            "archipelago": [],
+            "coastal": [],
+            "trawler": [],
+        }
+
+        for a in agents_list:
+            if a.fisher_type in by_type:
+                by_type[a.fisher_type].append(a)
+
         for ftype in ["archipelago", "coastal", "trawler"]:
-            type_agents = [a for a in agents_list if a.fisher_type == ftype]
+            type_agents = by_type[ftype]
             if type_agents:
                 avg_catch = sum(a.total_catch for a in type_agents) / len(type_agents)
                 avg_capital = sum(a.capital for a in type_agents) / len(type_agents)
                 bankrupt = sum(1 for a in type_agents if a.bankrupt)
-                print(f"{ftype:>12}: {len(type_agents):>3} agents, "
+                print(
+                    f"{ftype:>12}: {len(type_agents):>3} agents, "
                     f"avg catch={avg_catch:>8,.0f}, "
                     f"avg capital={avg_capital:>8,.2f}, "
-                    f"bankrupt={bankrupt}")
+                    f"bankrupt={bankrupt}"
+                )
+
+        print("=" * 80 + "\n")
+
         
-        print("="*80 + "\n")
         
-    def export_data(self, filename_prefix='fibe_output', directory='./results/'):
+    def export_data(self, filename_prefix="fibe_output", directory="./results/"):
         """
         Export collected data to CSV files.
-        
+
         Args:
             filename_prefix: Prefix for output files
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        directory = directory + f"{timestamp}/"
-        os.makedirs(directory, exist_ok=True)
-        
+        export_dir = os.path.join(directory, timestamp)
+        os.makedirs(export_dir, exist_ok=True)
+
+        # =========================
         # Export daily model data
+        # =========================
         model_df = self.datacollector.get_model_vars_dataframe()
-        model_df.to_csv(f"{os.path.join(directory, f"{filename_prefix}_model_{timestamp}.csv")}", index=False)
+        model_path = os.path.join(export_dir, f"{filename_prefix}_model_{timestamp}.csv")
+        model_df.to_csv(model_path, index=False)
+
         if self.verbose:
-            print(f"Exported: {filename_prefix}_model_{timestamp}.csv ({len(model_df)} rows)")
-        
+            print(f"Exported: {os.path.basename(model_path)} ({len(model_df)} rows)")
+
+        # =========================
         # Export daily agent data
+        # =========================
         agent_df = self.datacollector.get_agent_vars_dataframe()
-        agent_df.to_csv(f"{os.path.join(directory, f"{filename_prefix}_agent_{timestamp}.csv")}", index=False)
+        agent_path = os.path.join(export_dir, f"{filename_prefix}_agent_{timestamp}.csv")
+        agent_df.to_csv(agent_path, index=False)
+
         if self.verbose:
-            print(f"Exported: {filename_prefix}_agents_{timestamp}.csv ({len(agent_df)} rows)")
-        
+            print(f"Exported: {os.path.basename(agent_path)} ({len(agent_df)} rows)")
+
+        # =========================
+        # Export yearly data
+        # =========================
         if self.yearly_data:
             yearly_df = pd.DataFrame(self.yearly_data)
-            yearly_df.to_csv(f"{os.path.join(directory, f"{filename_prefix}_yearly_{timestamp}.csv")}", index=False)
-            self.save_output_map(directory, f"{filename_prefix}_stock_{timestamp}.csv")
+            yearly_path = os.path.join(export_dir, f"{filename_prefix}_yearly_{timestamp}.csv")
+            yearly_df.to_csv(yearly_path, index=False)
+
+            self.save_output_map(export_dir, f"{filename_prefix}_stock_{timestamp}.csv")
+
             if self.verbose:
-                print(f"Exported: {filename_prefix}_yearly_{timestamp}.csv ({len(yearly_df)} rows)")
-        
+                print(f"Exported: {os.path.basename(yearly_path)} ({len(yearly_df)} rows)")
+
         if self.verbose:
-            print(f"\n All data exported with timestamp: {timestamp}")
+            print(f"\nAll data exported with timestamp: {timestamp}")
+
         
     def get_region_carrying_capacity(self, region_name):
         """Get total carrying capacity for a region"""
@@ -875,25 +1252,6 @@ class FisheryModel(Model):
             "NULL": 0
         }
         return capacities.get(region_name, 0)
-    
-    def reduce_stock(self, x, y, catch_amount):
-        """
-        Reduce fish stock at a specific locationdue to fishing.
-        Returns the actual amount caught.
-        """
-        if (x, y) in self.patches:
-            patch = self.patches[(x, y)]
-            current_stock = patch['fish_stock']
-            
-            # Can't catch more than available
-            actual_catch = min(catch_amount, current_stock)
-            
-            # Update stock
-            patch['fish_stock'] = max(0, current_stock - actual_catch)
-            
-            return actual_catch
-        
-        return 0
     
     def validate_regional_stocks(self):
         """
@@ -1064,91 +1422,183 @@ class FisheryModel(Model):
         
         return gini
     
+    
     def collect_yearly_data(self):
         """
         Collect yearly summary data (called at end of each year).
         More detailed than daily datacollector.
         """
         year = self.current_step // self.YEAR
-        
-        agents_list = list(self.agents)
-        
-        archipelago_agents = [a for a in agents_list if a.fisher_type == "archipelago"]
-        coastal_agents = [a for a in agents_list if a.fisher_type == "coastal"]
-        trawler_agents = [a for a in agents_list if a.fisher_type == "trawler"]
-        
-        yearly_summary = {
-            'year': year,
-            'step': self.current_step,
-            
-            # === STOCKS ===
-            'stock_A': self.get_region_stock("A"),
-            'stock_B': self.get_region_stock("B"),
-            'stock_C': self.get_region_stock("C"),
-            'stock_D': self.get_region_stock("D"),
-            'total_stock': self.get_total_stock(),
-            'stock_A_pct_K': self.get_region_stock("A") / self.CARRYING_CAPACITY_A if self.CARRYING_CAPACITY_A > 0 else 0,
-            'stock_B_pct_K': self.get_region_stock("B") / self.CARRYING_CAPACITY_B if self.CARRYING_CAPACITY_B > 0 else 0,
-            'stock_C_pct_K': self.get_region_stock("C") / self.CARRYING_CAPACITY_C if self.CARRYING_CAPACITY_C > 0 else 0,
-            'stock_D_pct_K': self.get_region_stock("D") / self.CARRYING_CAPACITY_D if self.CARRYING_CAPACITY_D > 0 else 0,
-            
-            # === AGENTS ===
-            'num_agents': len(agents_list),
-            'num_archipelago': len(archipelago_agents),
-            'num_coastal': len(coastal_agents),
-            'num_trawler': len(trawler_agents),
-            'num_bankrupt': sum(1 for a in agents_list if a.bankrupt),
-            
-            # === CATCHES (by type) ===
-            'total_catch_archipelago': sum(a.total_catch for a in archipelago_agents),
-            'total_catch_coastal': sum(a.total_catch for a in coastal_agents),
-            'total_catch_trawler': sum(a.total_catch for a in trawler_agents),
-            'total_catch_all': sum(a.total_catch for a in agents_list),
-            'avg_catch_archipelago': self._safe_mean([a.total_catch for a in archipelago_agents]),
-            'avg_catch_coastal': self._safe_mean([a.total_catch for a in coastal_agents]),
-            'avg_catch_trawler': self._safe_mean([a.total_catch for a in trawler_agents]),
-            
-            # === ECONOMICS (by type) ===
-            'avg_capital_archipelago': self._safe_mean([a.capital for a in archipelago_agents]),
-            'avg_capital_coastal': self._safe_mean([a.capital for a in coastal_agents]),
-            'avg_capital_trawler': self._safe_mean([a.capital for a in trawler_agents]),
-            'total_capital': sum(a.capital for a in agents_list),
-            'total_profit': sum(a.total_profit for a in agents_list),
-            'total_revenue': sum(a.total_revenue for a in agents_list),
-            'total_costs': sum(a.total_cost for a in agents_list),
-            
-            # === INEQUALITY ===
-            'gini_capital': self.calculate_gini([a.capital for a in agents_list]),
-            'gini_wealth': self.calculate_gini([a.wealth for a in agents_list]),
-            'gini_catch': self.calculate_gini([a.total_catch for a in agents_list]),
-            
-            # === ACTIVITY ===
-            'total_trips': sum(a.profitable_trip + a.unprofitable_trip for a in agents_list),
-            'total_profitable_trips': sum(a.profitable_trip for a in agents_list),
-            'total_unprofitable_trips': sum(a.unprofitable_trip for a in agents_list),
-            'avg_success_rate': self._safe_mean([
-                a.profitable_trip / (a.profitable_trip + a.unprofitable_trip) 
-                if (a.profitable_trip + a.unprofitable_trip) > 0 else 0 
-                for a in agents_list
-            ]),
-            'avg_days_at_sea': self._safe_mean([a.days_at_sea for a in agents_list]),
+
+        stock_a = self._region_stock_cache["A"]
+        stock_b = self._region_stock_cache["B"]
+        stock_c = self._region_stock_cache["C"]
+        stock_d = self._region_stock_cache["D"]
+        total_stock = self._region_stock_cache["TOTAL"]
+
+        by_type_count = {
+            "archipelago": 0,
+            "coastal": 0,
+            "trawler": 0,
         }
-        
+
+        by_type_total_catch = {
+            "archipelago": 0,
+            "coastal": 0,
+            "trawler": 0,
+        }
+
+        by_type_capitals = {
+            "archipelago": [],
+            "coastal": [],
+            "trawler": [],
+        }
+
+        capitals = []
+        wealths = []
+        catches = []
+        days_at_sea = []
+
+        total_capital = 0
+        total_profit = 0
+        total_revenue = 0
+        total_costs = 0
+
+        total_trips = 0
+        total_profitable_trips = 0
+        total_unprofitable_trips = 0
+
+        success_rate_sum = 0.0
+        success_rate_count = 0
+
+        num_bankrupt = 0
+        num_agents = 0
+
+        for a in self.agents:
+            num_agents += 1
+            ftype = a.fisher_type
+
+            if ftype in by_type_count:
+                by_type_count[ftype] += 1
+                by_type_total_catch[ftype] += a.total_catch
+                by_type_capitals[ftype].append(a.capital)
+
+            capitals.append(a.capital)
+            wealths.append(a.wealth)
+            catches.append(a.total_catch)
+            days_at_sea.append(a.days_at_sea)
+
+            total_capital += a.capital
+            total_profit += a.total_profit
+            total_revenue += a.total_revenue
+            total_costs += a.total_cost
+
+            total_profitable_trips += a.profitable_trip
+            total_unprofitable_trips += a.unprofitable_trip
+
+            trips = a.profitable_trip + a.unprofitable_trip
+            total_trips += trips
+            if trips > 0:
+                success_rate_sum += a.profitable_trip / trips
+                success_rate_count += 1
+
+            if a.bankrupt:
+                num_bankrupt += 1
+
+        yearly_summary = {
+            # =========================
+            # General
+            # =========================
+            "year": year,
+            "step": self.current_step,
+
+            # =========================
+            # Stocks
+            # =========================
+            "stock_A": stock_a,
+            "stock_B": stock_b,
+            "stock_C": stock_c,
+            "stock_D": stock_d,
+            "total_stock": total_stock,
+            "stock_A_pct_K": stock_a / self.CARRYING_CAPACITY_A if self.CARRYING_CAPACITY_A > 0 else 0,
+            "stock_B_pct_K": stock_b / self.CARRYING_CAPACITY_B if self.CARRYING_CAPACITY_B > 0 else 0,
+            "stock_C_pct_K": stock_c / self.CARRYING_CAPACITY_C if self.CARRYING_CAPACITY_C > 0 else 0,
+            "stock_D_pct_K": stock_d / self.CARRYING_CAPACITY_D if self.CARRYING_CAPACITY_D > 0 else 0,
+
+            # =========================
+            # Agents
+            # =========================
+            "num_agents": num_agents,
+            "num_archipelago": by_type_count["archipelago"],
+            "num_coastal": by_type_count["coastal"],
+            "num_trawler": by_type_count["trawler"],
+            "num_bankrupt": num_bankrupt,
+
+            # =========================
+            # Catches
+            # =========================
+            "total_catch_archipelago": by_type_total_catch["archipelago"],
+            "total_catch_coastal": by_type_total_catch["coastal"],
+            "total_catch_trawler": by_type_total_catch["trawler"],
+            "total_catch_all": sum(catches),
+            "avg_catch_archipelago": (
+                by_type_total_catch["archipelago"] / by_type_count["archipelago"]
+                if by_type_count["archipelago"] else 0
+            ),
+            "avg_catch_coastal": (
+                by_type_total_catch["coastal"] / by_type_count["coastal"]
+                if by_type_count["coastal"] else 0
+            ),
+            "avg_catch_trawler": (
+                by_type_total_catch["trawler"] / by_type_count["trawler"]
+                if by_type_count["trawler"] else 0
+            ),
+
+            # =========================
+            # Economics
+            # =========================
+            "avg_capital_archipelago": self._safe_mean(by_type_capitals["archipelago"]),
+            "avg_capital_coastal": self._safe_mean(by_type_capitals["coastal"]),
+            "avg_capital_trawler": self._safe_mean(by_type_capitals["trawler"]),
+            "total_capital": total_capital,
+            "total_profit": total_profit,
+            "total_revenue": total_revenue,
+            "total_costs": total_costs,
+
+            # =========================
+            # Inequality
+            # =========================
+            "gini_capital": self.calculate_gini(capitals) if capitals else 0,
+            "gini_wealth": self.calculate_gini(wealths) if wealths else 0,
+            "gini_catch": self.calculate_gini(catches) if catches else 0,
+
+            # =========================
+            # Activity
+            # =========================
+            "total_trips": total_trips,
+            "total_profitable_trips": total_profitable_trips,
+            "total_unprofitable_trips": total_unprofitable_trips,
+            "avg_success_rate": success_rate_sum / success_rate_count if success_rate_count else 0,
+            "avg_days_at_sea": self._safe_mean(days_at_sea),
+        }
+
         self.yearly_data.append(yearly_summary)
-        
         return yearly_summary
+
+    
     
     def get_total_catch_all_agents(self):
-        """Somme des captures de TOUS les agents"""
-        if not hasattr(self, 'last_year_catches'):
+        """Somme des captures de tous les agents depuis le dernier snapshot annuel."""
+        if not hasattr(self, "last_year_catches") or not self.last_year_catches:
             return sum(a.total_catch for a in self.agents)
-        
+
         current_catches = {a.unique_id: a.total_catch for a in self.agents}
         yearly_catch = sum(
-            current_catches.get(aid, 0) - self.last_year_catches.get(aid, 0)
+            current_catches[aid] - self.last_year_catches.get(aid, 0)
             for aid in current_catches
         )
         return yearly_catch
+
     
     def get_output_map(self):
         """Get a map of current fish stocks for visualization"""
@@ -1169,7 +1619,6 @@ class FisheryModel(Model):
     def update_patches(self, new_fish_stocks):
         """Update patch fish stocks with a provided map (for coupling)"""
         for (x, y), stock in new_fish_stocks.items():
-            if (x, y) in self.patches:
-                #print(f"Updating patch at ({x}, {y}) with fish stock: {stock}")
-                self.patches[(x, y)]['fish_stock'] = stock
-                #print(f"Patch ({x}, {y}) new stock: {self.patches[(x, y)]['fish_stock']}")
+            pos = (x, y)
+            if pos in self.patches:
+                self._set_patch_fish_stock(pos, stock)
