@@ -11,7 +11,7 @@
     "duration_years": 2,
     "verbose": true,
     "random_seed": null,
-    "coupling": true
+    "coupling": false
   },
   
   "agents": {

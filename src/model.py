@@ -305,81 +305,167 @@ class FisheryModel(Model):
                      if patch['region'] == region]
         return random.choice(candidates) if candidates else None
     
-    def init_patches(self): #modifier ces quatre fonctions  
-        """Initialize all patches with region, density, and fish stock information"""
-        # Dictionary to store patch attributes
-        self.patches = {}
+
+    def init_patches(self):
+        self._prepare_spatial_indexes()
+        self._build_density_offsets()
+        self._build_density_map_exact()
+
+        width = self.grid.width
+        height = self.grid.height
+        growth_rate = self.GROWTH_RATE
+
+        patches = {}
+
+        # Bind locaux pour accélérer légèrement la boucle Python
+        get_region = self.get_region
+        get_density = self.get_density
+        get_carrying_capacity = self.get_carrying_capacity
+        get_initial_fish_stock = self.get_initial_fish_stock
+
+        for x in range(width):
+            for y in range(height):
+                region = get_region(x, y)
+                density = get_density(x, y, region)
+                carrying_capacity = get_carrying_capacity(region, density)
+                fish_stock = get_initial_fish_stock(carrying_capacity, region)
+
+                patches[(x, y)] = {
+                    'region': region,
+                    'density': density,
+                    'fish_stock': fish_stock,
+                    'carrying_capacity': carrying_capacity,
+                    'growth_rate': growth_rate,
+                    'regen_amount': 0,
+                    'patch_stock_after_regrowth': fish_stock
+                }
+
+        self.patches = patches
+
+
         
-        # Initialize all patches in the grid
-        for x in range(self.grid.width):
-            for y in range(self.grid.height):
-                region = self.get_region(x, y)
-                density = self.get_density(x, y, region)
-                carrying_capacity = self.get_carrying_capacity(region, density)
-                fish_stock = self.get_initial_fish_stock(carrying_capacity, region)
-                
-                # Store patch attributes
-                self.patches[(x, y)] = {
-                    'region' : region,
-                    'density' : density,
-                    'fish_stock' : fish_stock,
-                    'carrying_capacity' : carrying_capacity,
-                    'growth_rate' : self.GROWTH_RATE,
-                    'regen_amount' : 0,
-                    'patch_stock_after_regrowth' : fish_stock
-            
-        }
     
+    def _prepare_spatial_indexes(self):
+        
+        # Régions / LAND : membership O(1)
+        self._land_set = {tuple(coord) for coord in self.LAND}
+        self._region_a_set = {tuple(coord) for coord in self.REGION_A}
+        self._region_b_set = {tuple(coord) for coord in self.REGION_B}
+        self._region_c_set = {tuple(coord) for coord in self.REGION_C}
+        self._region_d_set = {tuple(coord) for coord in self.REGION_D}
+
+        # Hotspots : liste pour parcourir / set pour membership rapide
+        self._hotspots_a_list = [tuple(coord) for coord in self.HOTSPOTS_A]
+        self._hotspots_b_list = [tuple(coord) for coord in self.HOTSPOTS_B]
+        self._hotspots_c_list = [tuple(coord) for coord in self.HOTSPOTS_C]
+        self._hotspots_d_list = [tuple(coord) for coord in self.HOTSPOTS_D]
+
+        self._hotspots_a_set = set(self._hotspots_a_list)
+        self._hotspots_b_set = set(self._hotspots_b_list)
+        self._hotspots_c_set = set(self._hotspots_c_list)
+        self._hotspots_d_set = set(self._hotspots_d_list)
+
+
+        self._region_sets = {
+                'A': self._region_a_set,
+                'B': self._region_b_set,
+                'C': self._region_c_set,
+                'D': self._region_d_set,
+            }
+
+        self._hotspots_lists = {
+                'A': self._hotspots_a_list,
+                'B': self._hotspots_b_list,
+                'C': self._hotspots_c_list,
+                'D': self._hotspots_d_list,
+            }
+
+        self._hotspots_sets = {
+                'A': self._hotspots_a_set,
+                'B': self._hotspots_b_set,
+                'C': self._hotspots_c_set,
+                'D': self._hotspots_d_set,
+            }
+
+
+
+    def _build_density_offsets(self):
+        # HIGH : distance <= 3
+        high_offsets = []
+
+        for dx in range(-3, 4):
+            for dy in range(-3, 4):
+                if dx * dx + dy * dy <= 9:
+                    high_offsets.append((dx, dy))
+
+        # MEDIUM_ONLY : 3 < distance <= 5
+        medium_only_offsets = []
+
+        for dx in range(-5, 6):
+            for dy in range(-5, 6):
+                d2 = dx * dx + dy * dy
+                if 9 < d2 <= 25:
+                    medium_only_offsets.append((dx, dy))
+
+        self._high_offsets = high_offsets
+        self._medium_only_offsets = medium_only_offsets
+
+
+    def _build_density_map_exact(self):
+        self._density_map_by_region = {
+            'A': {},
+            'B': {},
+            'C': {},
+            'D': {},
+        }
+
+        for region_label in ('A', 'B', 'C', 'D'):
+            region_coords = self._region_sets[region_label]
+            hotspots = self._hotspots_lists[region_label]
+            density_map = self._density_map_by_region[region_label]
+
+            # 1) Marquage MEDIUM (anneau 3 < d <= 5)
+            # setdefault évite d'écraser plus tard inutilement
+            for hx, hy in hotspots:
+                for dx, dy in self._medium_only_offsets:
+                    coord = (hx + dx, hy + dy)
+                    if coord in region_coords:
+                        density_map.setdefault(coord, self.MEDIUM)
+
+            # 2) Marquage HIGH (d <= 3) -> écrase MEDIUM si besoin
+            for hx, hy in hotspots:
+                for dx, dy in self._high_offsets:
+                    coord = (hx + dx, hy + dy)
+                    if coord in region_coords:
+                        density_map[coord] = self.HIGH
+
     def get_region(self, x, y):
-        """Determine which region a coordinate belongs to using config definitions"""
-        # Check LAND FIRST to catch windfarm areas before region check
-        if [x, y] in self.LAND:
+        
+        coord = (x, y)
+
+        if coord in self._land_set:
             return 'LAND'
-        # Then check defined regions
-        elif [x, y] in self.REGION_A:
+        elif coord in self._region_a_set:
             return 'A'
-        elif [x, y] in self.REGION_B:
+        elif coord in self._region_b_set:
             return 'B'
-        elif [x, y] in self.REGION_C:
+        elif coord in self._region_c_set:
             return 'C'
-        elif [x, y] in self.REGION_D:
+        elif coord in self._region_d_set:
             return 'D'
         else:
             return 'NULL'
+
     
     def get_density(self, x, y, region):
+        
+        
         if region == 'LAND' or region == 'NULL':
-            return None
-        
-        coord = [x, y]
-        
-        # Check if coordinate is a hotspot center
-        hotspots = []
-        if region == 'A':
-            hotspots = self.HOTSPOTS_A
-        elif region == 'B':
-            hotspots = self.HOTSPOTS_B
-        elif region == 'C':
-            hotspots = self.HOTSPOTS_C
-        elif region == 'D':
-            hotspots = self.HOTSPOTS_D
-            
-        # if this is a hotspot center, it's high density
-        if coord in hotspots:
-            return self.HIGH
-        
-        # calculate the minimum distance to any hotspot
-        min_distance = float('inf')
-        for hs in hotspots:
-            distance = ((x - hs[0])**2 + (y - hs[1])**2)**0.5
-            min_distance = min(min_distance, distance)
-            
-        if min_distance <= 3:
-            return self.HIGH
-        elif min_distance <= 5:
-            return self.MEDIUM
-        else:
-            return self.LOW
+                return None
+
+        return self._density_map_by_region[region].get((x, y), self.LOW)
+
+
             
     
     def get_carrying_capacity(self, region, density):

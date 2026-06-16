@@ -241,7 +241,6 @@ def masks(topology = False, windfarm = False):
                         ligne_masque.append(val)
                 
                 mask_file.append(ligne_masque)
-        
         masks.append(mask_file)
     
     named_masks = {
