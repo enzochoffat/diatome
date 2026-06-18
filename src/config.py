@@ -15,7 +15,7 @@ from typing import List, Optional, Tuple
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.ecospace_outputs import masks
+from src.ecospace_outputs import masks, plot_masks
 from src.ecospace_outputs import get_ecospace_data
 from src import ecospace_outputs
 
@@ -114,6 +114,8 @@ def get_neighbors_by_euclidean_distance_as_xy(matrix: List[List[int]], center_va
 
 
 def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfarm_map_path: Optional[str] = None, apply_windfarm: bool = False) -> List[List[int]]:
+
+    #print(f"[DEBUG] Reloading spatial configuration with apply_windfarm={apply_windfarm}")
     
     global TOPOLOGY, ORIGINAL_TOPOLOGY, LAND, WATER, GRID_HEIGHT, GRID_WIDTH
     global single_slice, y_min_water, all_water_depths
@@ -122,26 +124,31 @@ def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfa
 
     if topology_map_path is not None or windfarm_map_path is not None:
         ecospace_outputs.configure_sources(topology_map_path=topology_map_path, wind_farm_map_path=windfarm_map_path)
+        #print(f"[DEBUG] Configured sources: topology_map_path={topology_map_path}, windfarm_map_path={windfarm_map_path}")
 
     base_topology = np.array(masks(topology=True, windfarm=False)["masks"][0])
+    #plot_masks(masks=[base_topology], title="Base Topology (without Wind Farm)")
     original_topology = base_topology.copy()
 
     if apply_windfarm:
         wf = np.array(masks(topology=False, windfarm=True)["masks"][0])
+        #plot_masks(masks=[wf], title="Wind Farm Topology")
 
         h, w = base_topology.shape
         wf_resized = np.zeros_like(base_topology)
 
         h_wf, w_wf = wf.shape
         wf_resized[:min(h, h_wf), :min(w, w_wf)] = wf[:h, :w]
+        #plot_masks(masks=[wf_resized], title="Resized Wind Farm Topology")
 
-        base_topology = np.where((base_topology == 0) & (wf_resized == 1), 0, base_topology)
+        base_topology = np.where((wf_resized == 1), 0, base_topology)
+        #plot_masks(masks=[base_topology], title="Final Topology (with Wind Farm)")
 
     TOPOLOGY = base_topology.tolist()
     ORIGINAL_TOPOLOGY = original_topology.tolist()
 
     GRID_HEIGHT, GRID_WIDTH = base_topology.shape
-    sigle_slice = GRID_HEIGHT // 4
+    single_slice = GRID_HEIGHT // 4
 
     water_mask = base_topology >= 0
     positive_mask = base_topology > 0
@@ -175,6 +182,8 @@ def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfa
     print(f"  percentile_90_depth = {percentile_90_depth}")
     print(f"  Total water cells: {all_water_depths.size}")
 
+    #plot_masks(masks=[np.array(TOPOLOGY)], title="Final Topology (with Wind Farm)" if apply_windfarm else "Final Topology")
+
     return TOPOLOGY
 
 
@@ -184,16 +193,16 @@ def define_region(REGION_NAME, topology_matrix=None) :
     
     if REGION_NAME == 'A' : 
         center_value = min_depth
-        radius = 20
+        radius = (max_depth - min_depth)/4
     elif REGION_NAME == 'B' : 
-        center_value = (max_depth - min_depth)/4 + min_depth
-        radius = 20
+        center_value = 2*(max_depth - min_depth)/8 + min_depth
+        radius = (max_depth - min_depth)/4
     elif REGION_NAME == 'C' : 
-        center_value = 3*(max_depth - min_depth)/4 + min_depth
-        radius = 30
+        center_value = 3*(max_depth - min_depth)/8 + min_depth
+        radius = (max_depth - min_depth)/4
     elif REGION_NAME == 'D' : 
-        center_value = percentile_90_depth
-        radius = 20
+        center_value = max_depth - 20
+        radius = (max_depth - min_depth)/4
     
     # Convert to int to match TOPOLOGY values
     center_value = int(round(center_value))
@@ -212,6 +221,7 @@ def define_region(REGION_NAME, topology_matrix=None) :
     return result_indices
 
 reload_spatial_configuration()
+
 
 print(f"\n[DEBUG] After removing overlaps:")
 print(f"  REGION_C: {len(REGION_C)} cells")
@@ -245,20 +255,33 @@ def get_hotspots_for_step(step, region_name):
     # Essayer d'utiliser Ecospace si disponible
     if ecospace_outputs._ecospace_data_cache is not None:
         try:
-            ecospace_data = ecospace_outputs._ecospace_data_cache
-            if ecospace_data and 'maps' in ecospace_data:
+            ecospace_data, species_names = ecospace_outputs.get_ecospace_data()
+            #print(f"{ecospace_data.shape} is the shape of the ecospace data")
+            sum_data = np.sum(ecospace_data, axis=2)  # Sum across species to get total concentration
+            if sum_data is not None:
                 date_index = step // 30
                 
                 # Gestion des limites
-                if date_index >= len(ecospace_data['maps']['map']):
-                    date_index = len(ecospace_data['maps']['map']) - 1
+                #if date_index >= len(ecospace_data['maps']['map']):
+                #   date_index = len(ecospace_data['maps']['map']) - 1
                 
-                fish_map = np.array(ecospace_data['maps']['map'][date_index][0])
+                fish_map = np.array(sum_data)
                 
                 # Trouver les 2 points avec les plus hautes concentrations
-                top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)[:3]
-                if len(top_coords) == 3:
-                    return top_coords
+                top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)
+                hotspots = []
+
+                for x, y in top_coords:
+                    if all(
+                        ((x - hx) ** 2 + (y - hy) ** 2) >= 10 ** 2
+                        for hx, hy in hotspots
+                    ):
+                        hotspots.append((x, y))
+                    if len(hotspots) == 3:
+                        break
+                #print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
+                if len(hotspots) == 3:
+                    return hotspots
         except Exception as e:
             pass
     

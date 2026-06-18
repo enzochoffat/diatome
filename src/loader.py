@@ -263,19 +263,20 @@ class ConfigLoader:
             return
 
         map_params = self.get_map_params()
-        species_paths = list(map_params["species_map"].values()) or None
+        species_paths = list(map_params["species_map"]) or None
 
         ecospace_outputs.configure_sources(
             topology_map_path=map_params["topology_map"],
             wind_farm_map_path=map_params["wind_farm_map"],
-            species_map_paths=species_paths,
+            species_map_paths=map_params["species_map"],
+
         )
         default_config.reload_spatial_configuration(
             topology_map_path=map_params["topology_map"],
             windfarm_map_path=map_params["wind_farm_map"],
             apply_windfarm=map_params["wind_farm_map"] is not None,
         )
-                
+        
     def save_config(self, output_path):
         """
         Save current configuration to file (for reproducibility).

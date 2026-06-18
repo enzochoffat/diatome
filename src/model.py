@@ -14,7 +14,8 @@ import numpy as np
 
 from src.config import get_hotspots_for_step
 from src.Couplage.couplage import Couplage
-
+from src.ecospace_outputs import get_ecospace_data
+from src import ecospace_outputs
 class FisheryModel(Model):
     def __init__(
         self,
@@ -624,12 +625,17 @@ class FisheryModel(Model):
         get_carrying_capacity = self.get_carrying_capacity
         get_initial_fish_stock = self.get_initial_fish_stock
 
-        for x in range(width):
-            for y in range(height):
+        ecospace_data, species_names = ecospace_outputs.get_ecospace_data()
+        sum_data = np.sum(ecospace_data, axis=2)
+        print(f"shape sum_data: {sum_data.shape}, width: {width}, height: {height}")
+        for x in range(height):
+            for y in range(width):
                 region = get_region(x, y)
                 density = get_density(x, y, region)
                 carrying_capacity = get_carrying_capacity(region, density)
-                fish_stock = get_initial_fish_stock(carrying_capacity, region)
+                fish_stock = sum_data[x, y] if region not in ("LAND", "NULL") else 0
+                if region not in ("LAND", "NULL") and density != "low":
+                    print(f"Patch ({x}, {y}): Region={region}, Density={density}, Carrying Capacity={carrying_capacity}, Initial Fish Stock={fish_stock}")
 
                 patches[(x, y)] = {
                     'region': region,
@@ -840,9 +846,12 @@ class FisheryModel(Model):
             return round(0.5 * carrying_capacity)
         if mode == "quartCarryingCap":
             return round(0.25 * carrying_capacity)
-
-        raise ValueError(f"Invalid initial stock size mode: {mode}")
+  
         
+        raise ValueError(f"Invalid initial stock size mode: {mode}")
+    
+
+
     def get_region_stock(self, region_name):
         return self._region_stock_cache.get(region_name, 0)
     
@@ -871,6 +880,7 @@ class FisheryModel(Model):
             region = patch['region']
             if patch['region'] not in ["LAND", "NULL"]:
                 current_stock = patch['fish_stock']
+                print(f"Patch at {patch} has current stock: {current_stock}")
                 carrying_capacity = patch['carrying_capacity']
                 
                 factor = density_factor.get(patch['density'], 1.0)
@@ -1072,13 +1082,13 @@ class FisheryModel(Model):
         # =========================
         self.current_step += 1
 
-        if self.verbose:
-            print(
-                f"Step {self.current_step} completed. "
-                f"Agents fishing: {self.num_fishing_midday}, "
-                f"at home: {self.num_at_home_midday}, "
-                f"fished today: {self.num_fished_today}"
-            )
+        #if self.verbose:
+            #print(
+            #   f"Step {self.current_step} completed. "
+            #   f"Agents fishing: {self.num_fishing_midday}, "
+            #   f"at home: {self.num_at_home_midday}, "
+            #   f"fished today: {self.num_fished_today}"
+            #)
 
         # =========================
         # End condition
@@ -1602,7 +1612,7 @@ class FisheryModel(Model):
     
     def get_output_map(self):
         """Get a map of current fish stocks for visualization"""
-        stock_map = np.zeros((self.grid.width, self.grid.height), dtype=int)
+        stock_map = np.zeros((self.grid.height, self.grid.width), dtype=int)
         for (x, y), patch in self.patches.items():
             stock_map[x, y] = int(patch['fish_stock'])
         return stock_map

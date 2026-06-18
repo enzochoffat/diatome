@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.model import FisheryModel
 from src.loader import load_config
+from src.ecospace_outputs import configure_sources, get_ecospace_data, plot_masks
 
 def run_from_config(config_path, run_id=0):
     """

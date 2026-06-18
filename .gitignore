@@ -61,3 +61,4 @@ read_cProfile.py
 .gitignore
 resultat.prof
 test_config_None.json
+resultat.prof
