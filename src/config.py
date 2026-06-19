@@ -172,9 +172,26 @@ def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfa
     REGION_C = define_region("C", ORIGINAL_TOPOLOGY)
     REGION_D = define_region("D", ORIGINAL_TOPOLOGY)
 
+    set_a = {tuple(cell) for cell in REGION_A}
+    set_b = {tuple(cell) for cell in REGION_B}
+    set_c = {tuple(cell) for cell in REGION_C}
+    set_d = {tuple(cell) for cell in REGION_D}
 
-    region_d_set = {tuple(cell) for cell in REGION_D}
-    REGION_C = [cell for cell in REGION_C if tuple(cell) not in region_d_set]
+
+    set_c -= set_d
+    set_b -= (set_c | set_d)
+    set_a -= (set_b | set_c | set_d)
+
+    REGION_A = list(set_a)
+    REGION_B = list(set_b)
+    REGION_C = list(set_c)
+    REGION_D = list(set_d)
+
+    print(f"[DEBUG] After removing overlaps:")
+    print(f"  REGION_A: {len(REGION_A)} cells")
+    print(f"  REGION_B: {len(REGION_B)} cells")
+    print(f"  REGION_C: {len(REGION_C)} cells")
+    print(f"  REGION_D: {len(REGION_D)} cells")
 
     print(f"[DEBUG] Loaded topology: GRID_WIDTH={GRID_WIDTH}, GRID_HEIGHT={GRID_HEIGHT}")
     print("[DEBUG] Depth calculation:")
@@ -195,14 +212,14 @@ def define_region(REGION_NAME, topology_matrix=None) :
         center_value = min_depth
         radius = (max_depth - min_depth)/4
     elif REGION_NAME == 'B' : 
-        center_value = 2*(max_depth - min_depth)/8 + min_depth
-        radius = (max_depth - min_depth)/4
-    elif REGION_NAME == 'C' : 
         center_value = 3*(max_depth - min_depth)/8 + min_depth
         radius = (max_depth - min_depth)/4
+    elif REGION_NAME == 'C' : 
+        center_value = 4*(max_depth - min_depth)/8 + min_depth
+        radius = (max_depth - min_depth)/6
     elif REGION_NAME == 'D' : 
-        center_value = max_depth - 20
-        radius = (max_depth - min_depth)/4
+        center_value = max_depth - 5
+        radius = (max_depth - min_depth)/6
     
     # Convert to int to match TOPOLOGY values
     center_value = int(round(center_value))
@@ -224,6 +241,8 @@ reload_spatial_configuration()
 
 
 print(f"\n[DEBUG] After removing overlaps:")
+print(f"  REGION_A: {len(REGION_A)} cells")
+print(f"  REGION_B: {len(REGION_B)} cells")
 print(f"  REGION_C: {len(REGION_C)} cells")
 print(f"  REGION_D: {len(REGION_D)} cells")
 
@@ -248,6 +267,7 @@ def get_hotspots_for_step(step, region_name):
         'D': REGION_D
     }
     region = region_map.get(region_name, [])
+    print(f"\n[DEBUG] Getting hotspots for region {region_name} at step {step}")
     
     if not region:
         return []
@@ -277,10 +297,12 @@ def get_hotspots_for_step(step, region_name):
                         for hx, hy in hotspots
                     ):
                         hotspots.append((x, y))
+                        
                     if len(hotspots) == 3:
                         break
                 #print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
                 if len(hotspots) == 3:
+                    print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
                     return hotspots
         except Exception as e:
             pass

@@ -122,7 +122,6 @@ class FisheryModel(Model):
         self.HOTSPOTS_B = get_hotspots_for_step(0, 'B')
         self.HOTSPOTS_C = get_hotspots_for_step(0, 'C')
         self.HOTSPOTS_D = get_hotspots_for_step(0, 'D')
-
         # Define growth rate
         self.GROWTH_RATE = config.GROWTH_RATE if growth_rate is None else float(growth_rate)
         
@@ -634,8 +633,8 @@ class FisheryModel(Model):
                 density = get_density(x, y, region)
                 carrying_capacity = get_carrying_capacity(region, density)
                 fish_stock = sum_data[x, y] if region not in ("LAND", "NULL") else 0
-                if region not in ("LAND", "NULL") and density != "low":
-                    print(f"Patch ({x}, {y}): Region={region}, Density={density}, Carrying Capacity={carrying_capacity}, Initial Fish Stock={fish_stock}")
+                #if region not in ("LAND", "NULL") and density != "low":
+                #    print(f"Patch ({x}, {y}): Region={region}, Density={density}, Carrying Capacity={carrying_capacity}, Initial Fish Stock={fish_stock}")
 
                 patches[(x, y)] = {
                     'region': region,
@@ -666,6 +665,18 @@ class FisheryModel(Model):
         self._hotspots_b_list = [tuple(coord) for coord in self.HOTSPOTS_B]
         self._hotspots_c_list = [tuple(coord) for coord in self.HOTSPOTS_C]
         self._hotspots_d_list = [tuple(coord) for coord in self.HOTSPOTS_D]
+        for point in self._hotspots_a_list:
+              # Ensure the region is set correctly for each hotspot
+            print(f"Hotspot A at {point} is in region: {self.get_region(point[0], point[1])}")
+        for point in self._hotspots_b_list:
+            self.get_region(point[0], point[1])  # Ensure the region is set correctly for each hotspot
+            print(f"Hotspot B at {point} is in region: {self.get_region(point[0], point[1])}")
+        for point in self._hotspots_c_list:
+            self.get_region(point[0], point[1])  # Ensure the region is set correctly for each hotspot
+            print(f"Hotspot C at {point} is in region: {self.get_region(point[0], point[1])}")
+        for point in self._hotspots_d_list:
+            self.get_region(point[0], point[1])  # Ensure the region is set correctly for each hotspot
+            print(f"Hotspot D at {point} is in region: {self.get_region(point[0], point[1])}")
 
         self._hotspots_a_set = set(self._hotspots_a_list)
         self._hotspots_b_set = set(self._hotspots_b_list)
