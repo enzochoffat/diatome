@@ -821,7 +821,7 @@ class FisherAgent(Agent):
             self.bankrupt = True
             self.lay_low = True
             self.lay_low_counter = config.BANKRUPTCY_LAYLOW_DAYS
-            print(f"Agent {self.unique_id} ({self.fisher_type}) is bankrupt!")
+            #print(f"Agent {self.unique_id} ({self.fisher_type}) is bankrupt!")
         elif self.capital < 0:
             if not self.lay_low:
                 if random.random() < config.NEGATIVE_CAPITAL_LAYLOW_PROBABILITY:

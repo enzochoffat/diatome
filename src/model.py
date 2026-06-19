@@ -1126,7 +1126,10 @@ class FisheryModel(Model):
                 )
 
                 fish = Coupling.update_biomass(self, species_maps)
+                print(f"stock for region A before update: {self.get_region_stock('A')}, B: {self.get_region_stock('B')}, C: {self.get_region_stock('C')}, D: {self.get_region_stock('D')}")
                 self.update_patches(fish)
+                print(f"stock for region A after update: {self.get_region_stock('A')}, B: {self.get_region_stock('B')}, C: {self.get_region_stock('C')}, D: {self.get_region_stock('D')}")
+
 
                 # Stock changed => refresh cache for future reads
 
@@ -1141,11 +1144,11 @@ class FisheryModel(Model):
         print("SIMULATION FINALE SUMMARY")
         print("=" * 80)
 
-        stock_a = self._region_stock_cache["A"]
-        stock_b = self._region_stock_cache["B"]
-        stock_c = self._region_stock_cache["C"]
-        stock_d = self._region_stock_cache["D"]
-        total_stock = self._region_stock_cache["TOTAL"]
+        stock_a = self._region_stock_cache.get("A", 0)
+        stock_b = self._region_stock_cache.get("B", 0)
+        stock_c = self._region_stock_cache.get("C", 0)
+        stock_d = self._region_stock_cache.get("D", 0)
+        total_stock = self._region_stock_cache.get("TOTAL", 0)
 
         agents_list = list(self.agents)
 
@@ -1639,7 +1642,13 @@ class FisheryModel(Model):
 
     def update_patches(self, new_fish_stocks):
         """Update patch fish stocks with a provided map (for coupling)"""
+        sum_A = 0
         for (x, y), stock in new_fish_stocks.items():
             pos = (x, y)
+            region = self.get_region(x, y)
+            
+            if region in "A":
+                sum_A += stock
             if pos in self.patches:
                 self._set_patch_fish_stock(pos, stock)
+        print(f"Total stock for region A after update: {sum_A}")
