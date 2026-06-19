@@ -62,3 +62,5 @@ read_cProfile.py
 resultat.prof
 test_config_None.json
 resultat.prof
+pyproject.toml
+.pylintrc

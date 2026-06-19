@@ -13,7 +13,7 @@ import os
 import numpy as np
 
 from src.config import get_hotspots_for_step
-from src.Couplage.couplage import Couplage
+from src.Couplage.couplage import Coupling
 from src.ecospace_outputs import get_ecospace_data
 from src import ecospace_outputs
 class FisheryModel(Model):
@@ -402,7 +402,7 @@ class FisheryModel(Model):
         Attend qu'un fichier de config soit modifié.
         Retourne species_maps, current_step_val dès qu'une mise à jour est détectée.
         """
-        species_maps, last_step = Couplage.read_csv_biomass(self)
+        species_maps, last_step = Coupling.read_csv_biomass(self)
         current_step_val = last_step
 
         last_modified_time = 0
@@ -418,7 +418,7 @@ class FisheryModel(Model):
             if os.path.exists(json_path):
                 current_modified_time = os.path.getmtime(json_path)
                 if current_modified_time > last_modified_time:
-                    species_maps, current_step_val = Couplage.read_csv_biomass(self)
+                    species_maps, current_step_val = Coupling.read_csv_biomass(self)
                     if self.verbose:
                         print(
                             f"File {json_path} updated. Proceeding with biomass update for step {current_step_val}."
@@ -1114,7 +1114,7 @@ class FisheryModel(Model):
                     poll_interval=0.5,
                 )
 
-                fish = Couplage.update_biomass(self, species_maps)
+                fish = Coupling.update_biomass(self, species_maps)
                 self.update_patches(fish)
 
                 # Stock changed => refresh cache for future reads
