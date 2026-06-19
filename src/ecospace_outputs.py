@@ -95,6 +95,7 @@ def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la 
         #print(" ")
         #print(f"Processing species {species_name} with path {fichier}")
         species_names.append(species_name)
+        print(f"file shape: {fichier.shape}")
         maps = np.genfromtxt(fichier, delimiter=',', skip_header=1)[:, 1:]  # Skip header and first column
         species_data.append(maps)
 

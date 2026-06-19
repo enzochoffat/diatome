@@ -1291,7 +1291,7 @@ class FisheryModel(Model):
             total_capacity = 0
             for pos, patch in self.patches.items():
                 if patch['region'] == region:
-                    total_capacity += patch['carrying_capacity']
+                    total_capacity += patch['fish_stock']
             
             # Update the capacity constants with actual values
             if region == "A":

@@ -66,7 +66,7 @@
     }
   },
   "maps": {
-    "spatial_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Depth.csv",
+    "spatial_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Depth\\DepthMap.csv",
     "wind_farm_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
     "species_map": {
       "11": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_11.csv",
@@ -135,7 +135,7 @@
     }
   },
   "execution": {
-    "timestamp": "2026-06-18T10:43:58.327937",
+    "timestamp": "2026-06-19T09:44:04.637398",
     "config_loader_version": "1.0"
   }
 }
