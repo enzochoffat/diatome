@@ -267,7 +267,7 @@ def get_hotspots_for_step(step, region_name):
         'D': REGION_D
     }
     region = region_map.get(region_name, [])
-    print(f"\n[DEBUG] Getting hotspots for region {region_name} at step {step}")
+    #print(f"\n[DEBUG] Getting hotspots for region {region_name} at step {step}")
     
     if not region:
         return []
@@ -302,7 +302,7 @@ def get_hotspots_for_step(step, region_name):
                         break
                 #print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
                 if len(hotspots) == 3:
-                    print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
+                    #print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
                     return hotspots
         except Exception as e:
             pass

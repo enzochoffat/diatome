@@ -12,9 +12,9 @@ class Archipelagos:
         if len(self.memory) < config.EXPLORATION_PHASE_TRIPS:
             can_fish = not self.model.bad_weather
             self.will_fish = can_fish
-            if self.model.current_step < 5:
-                print(f"[Day {self.model.current_step}] Archipelago #{self.unique_id} EXPLORATION: "
-                    f"will_fish={self.will_fish}, bad_weather={self.model.bad_weather}")
+            #if self.model.current_step < 5:
+                #print(f"[Day {self.model.current_step}] Archipelago #{self.unique_id} EXPLORATION: "
+                #   f"will_fish={self.will_fish}, bad_weather={self.model.bad_weather}")
             if self.will_fish:
                 self.region_preference = "A"
             return

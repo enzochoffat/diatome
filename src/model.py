@@ -665,18 +665,19 @@ class FisheryModel(Model):
         self._hotspots_b_list = [tuple(coord) for coord in self.HOTSPOTS_B]
         self._hotspots_c_list = [tuple(coord) for coord in self.HOTSPOTS_C]
         self._hotspots_d_list = [tuple(coord) for coord in self.HOTSPOTS_D]
-        for point in self._hotspots_a_list:
+        #for point in self._hotspots_a_list:
+        #    region = self.get_region(point[0], point[1])
               # Ensure the region is set correctly for each hotspot
-            print(f"Hotspot A at {point} is in region: {self.get_region(point[0], point[1])}")
-        for point in self._hotspots_b_list:
-            self.get_region(point[0], point[1])  # Ensure the region is set correctly for each hotspot
-            print(f"Hotspot B at {point} is in region: {self.get_region(point[0], point[1])}")
-        for point in self._hotspots_c_list:
-            self.get_region(point[0], point[1])  # Ensure the region is set correctly for each hotspot
-            print(f"Hotspot C at {point} is in region: {self.get_region(point[0], point[1])}")
-        for point in self._hotspots_d_list:
-            self.get_region(point[0], point[1])  # Ensure the region is set correctly for each hotspot
-            print(f"Hotspot D at {point} is in region: {self.get_region(point[0], point[1])}")
+        #    print(f"Hotspot A at {point} is in region: {region}")
+        #for point in self._hotspots_b_list:
+        #    region = self.get_region(point[0], point[1])
+        #    print(f"Hotspot B at {point} is in region: {region}")
+        #for point in self._hotspots_c_list:
+        #    region = self.get_region(point[0], point[1])
+        #    print(f"Hotspot C at {point} is in region: {region}")
+        #for point in self._hotspots_d_list:
+        #    region = self.get_region(point[0], point[1])
+        #    print(f"Hotspot D at {point} is in region: {region}")
 
         self._hotspots_a_set = set(self._hotspots_a_list)
         self._hotspots_b_set = set(self._hotspots_b_list)
