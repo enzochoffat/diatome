@@ -4,7 +4,7 @@ import random
 import statistics
 from collections import Counter
 
-from src.Agent.archipelagos import Archipelagos
+from src.Agent.archipelagos import Archipelago
 from src.Agent.coastal import Coastal
 from src.Agent.trawler import Trawler
 
@@ -1343,7 +1343,7 @@ class FisherAgent(Agent):
         Routes to appropriate decision model based on fisher type
         """
         if self.fisher_type == "archipelago":
-            Archipelagos.satisfice_lifestyle(self)
+            Archipelago.satisfice_lifestyle(self)
         elif self.fisher_type == "coastal":
             Coastal.optimise_lifestyle_and_growth(self)
         elif self.fisher_type == "trawler":
