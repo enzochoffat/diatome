@@ -389,6 +389,27 @@ def get_hotspots_for_step(
     )[:3]
     return top_coords
 
+def load_ports_map(ports_map_path: Optional[str] = None) -> List[List[int]]:
+    """Loads the ports map from a CSV file.
+
+    Args:
+        ports_map_path: Optional path to a custom ports map CSV.
+    Returns:
+        2-D list representing the ports map, where each cell contains
+        an integer value indicating the presence of a port.
+    """
+    if ports_map_path is not None:
+        ecospace_outputs.configure_sources(ports_map_path=ports_map_path)
+
+    ports_map = np.array(masks(topology=False, windfarm=False)["masks"][0])
+    for y in range(ports_map.shape[0]):
+        for x in range(ports_map.shape[1]):
+            if ports_map[y][x] > 0:
+                print(f"[DEBUG] Port found at (x={x}, y={y}) with value {ports_map[y][x]}")
+            else:
+                continue
+
+    return ports_map.tolist()
 
 # =============================================================================
 # DENSITY LEVELS

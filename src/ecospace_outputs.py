@@ -32,6 +32,10 @@ WINDFARM_MAP_PATH: str = str(
 )
 SPECIES_MAP_PATHS: Optional[Dict[str, str]] = None
 SPECIES_MAP_NAMES: Optional[List[str]] = None
+PORTS_MAP_PATH: str = str(
+    _PROJECT_ROOT
+    / "Ecospace_outputs/ports/PortsMap.csv"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +46,7 @@ def configure_sources(
     topology_map_path: Optional[str] = None,
     wind_farm_map_path: Optional[str] = None,
     species_map_paths: Optional[Dict[str, str]] = None,
+    ports_map_path: Optional[str] = None,
 ) -> None:
     """Configures the CSV sources used by the module.
 
@@ -55,8 +60,9 @@ def configure_sources(
             the current value is kept.
         species_map_paths: Mapping of species name to CSV file path.
             If None, the current value is kept.
+        ports_map_path: Path to the ports CSV file. If None, the current value is kept.
     """
-    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS
+    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, PORTS_MAP_PATH
     global _ecospace_data_cache
 
     if topology_map_path is not None:
@@ -65,6 +71,8 @@ def configure_sources(
         WINDFARM_MAP_PATH = str(wind_farm_map_path)
     if species_map_paths is not None:
         SPECIES_MAP_PATHS = species_map_paths
+    if ports_map_path is not None:
+        PORTS_MAP_PATH = str(ports_map_path)
 
     _ecospace_data_cache = get_ecospace_data()
 

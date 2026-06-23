@@ -234,6 +234,9 @@ class ConfigLoader:
                 species_name: self._resolve_config_path(species_path)
                 for species_name, species_path in species_map.items()
             },
+            "ports_map": self._resolve_config_path(
+                maps.get("ports_map")
+            ),
         }
 
     def get_model_params(self) -> Dict[str, Any]:
@@ -351,11 +354,16 @@ class ConfigLoader:
             topology_map_path=map_params["topology_map"],
             wind_farm_map_path=map_params["wind_farm_map"],
             species_map_paths=map_params["species_map"],
+            ports_map_path=map_params["ports_map"]
         )
         default_config.reload_spatial_configuration(
             topology_map_path=map_params["topology_map"],
             windfarm_map_path=map_params["wind_farm_map"],
-            apply_windfarm=map_params["wind_farm_map"] is not None,
+            apply_windfarm=map_params["wind_farm_map"] is not None
+        )
+
+        default_config.load_ports_map(
+            ports_map_path=map_params["ports_map"]
         )
 
     def save_config(self, output_path: str) -> None:
