@@ -96,8 +96,8 @@ class Coastal:
         between home-time satisfaction and growth satisfaction to determine
         the final fishing decision.
         """
-        home_sat = getattr(self, "homeTime_satisfaction", 0.5)
-        growth_sat = getattr(self, "growth_satisfaction", 0.5)
+        home_sat = getattr(self, "satisfaction_home", 0.5)
+        growth_sat = getattr(self, "satisfaction_growth", 0.5)
         threshold = self.satisfaction_home_threshold
 
         if growth_sat >= threshold and home_sat >= threshold:

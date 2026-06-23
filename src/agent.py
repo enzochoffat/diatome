@@ -113,8 +113,8 @@ class FisherAgent(Agent):
             self.has_partner = True
             self.has_colleagues = True
             self.has_technologie = False
-            self.homeTime_satisfaction = 1.0 - (random.randint(0, 50) / 100)
-            self.growth_satisfaction = 1.0 - (random.randint(0, 50) / 100)
+            self.satisfaction_home = 1.0 - (random.randint(0, 50) / 100)
+            self.satisfaction_growth = 1.0 - (random.randint(0, 50) / 100)
             
         elif self.fisher_type == "trawler":
             self.cost_existence = self.model.HIGH_COST_EXISTENCE
@@ -1220,10 +1220,10 @@ class FisherAgent(Agent):
         """ 
         Update agent's satisfaction levels based on recentexperience
         """
-        if len(self.memory) < 7:
-            self.satisfaction_home = 0.5
-            self.satisfaction_growth = 0.5
-            return
+        #if len(self.memory) < 7:
+        #    self.satisfaction_home = 0.5
+        #    self.satisfaction_growth = 0.5
+        #    return
         
         recent_trips = list(self.memory)[-14:]
         
