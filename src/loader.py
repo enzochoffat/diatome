@@ -1,128 +1,163 @@
+"""Configuration loader for FIBE fishery model experiments.
+
+Provides utilities to load, validate, merge, and apply JSON-based
+experiment configurations.
+"""
+
 import json
-import os
-from pathlib import Path
 from datetime import datetime
-from tkinter.font import names
-from typing import Dict, Any, Optional
-from . import config as default_config
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from src import ecospace_outputs
- 
+from src import config as default_config
+
+
 class ConfigLoader:
-    """Load and validate experiment configuration from JSON files"""
-    
-    def __init__(self, config_dir="configs"):
-        """
-        Initialize configuration loader.
-        
+    """Loads and validates experiment configuration from JSON files.
+
+    Attributes:
+        config_dir: Directory used to resolve relative config paths.
+        loaded_config: The configuration dict after loading, or None.
+        config_path: Resolved absolute path to the loaded file, or None.
+    """
+
+    _REQUIRED_SECTIONS = ["metadata", "simulation", "agents", "output"]
+    _REQUIRED_AGENT_KEYS = ["num_archipelago", "num_coastal", "num_trawler"]
+    _VALID_STOCK_SIZES = {
+        "random",
+        "carryingCap",
+        "halfCarryingCap",
+        "quartCarryingCap",
+    }
+
+    def __init__(self, config_dir: str = "configs") -> None:
+        """Initialises the configuration loader.
+
         Args:
-            config_dir: Path to configuration directory
+            config_dir: Path to the directory containing config files.
         """
-        
         self.config_dir = Path(config_dir)
-        self.loaded_config = None
-        self.config_path = None
-        
-    def load(self, config_path):
-        """
-        Load configuration from JSON file.
-        
+        self.loaded_config: Optional[Dict[str, Any]] = None
+        self.config_path: Optional[Path] = None
+
+    def load(self, config_path: str) -> Dict[str, Any]:
+        """Loads a configuration from a JSON file.
+
+        The path may be absolute or relative. Relative paths are
+        resolved first against the current working directory, then
+        against ``config_dir``.
+
         Args:
-            config_path: Path to JSON config file (relative to config_dir or absolute)
-            
+            config_path: Path to the JSON config file.
+
         Returns:
-            Dict containing configuration
-            
+            Dictionary containing the merged configuration.
+
         Raises:
-            FileNotFoundError: If config file doesn't exist
-            json.JSONDecodeError: If JSON is invalid
+            FileNotFoundError: If the config file cannot be found.
+            json.JSONDecodeError: If the file contains invalid JSON.
+            ValueError: If the configuration structure is invalid.
         """
-        
-        config_path = Path(config_path)
+        resolved = self._find_config_file(Path(config_path))
+        self.config_path = resolved.resolve()
 
-        if not config_path.is_absolute():
-            candidate_paths = [config_path, self.config_dir / config_path]
-            for candidate in candidate_paths:
-                if candidate.exists():
-                    config_path = candidate
-                    break
-            else:
-                config_path = self.config_dir / config_path
-        
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-
-        self.config_path = config_path.resolve()
-        
-        with open(config_path, 'r') as f:
+        with open(resolved, "r") as f:
             config_data = json.load(f)
-            
+
         self._validate_config(config_data)
-        
         config_data = self._merge_with_defaults(config_data)
-        
         self.loaded_config = config_data
-        
         return config_data
-    
-    def _validate_config(self, config):
-        """
-        Validate configuration structure.
-        
+
+    def _find_config_file(self, config_path: Path) -> Path:
+        """Locates a config file from an absolute or relative path.
+
         Args:
-            config: Configuration dictionary
-            
+            config_path: Candidate path (absolute or relative).
+
+        Returns:
+            Resolved ``Path`` to an existing config file.
+
         Raises:
-            ValueError: If configuration is invalid
+            FileNotFoundError: If the file cannot be found at any
+                candidate location.
         """
-        
-        required_section = ["metadata", "simulation", "agents", "output"]
-        
-        for section in required_section:
+        if config_path.is_absolute():
+            if not config_path.exists():
+                raise FileNotFoundError(
+                    f"Configuration file not found: {config_path}"
+                )
+            return config_path
+
+        candidates = [config_path, self.config_dir / config_path]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+
+        raise FileNotFoundError(
+            f"Configuration file not found: {config_path}"
+        )
+
+    def _validate_config(self, config: Dict[str, Any]) -> None:
+        """Validates the top-level structure of a configuration dict.
+
+        Args:
+            config: Configuration dictionary to validate.
+
+        Raises:
+            ValueError: If any required section or key is missing, or
+                if a value violates its constraint.
+        """
+        for section in self._REQUIRED_SECTIONS:
             if section not in config:
                 raise ValueError(f"Missing required section: {section}")
-            
+
         sim = config["simulation"]
         if "duration_years" not in sim:
-            raise ValueError(f"Missing 'duration_years' in simulation section")
-        
+            raise ValueError(
+                "Missing 'duration_years' in simulation section"
+            )
         if sim["duration_years"] <= 0:
             raise ValueError("duration_years must be positive")
-        
+
         agents = config["agents"]
-        required_agents = ["num_archipelago", "num_coastal", "num_trawler"]
-        for agent_type in required_agents:
-            if agent_type not in agents:
-                raise ValueError(f"Missing agent count: {agent_type}")
-            if agents[agent_type] < 0:
-                raise ValueError(f"{agent_type} must be non-negative")
-            
-    def _merge_with_defaults(self, config):
-        """
-        Merge configuration with default values.
-        
+        for agent_key in self._REQUIRED_AGENT_KEYS:
+            if agent_key not in agents:
+                raise ValueError(f"Missing agent count: {agent_key}")
+            if agents[agent_key] < 0:
+                raise ValueError(f"{agent_key} must be non-negative")
+
+    def _merge_with_defaults(
+        self, config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Merges a user configuration with built-in default values.
+
+        Missing top-level sections are added wholesale; missing keys
+        within existing sections are filled individually.
+
         Args:
-            config: User configuration
-            
+            config: User-supplied configuration dictionary.
+
         Returns:
-            Merged configuration
+            Configuration dictionary with defaults applied.
         """
-    
-        defaults = {
+        defaults: Dict[str, Any] = {
             "simulation": {
                 "verbose": True,
                 "random_seed": None,
                 "repetitions": 1,
-                "coupling": False
+                "coupling": False,
             },
             "output": {
                 "export_data": True,
                 "filename_prefix": "fibe_output",
                 "save_final_state": False,
-                "export_yearly_only": False
+                "export_yearly_only": False,
             },
-            "parameters": {}
+            "parameters": {},
         }
-        
+
         for section, values in defaults.items():
             if section not in config:
                 config[section] = values
@@ -130,11 +165,26 @@ class ConfigLoader:
                 for key, default_value in values.items():
                     if key not in config[section]:
                         config[section][key] = default_value
-        
+
         return config
 
-    def _resolve_config_path(self, relative_path):
-        """Resolve a path from the JSON configuration file location."""
+    def _resolve_config_path(
+        self, relative_path: Optional[str]
+    ) -> Optional[str]:
+        """Resolves a path from the loaded JSON configuration file location.
+
+        Tries the config file's directory, its parent, and the current
+        working directory in order, returning the first match found.
+
+        Args:
+            relative_path: A path string from the JSON config, which
+                may be absolute, relative, or None.
+
+        Returns:
+            Absolute path string if the file exists somewhere, or the
+            best-guess absolute path if it does not. Returns None if
+            ``relative_path`` is None.
+        """
         if relative_path is None:
             return None
 
@@ -142,169 +192,214 @@ class ConfigLoader:
         if path.is_absolute():
             return str(path)
 
-        candidates = []
+        candidates: List[Path] = []
         if self.config_path is not None:
             candidates.append(self.config_path.parent / path)
             candidates.append(self.config_path.parent.parent / path)
-
         candidates.append(Path.cwd() / path)
 
         for candidate in candidates:
             if candidate.exists():
                 return str(candidate.resolve())
 
-        return str(candidates[0].resolve()) if candidates else str(path.resolve())
+        return (
+            str(candidates[0].resolve())
+            if candidates
+            else str(path.resolve())
+        )
 
-    def get_map_params(self):
-        """Extract map-related configuration parameters."""
-        if self.loaded_config is None:
-            raise ValueError("No configuration loaded. Call load() first.")
+    def get_map_params(self) -> Dict[str, Any]:
+        """Extracts map-related configuration parameters.
+
+        Returns:
+            Dictionary with keys ``topology_map``, ``wind_farm_map``,
+            and ``species_map`` (a dict of species-name → path).
+
+        Raises:
+            ValueError: If no configuration has been loaded.
+        """
+        self._require_loaded()
 
         maps = self.loaded_config.get("maps", {})
-        species_map = maps.get("species_map", {}) or {}
+        species_map = maps.get("species_map") or {}
 
         return {
-            "topology_map": self._resolve_config_path(maps.get("spatial_map")),
-            "wind_farm_map": self._resolve_config_path(maps.get("wind_farm_map")),
+            "topology_map": self._resolve_config_path(
+                maps.get("spatial_map")
+            ),
+            "wind_farm_map": self._resolve_config_path(
+                maps.get("wind_farm_map")
+            ),
             "species_map": {
                 species_name: self._resolve_config_path(species_path)
                 for species_name, species_path in species_map.items()
             },
         }
-    
-    def get_model_params(self):
-        """
-        Extract parameters for FisheryModel initialization.
-        
-        Returns:
-            Dict with model parameters
-        """
-        
-        if self.loaded_config is None:
-            raise ValueError("No configuration loaded. Call load() first.")
-        
-        config = self.loaded_config
-        names = config["agents"]["names"]        
 
-        return{
+    def get_model_params(self) -> Dict[str, Any]:
+        """Extracts parameters for ``FisheryModel`` initialisation.
+
+        Returns:
+            Dictionary with model constructor parameters.
+
+        Raises:
+            ValueError: If no configuration has been loaded.
+        """
+        self._require_loaded()
+
+        config = self.loaded_config
+        agent_names: List[str] = config["agents"]["names"]
+        num_archipelago: int = config["agents"]["num_archipelago"]
+        num_coastal: int = config["agents"]["num_coastal"]
+
+        return {
             "end_of_sim": config["simulation"]["duration_years"] * 365,
-            "num_archipelago": config["agents"]["num_archipelago"],
-            "num_coastal": config["agents"]["num_coastal"],
+            "num_archipelago": num_archipelago,
+            "num_coastal": num_coastal,
             "num_trawler": config["agents"]["num_trawler"],
             "verbose": config["simulation"]["verbose"],
             "coupling": config["simulation"]["coupling"],
-            "archipelago_names": names[:config["agents"]["num_archipelago"]],
-            "coastal_names": names[config["agents"]["num_archipelago"]:config["agents"]["num_archipelago"] + config["agents"]["num_coastal"]],
-            "trawler_names": names[config["agents"]["num_archipelago"] + config["agents"]["num_coastal"]:],
+            "archipelago_names": agent_names[:num_archipelago],
+            "coastal_names": agent_names[
+                num_archipelago: num_archipelago + num_coastal
+            ],
+            "trawler_names": agent_names[num_archipelago + num_coastal:],
         }
-    
-    def get_output_params(self):
-        """Get output configuration parameters"""
-        if self.loaded_config is None:
-            raise ValueError("No configuration loaded")
-        
-        return self.loaded_config["output"]
-    
-    def get_metadata(self):
-        """Get experiment metadata"""
-        if self.loaded_config is None:
-            raise ValueError("No configuration loaded")
-        
-        return self.loaded_config["metadata"]
-    
-    def apply_custom_parameters(self, model):
-        """
-        Apply custom parameter overrides to model.
-        
-        Args:
-            model: FisheryModel instance
-        """
-        if self.loaded_config is None or "parameters" not in self.loaded_config:
-            return
-        
-        params = self.loaded_config["parameters"]
-        
-        fish_dynamics = params.get("fish_dynamics", {})
 
+    def get_output_params(self) -> Dict[str, Any]:
+        """Returns the output configuration parameters.
+
+        Returns:
+            Dictionary from the ``output`` section of the config.
+
+        Raises:
+            ValueError: If no configuration has been loaded.
+        """
+        self._require_loaded()
+        return self.loaded_config["output"]
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """Returns the experiment metadata section.
+
+        Returns:
+            Dictionary from the ``metadata`` section of the config.
+
+        Raises:
+            ValueError: If no configuration has been loaded.
+        """
+        self._require_loaded()
+        return self.loaded_config["metadata"]
+
+    def apply_custom_parameters(self, model: Any) -> None:
+        """Applies custom parameter overrides from the config to a model.
+
+        Overrides ``default_config`` module globals and the
+        corresponding model attributes where applicable.
+
+        Args:
+            model: A ``FisheryModel`` instance to update.
+
+        Raises:
+            ValueError: If ``initial_stock_size`` is not a recognised
+                option.
+        """
+        if not self.loaded_config or "parameters" not in self.loaded_config:
+            return
+
+        params = self.loaded_config["parameters"]
+
+        fish_dynamics = params.get("fish_dynamics", {})
         if "growth_rate" in fish_dynamics:
             default_config.GROWTH_RATE = fish_dynamics["growth_rate"]
 
         if "initial_stock_size" in fish_dynamics:
-            allowed_values = {
-                "random",
-                "carryingCap",
-                "halfCarryingCap",
-                "quartCarryingCap",
-            }
             value = fish_dynamics["initial_stock_size"]
-            if value not in allowed_values:
+            if value not in self._VALID_STOCK_SIZES:
                 raise ValueError(
                     f"Invalid initial_stock_size '{value}'. "
-                    f"Allowed values: {sorted(allowed_values)}"
+                    f"Allowed values: {sorted(self._VALID_STOCK_SIZES)}"
                 )
             default_config.INIT_STOCK_SIZE = value
             model.init_stock_size = value
-                
-        if "economics" in params:
-            eco_params = params["economics"]
-            if "fish_price" in eco_params:
-                default_config.FISH_PRICE = eco_params["fish_price"]
-                model.FISH_PRICE = eco_params["fish_price"]
-                
-        if "weather" in params:
-            weather_params = params["weather"]
-            if "bad_weather_probability" in weather_params:
-                default_config.BAD_WEATHER_PROBABILITY = weather_params["bad_weather_probability"]
-                model.bad_weather_probability = weather_params["bad_weather_probability"]
 
-    def apply_map_configuration(self):
-        """Apply map sources from the loaded configuration."""
+        eco_params = params.get("economics", {})
+        if "fish_price" in eco_params:
+            default_config.FISH_PRICE = eco_params["fish_price"]
+            model.FISH_PRICE = eco_params["fish_price"]
+
+        weather_params = params.get("weather", {})
+        if "bad_weather_probability" in weather_params:
+            prob = weather_params["bad_weather_probability"]
+            default_config.BAD_WEATHER_PROBABILITY = prob
+            model.bad_weather_probability = prob
+
+    def apply_map_configuration(self) -> None:
+        """Applies map sources from the loaded configuration.
+
+        Configures ``ecospace_outputs`` and reloads the spatial
+        configuration in ``default_config``.
+
+        Raises:
+            ValueError: If no configuration has been loaded.
+        """
         if self.loaded_config is None:
             return
 
         map_params = self.get_map_params()
-        species_paths = list(map_params["species_map"]) or None
 
         ecospace_outputs.configure_sources(
             topology_map_path=map_params["topology_map"],
             wind_farm_map_path=map_params["wind_farm_map"],
             species_map_paths=map_params["species_map"],
-
         )
         default_config.reload_spatial_configuration(
             topology_map_path=map_params["topology_map"],
             windfarm_map_path=map_params["wind_farm_map"],
             apply_windfarm=map_params["wind_farm_map"] is not None,
         )
-        
-    def save_config(self, output_path):
-        """
-        Save current configuration to file (for reproducibility).
-        
+
+    def save_config(self, output_path: str) -> None:
+        """Saves the current configuration to a JSON file.
+
+        Adds an ``execution`` block with a timestamp for reproducibility.
+
         Args:
-            output_path: Path to save configuration
+            output_path: Destination file path.
+
+        Raises:
+            ValueError: If no configuration has been loaded.
         """
-        if self.loaded_config is None:
-            raise ValueError("No configuration loaded")
-        
+        self._require_loaded()
+
         config_copy = self.loaded_config.copy()
         config_copy["execution"] = {
             "timestamp": datetime.now().isoformat(),
-            "config_loader_version": "1.0"
+            "config_loader_version": "1.0",
         }
-        
-        with open(output_path, 'w') as f:
+
+        with open(output_path, "w") as f:
             json.dump(config_copy, f, indent=2)
-            
-def load_config(config_path):
-    """
-    Convenience function to load a configuration.
-    
+
+    def _require_loaded(self) -> None:
+        """Raises ``ValueError`` if no configuration has been loaded.
+
+        Raises:
+            ValueError: If ``loaded_config`` is None.
+        """
+        if self.loaded_config is None:
+            raise ValueError(
+                "No configuration loaded. Call load() first."
+            )
+
+
+def load_config(config_path: str) -> ConfigLoader:
+    """Convenience function to load a configuration from a file.
+
     Args:
-        config_path: Path to configuration file
-        
+        config_path: Path to the JSON configuration file.
+
     Returns:
-        ConfigLoader instance with loaded configuration
+        A ``ConfigLoader`` instance with the configuration already loaded.
     """
     loader = ConfigLoader()
     loader.load(config_path)

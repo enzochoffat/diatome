@@ -1,23 +1,24 @@
-"""
-Configuration constants for the FIBE fishery model.
+"""Configuration constants for the FIBE fishery model.
 
-This module centralizes all model parameters, making them easy to modify
+This module centralises all model parameters, making them easy to modify
 for experiments and sensitivity analysis.
 """
 
-import sys 
-from pathlib import Path
-import numpy as np 
 import math
-from typing import List, Optional, Tuple
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
-# Add the project root to Python path so we can import from src
+import numpy as np
+
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.ecospace_outputs import masks, plot_masks
-from src.ecospace_outputs import get_ecospace_data
 from src import ecospace_outputs
+from src.ecospace_outputs import get_ecospace_data
+from src.ecospace_outputs import masks
+from src.ecospace_outputs import plot_masks
+
 
 # =============================================================================
 # TIME CONSTANTS
@@ -29,120 +30,174 @@ SEASON = 84
 HALFYEAR = 168
 YEAR = 365
 
+
 # =============================================================================
 # SPATIAL DEFINITIONS
 # =============================================================================
 
-# Grid dimensions
-GRID_WIDTH = 101
-GRID_HEIGHT = 70
+GRID_WIDTH: int = 0
+GRID_HEIGHT: int = 0
 
-def compute_land_coordinates(topo_matrix):
-    """Compute list of [x, y] coordinates for all LAND cells"""
-    land_coords = []
-    for y in range(len(topo_matrix)):
-        for x in range(len(topo_matrix[y])):
-            if topo_matrix[y][x] == 0 or topo_matrix[y][x] < 1e-29:
-                land_coords.append([x, y])
-    return land_coords
+TOPOLOGY: List[List[int]] = []
+ORIGINAL_TOPOLOGY: List[List[int]] = []
+LAND: List[List[int]] = []
+WATER: List[List[int]] = []
 
-TOPOLOGY = []
-ORIGINAL_TOPOLOGY = []
-LAND = []
-WATER = []
-GRID_HEIGHT = 0
-GRID_WIDTH = 0
-single_slice = 0
-y_min_water = 0
-all_water_depths = []
-max_depth = 0
-min_depth = 0
-percentile_90_depth = 0
-REGION_A = []
-REGION_B = []
-REGION_C = []
-REGION_D = []
+single_slice: int = 0
+y_min_water: int = 0
+all_water_depths: np.ndarray = np.array([])
+max_depth: int = 0
+min_depth: int = 0
+percentile_90_depth: float = 0.0
 
-def add_windfarm_to_topology():
+REGION_A: List[List[int]] = []
+REGION_B: List[List[int]] = []
+REGION_C: List[List[int]] = []
+REGION_D: List[List[int]] = []
+
+
+def compute_land_coordinates(
+    topo_matrix: List[List[float]],
+) -> List[List[int]]:
+    """Computes coordinates of all land cells in the topology matrix.
+
+    A cell is considered land if its value is 0 or below the floating-point
+    threshold 1e-29.
+
+    Args:
+        topo_matrix: 2-D grid of depth/topology values.
+
+    Returns:
+        List of [x, y] coordinate pairs for all land cells.
     """
-    Load Wind Farm topology and merge it with existing TOPOLOGY.
-    Updates LAND zones to include Wind Farm areas.
-    Also recalculates REGION_A/B/C/D with new topology.
+    return [
+        [x, y]
+        for y in range(len(topo_matrix))
+        for x in range(len(topo_matrix[y]))
+        if topo_matrix[y][x] == 0 or topo_matrix[y][x] < 1e-29
+    ]
+
+
+def get_neighbors_by_euclidean_distance(
+    matrix: List[List[int]],
+    center_value: int,
+    radius: int = 7,
+) -> Tuple[List[Tuple[int, int]], List[int]]:
+    """Finds all cells within a given Euclidean distance of a centre value.
+
+    Identifies all grid cells whose value matches ``center_value``, then
+    returns every other positive-valued cell within ``radius`` of at least
+    one such centre.
+
+    Args:
+        matrix: 2-D integer grid.
+        center_value: Grid value used to locate centre cells.
+        radius: Maximum Euclidean distance from any centre cell.
+
+    Returns:
+        A tuple of (indices, values) where indices is a list of (row, col)
+        pairs and values contains the corresponding grid values.
     """
-    try:
-        reload_spatial_configuration(apply_windfarm=True)
-        return TOPOLOGY
-    
-    except Exception as e:
-        print(f"Error loading Wind Farm topology: {e}")
-print(f"  Total water cells: {len(all_water_depths)}")
-
-
-import numpy as np
-
-def get_neighbors_by_euclidean_distance(matrix: List[List[int]], center_value: int, radius: int = 7) -> Tuple[List[Tuple[int, int]], List[int]]:
-
     arr = np.array(matrix)
-
     centers = np.argwhere(arr == center_value)
-    print(f"    [get_neighbors] Looking for center_value={center_value}, found {len(centers)} centers")
+    print(
+        f"    [get_neighbors] Looking for center_value={center_value},"
+        f" found {len(centers)} centers"
+    )
 
     if centers.size == 0:
-        unique_vals = sorted(set(v for row in matrix for v in row if v > 0))[:10]
-        print(f"    [get_neighbors] WARNING: No centers found! Unique values: {unique_vals}...")
+        unique_vals = sorted(
+            {v for row in matrix for v in row if v > 0}
+        )[:10]
+        print(
+            f"    [get_neighbors] WARNING: No centers found!"
+            f" Unique values: {unique_vals}..."
+        )
         return [], []
-    
+
     rows, cols = arr.shape
+    rr, cc = np.meshgrid(
+        np.arange(rows), np.arange(cols), indexing="ij"
+    )
 
-    rr, cc = np.meshgrid(np.arange(rows), np.arange(cols), indexing='ij')
-
-    dists = np.sqrt((rr[..., None] - centers[:, 0])**2 + (cc[..., None] - centers[:, 1])**2)
-
+    dists = np.sqrt(
+        (rr[..., None] - centers[:, 0]) ** 2
+        + (cc[..., None] - centers[:, 1]) ** 2
+    )
     min_dist = np.min(dists, axis=2)
-
     mask = (min_dist <= radius) & (arr != center_value) & (arr > 0)
 
     indices = np.argwhere(mask)
     values = arr[mask]
-
     return indices.tolist(), values.tolist()
 
-def get_neighbors_by_euclidean_distance_as_xy(matrix: List[List[int]], center_value: int, radius: int = 7) -> Tuple[List[List[int]], List[int]]:
-    indices, values = get_neighbors_by_euclidean_distance(matrix, center_value, radius)
+
+def get_neighbors_by_euclidean_distance_as_xy(
+    matrix: List[List[int]],
+    center_value: int,
+    radius: int = 7,
+) -> Tuple[List[List[int]], List[int]]:
+    """Wraps ``get_neighbors_by_euclidean_distance`` returning (x, y) pairs.
+
+    Args:
+        matrix: 2-D integer grid.
+        center_value: Grid value used to locate centre cells.
+        radius: Maximum Euclidean distance from any centre cell.
+
+    Returns:
+        A tuple of (xy_indices, values) where xy_indices is a list of
+        [col, row] pairs (i.e. [x, y]) and values contains the
+        corresponding grid values.
+    """
+    indices, values = get_neighbors_by_euclidean_distance(
+        matrix, center_value, radius
+    )
     xy_indices = [[col, row] for row, col in indices]
     return xy_indices, values
 
 
-def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfarm_map_path: Optional[str] = None, apply_windfarm: bool = False) -> List[List[int]]:
+def reload_spatial_configuration(
+    topology_map_path: Optional[str] = None,
+    windfarm_map_path: Optional[str] = None,
+    apply_windfarm: bool = False,
+) -> List[List[int]]:
+    """Loads and rebuilds all spatial globals from source files.
 
-    #print(f"[DEBUG] Reloading spatial configuration with apply_windfarm={apply_windfarm}")
-    
+    Optionally merges a wind-farm mask into the base topology before
+    deriving region definitions and depth statistics.
+
+    Args:
+        topology_map_path: Optional path to a custom topology raster.
+        windfarm_map_path: Optional path to a wind-farm raster.
+        apply_windfarm: If True, subtracts the wind-farm footprint from
+            the topology, marking those cells as land.
+
+    Returns:
+        The updated TOPOLOGY grid as a 2-D list.
+    """
     global TOPOLOGY, ORIGINAL_TOPOLOGY, LAND, WATER, GRID_HEIGHT, GRID_WIDTH
     global single_slice, y_min_water, all_water_depths
     global max_depth, min_depth, percentile_90_depth
     global REGION_A, REGION_B, REGION_C, REGION_D
 
     if topology_map_path is not None or windfarm_map_path is not None:
-        ecospace_outputs.configure_sources(topology_map_path=topology_map_path, wind_farm_map_path=windfarm_map_path)
-        #print(f"[DEBUG] Configured sources: topology_map_path={topology_map_path}, windfarm_map_path={windfarm_map_path}")
+        ecospace_outputs.configure_sources(
+            topology_map_path=topology_map_path,
+            wind_farm_map_path=windfarm_map_path,
+        )
 
-    base_topology = np.array(masks(topology=True, windfarm=False)["masks"][0])
-    #plot_masks(masks=[base_topology], title="Base Topology (without Wind Farm)")
+    base_topology = np.array(
+        masks(topology=True, windfarm=False)["masks"][0]
+    )
     original_topology = base_topology.copy()
 
     if apply_windfarm:
         wf = np.array(masks(topology=False, windfarm=True)["masks"][0])
-        #plot_masks(masks=[wf], title="Wind Farm Topology")
-
         h, w = base_topology.shape
         wf_resized = np.zeros_like(base_topology)
-
         h_wf, w_wf = wf.shape
-        wf_resized[:min(h, h_wf), :min(w, w_wf)] = wf[:h, :w]
-        #plot_masks(masks=[wf_resized], title="Resized Wind Farm Topology")
-
-        base_topology = np.where((wf_resized == 1), 0, base_topology)
-        #plot_masks(masks=[base_topology], title="Final Topology (with Wind Farm)")
+        wf_resized[: min(h, h_wf), : min(w, w_wf)] = wf[:h, :w]
+        base_topology = np.where(wf_resized == 1, 0, base_topology)
 
     TOPOLOGY = base_topology.tolist()
     ORIGINAL_TOPOLOGY = original_topology.tolist()
@@ -150,12 +205,13 @@ def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfa
     GRID_HEIGHT, GRID_WIDTH = base_topology.shape
     single_slice = GRID_HEIGHT // 4
 
-    water_mask = base_topology >= 0
     positive_mask = base_topology > 0
-
-    WATER = [row[row >= 0].tolist() for row in base_topology if np.any(row >= 0)]
+    WATER = [
+        row[row >= 0].tolist()
+        for row in base_topology
+        if np.any(row >= 0)
+    ]
     all_water_depths = base_topology[positive_mask]
-
     y_min_water = int(np.min(WATER[-1])) if WATER else 0
 
     if all_water_depths.size > 0:
@@ -163,7 +219,8 @@ def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfa
         min_depth = int(np.min(all_water_depths))
         percentile_90_depth = float(np.percentile(all_water_depths, 90))
     else:
-        max_depth = min_depth = percentile_90_depth = 0
+        max_depth = min_depth = 0
+        percentile_90_depth = 0.0
 
     LAND = compute_land_coordinates(TOPOLOGY)
 
@@ -177,138 +234,159 @@ def reload_spatial_configuration(topology_map_path: Optional[str] = None, windfa
     set_c = {tuple(cell) for cell in REGION_C}
     set_d = {tuple(cell) for cell in REGION_D}
 
-
     set_c -= set_d
-    set_b -= (set_c | set_d)
-    set_a -= (set_b | set_c | set_d)
+    set_b -= set_c | set_d
+    set_a -= set_b | set_c | set_d
 
     REGION_A = list(set_a)
     REGION_B = list(set_b)
     REGION_C = list(set_c)
     REGION_D = list(set_d)
 
-    print(f"[DEBUG] After removing overlaps:")
+    print("[DEBUG] After removing overlaps:")
     print(f"  REGION_A: {len(REGION_A)} cells")
     print(f"  REGION_B: {len(REGION_B)} cells")
     print(f"  REGION_C: {len(REGION_C)} cells")
     print(f"  REGION_D: {len(REGION_D)} cells")
-
-    print(f"[DEBUG] Loaded topology: GRID_WIDTH={GRID_WIDTH}, GRID_HEIGHT={GRID_HEIGHT}")
+    print(
+        f"[DEBUG] Loaded topology:"
+        f" GRID_WIDTH={GRID_WIDTH}, GRID_HEIGHT={GRID_HEIGHT}"
+    )
     print("[DEBUG] Depth calculation:")
     print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
     print(f"  percentile_90_depth = {percentile_90_depth}")
     print(f"  Total water cells: {all_water_depths.size}")
 
-    #plot_masks(masks=[np.array(TOPOLOGY)], title="Final Topology (with Wind Farm)" if apply_windfarm else "Final Topology")
-
     return TOPOLOGY
 
 
-def define_region(REGION_NAME, topology_matrix=None) :
+def define_region(
+    region_name: str,
+    topology_matrix: Optional[List[List[int]]] = None,
+) -> List[List[int]]:
+    """Defines the set of grid cells belonging to a named fishing region.
+
+    Region boundaries are derived from depth percentiles of the global
+    topology. The four regions correspond to increasing depth bands:
+    A (shallow) → D (deep).
+
+    Args:
+        region_name: One of ``"A"``, ``"B"``, ``"C"``, or ``"D"``.
+        topology_matrix: Topology grid to use. Defaults to ``TOPOLOGY``.
+
+    Returns:
+        List of [x, y] cell coordinates that fall within the region.
+    """
     if topology_matrix is None:
         topology_matrix = TOPOLOGY
-    
-    if REGION_NAME == 'A' : 
-        center_value = min_depth
-        radius = (max_depth - min_depth)/4
-    elif REGION_NAME == 'B' : 
-        center_value = 3*(max_depth - min_depth)/8 + min_depth
-        radius = (max_depth - min_depth)/4
-    elif REGION_NAME == 'C' : 
-        center_value = 4*(max_depth - min_depth)/8 + min_depth
-        radius = (max_depth - min_depth)/6
-    elif REGION_NAME == 'D' : 
-        center_value = max_depth - 5
-        radius = (max_depth - min_depth)/6
-    
-    # Convert to int to match TOPOLOGY values
-    center_value = int(round(center_value))
-    
-    # DEBUG: Print center value details
-    print(f"\n[DEBUG] Region {REGION_NAME}:")
-    print(f"  center_value = {center_value} (type: {type(center_value).__name__})")
+
+    depth_range = max_depth - min_depth
+
+    region_params: Dict[str, Tuple[float, float]] = {
+        "A": (float(min_depth), depth_range / 3),
+        "B": (depth_range / 3, depth_range / 6),
+        "C": (6 * depth_range / 8 + min_depth, depth_range / 6),
+        "D": (float(max_depth - 5), depth_range / 6),
+    }
+
+    center_value_f, radius = region_params[region_name]
+    center_value = int(round(center_value_f))
+
+    print(f"\n[DEBUG] Region {region_name}:")
+    print(
+        f"  center_value = {center_value}"
+        f" (type: {type(center_value).__name__})"
+    )
     print(f"  min_depth = {min_depth}, max_depth = {max_depth}")
-    
-    result_indices, result_values = get_neighbors_by_euclidean_distance_as_xy(topology_matrix, center_value, radius = radius)
-    
+
+    result_indices, result_values = get_neighbors_by_euclidean_distance_as_xy(
+        topology_matrix, center_value, radius=radius
+    )
+
     print(f"  Found {len(result_indices)} cells in the region")
     if result_indices:
-        print(f"  Values in region: min={min(result_values)}, max={max(result_values)}")
-    
+        print(
+            f"  Values in region:"
+            f" min={min(result_values)}, max={max(result_values)}"
+        )
+
     return result_indices
+
 
 reload_spatial_configuration()
 
-
-print(f"\n[DEBUG] After removing overlaps:")
+print("\n[DEBUG] After removing overlaps:")
 print(f"  REGION_A: {len(REGION_A)} cells")
 print(f"  REGION_B: {len(REGION_B)} cells")
 print(f"  REGION_C: {len(REGION_C)} cells")
 print(f"  REGION_D: {len(REGION_D)} cells")
 
+
 # =============================================================================
 # HOTSPOT LOCATIONS
 # =============================================================================
 
-# High-density fishing spots (coordinates [x, y])
+def get_hotspots_for_step(
+    step: int,
+    region_name: str,
+) -> List[Tuple[int, int]]:
+    """Returns the top-3 hotspots for a region at a given simulation step.
 
-def get_hotspots_for_step(step, region_name):
+    Each Ecospace date corresponds to 30 model steps. If Ecospace data are
+    unavailable the function falls back to raw topology values.
+
+    Args:
+        step: Current simulation step.
+        region_name: One of ``"A"``, ``"B"``, ``"C"``, or ``"D"``.
+
+    Returns:
+        List of up to 3 (x, y) coordinate pairs with the highest fish
+        concentration, spaced at least 10 units apart.
     """
-    Retourne les 2 hotspots avec la plus haute concentration pour une région à un step donné.
-    Chaque date Ecospace = 30 steps du modèle.
-    La première date Ecospace correspond à step 0.
-    Si Ecospace n'est pas disponible, utilise les valeurs de TOPOLOGY pour trouver les hotspots.
-    """
-    # Sélectionner la région
     region_map = {
-        'A': REGION_A,
-        'B': REGION_B,
-        'C': REGION_C,
-        'D': REGION_D
+        "A": REGION_A,
+        "B": REGION_B,
+        "C": REGION_C,
+        "D": REGION_D,
     }
     region = region_map.get(region_name, [])
-    #print(f"\n[DEBUG] Getting hotspots for region {region_name} at step {step}")
-    
+
     if not region:
         return []
-    
-    # Essayer d'utiliser Ecospace si disponible
+
     if ecospace_outputs._ecospace_data_cache is not None:
         try:
-            ecospace_data, species_names = ecospace_outputs.get_ecospace_data()
-            #print(f"{ecospace_data.shape} is the shape of the ecospace data")
-            sum_data = np.sum(ecospace_data, axis=2)  # Sum across species to get total concentration
+            ecospace_data, _ = ecospace_outputs.get_ecospace_data()
+            sum_data = np.sum(ecospace_data, axis=2)
+
             if sum_data is not None:
-                date_index = step // 30
-                
-                # Gestion des limites
-                #if date_index >= len(ecospace_data['maps']['map']):
-                #   date_index = len(ecospace_data['maps']['map']) - 1
-                
                 fish_map = np.array(sum_data)
-                
-                # Trouver les 2 points avec les plus hautes concentrations
-                top_coords = sorted(region, key=lambda xy: fish_map[xy[1]][xy[0]], reverse=True)
-                hotspots = []
+                top_coords = sorted(
+                    region,
+                    key=lambda xy: fish_map[xy[1]][xy[0]],
+                    reverse=True,
+                )
+                hotspots: List[Tuple[int, int]] = []
 
                 for x, y in top_coords:
                     if all(
-                        ((x - hx) ** 2 + (y - hy) ** 2) >= 10 ** 2
+                        (x - hx) ** 2 + (y - hy) ** 2 >= 10 ** 2
                         for hx, hy in hotspots
                     ):
                         hotspots.append((x, y))
-                        
                     if len(hotspots) == 3:
                         break
-                #print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
+
                 if len(hotspots) == 3:
-                    #print(f"  Hotspots for region {region_name} at step {step}: {hotspots}")
                     return hotspots
-        except Exception as e:
+        except Exception:
             pass
-    
-    # Fallback: utiliser les valeurs TOPOLOGY pour trouver les hotspots
-    top_coords = sorted(region, key=lambda xy: TOPOLOGY[xy[1]][xy[0]], reverse=True)[:3]
+
+    top_coords = sorted(
+        region,
+        key=lambda xy: TOPOLOGY[xy[1]][xy[0]],
+        reverse=True,
+    )[:3]
     return top_coords
 
 
@@ -327,192 +405,179 @@ LOW_MEDIUM = "low_medium"
 # FISH STOCK PARAMETERS
 # =============================================================================
 
-# Growth rate (annual logistic growth)
-GROWTH_RATE = 1.0  # 10% per year
+GROWTH_RATE = 1.0
 
-# Carrying capacities by density level (fish per patch)
-LOW_CARRYING_CAPACITY = 4           # Poor patch
-MEDIUM_CARRYING_CAPACITY = 3276     # Medium patch
-HIGH_CARRYING_CAPACITY = 8736     # Rich patch (hotspot)
+LOW_CARRYING_CAPACITY = 4
+MEDIUM_CARRYING_CAPACITY = 3276
+HIGH_CARRYING_CAPACITY = 8736
 
-# Regional carrying capacities (total fish)
-# NOTE: These are recalculated at model init based on actual patch distribution
-CARRYING_CAPACITY_A_INITIAL = 219000    # Archipelago
-CARRYING_CAPACITY_B_INITIAL = 438000    # Coastal 1
-CARRYING_CAPACITY_C_INITIAL = 876000    # Coastal 2
-CARRYING_CAPACITY_D_INITIAL = 876000    # Open sea
+CARRYING_CAPACITY_A_INITIAL = 219000
+CARRYING_CAPACITY_B_INITIAL = 438000
+CARRYING_CAPACITY_C_INITIAL = 876000
+CARRYING_CAPACITY_D_INITIAL = 876000
 
 INIT_STOCK_SIZE = "halfCarryingCap"
+
 
 # =============================================================================
 # ECONOMIC PARAMETERS
 # =============================================================================
 
-# Fish market price (SEK per fish)
 FISH_PRICE = 1.0
-
-# Initial capital for all fisher types (SEK)
 INITIAL_CAPITAL = 1000
 
-# Age range for fishers
 MIN_AGE = 18
 MAX_AGE = 65
 
-# Bankruptcy parameters
-BANKRUPTCY_THRESHOLD_YEARS = 1          # Years of existence costs before bankruptcy
-BANKRUPTCY_LAYLOW_DAYS = 30             # Days to lay low after bankruptcy
-NEGATIVE_CAPITAL_LAYLOW_PROBABILITY = 0.3  # Probability to lay low when capital < 0
-NEGATIVE_CAPITAL_LAYLOW_DAYS = 7        # Days to lay low when capital < 0
+BANKRUPTCY_THRESHOLD_YEARS = 1
+BANKRUPTCY_LAYLOW_DAYS = 30
+NEGATIVE_CAPITAL_LAYLOW_PROBABILITY = 0.3
+NEGATIVE_CAPITAL_LAYLOW_DAYS = 7
+SAFETY_BUFFER_DAYS = 7
 
-# Financial safety buffer
-SAFETY_BUFFER_DAYS = 7                  # Days of existence costs to keep as buffer
 
 # =============================================================================
 # FISHER TYPE: ARCHIPELAGO
 # =============================================================================
 
-ARCHIPELAGO_COST_EXISTENCE = 0.5      # Daily existence cost (SEK)
-ARCHIPELAGO_COST_ACTIVITY = 0.5       # Fishing activity cost (SEK)
-ARCHIPELAGO_CATCHABILITY = 5          # Fish caught per day
+ARCHIPELAGO_COST_EXISTENCE = 0.5
+ARCHIPELAGO_COST_ACTIVITY = 0.5
+ARCHIPELAGO_CATCHABILITY = 5
 ARCHIPELAGO_ACCESSIBLE_REGIONS = ["A"]
-ARCHIPELAGO_MAX_GOOD_SPOTS = 5        # Memory capacity for good spots
+ARCHIPELAGO_MAX_GOOD_SPOTS = 5
+
 
 # =============================================================================
 # FISHER TYPE: COASTAL
 # =============================================================================
 
-COASTAL_COST_EXISTENCE = 1.0          # Daily existence cost (SEK)
-COASTAL_COST_ACTIVITY = 1.0           # Fishing activity cost (SEK)
-COASTAL_CATCHABILITY = 10             # Fish caught per day
+COASTAL_COST_EXISTENCE = 1.0
+COASTAL_COST_ACTIVITY = 1.0
+COASTAL_CATCHABILITY = 10
 COASTAL_ACCESSIBLE_REGIONS = ["A", "B"]
-COASTAL_MAX_GOOD_SPOTS = 3            # Memory capacity for good spots
+COASTAL_MAX_GOOD_SPOTS = 3
+
 
 # =============================================================================
 # FISHER TYPE: TRAWLER
 # =============================================================================
 
-TRAWLER_COST_EXISTENCE = 5.0          # Daily existence cost (SEK)
-TRAWLER_COST_ACTIVITY = 5.0           # Fishing activity cost (SEK)
-TRAWLER_CATCHABILITY = 50             # Fish caught per day
+TRAWLER_COST_EXISTENCE = 5.0
+TRAWLER_COST_ACTIVITY = 5.0
+TRAWLER_CATCHABILITY = 50
 TRAWLER_ACCESSIBLE_REGIONS = ["B", "C", "D"]
-TRAWLER_MAX_GOOD_SPOTS = 2            # Memory capacity for good spots
-TRAWLER_STORAGE_CAPACITY = 50       # Fish storage capacity
+TRAWLER_MAX_GOOD_SPOTS = 2
+TRAWLER_STORAGE_CAPACITY = 50
+
 
 # =============================================================================
 # TRAVEL COSTS
 # =============================================================================
 
-LOW_COST_TRAVEL = 2.5                 # Travel to Region A (SEK)
-MEDIUM_COST_TRAVEL = 5.0              # Travel to Region B (SEK)
-MEDIUM_COST_TRAVEL_BIGVESSEL = 8.0    # Travel to Region B (trawler) (SEK)
-HIGH_COST_TRAVEL = 15.0               # Travel to Region C or D (SEK)
-
-# Inter-region travel cost multiplier
-INTER_REGION_TRAVEL_MULTIPLIER = 0.5  # Cheaper to switch between regions
-
-# Travel cost per unit distance (for calculate_travel_cost)
+LOW_COST_TRAVEL = 2.5
+MEDIUM_COST_TRAVEL = 5.0
+MEDIUM_COST_TRAVEL_BIGVESSEL = 8.0
+HIGH_COST_TRAVEL = 15.0
+INTER_REGION_TRAVEL_MULTIPLIER = 0.5
 TRAVEL_COST_PER_UNIT = 1.0
+
 
 # =============================================================================
 # DECISION-MAKING PARAMETERS
 # =============================================================================
 
-# Memory settings
-DEFAULT_MEMORY_SIZE = 365              # Remember last N fishing trips
-SPATIAL_MEMORY_MAX_AGE = 365 * 1      # Forget spots after 1 years
+DEFAULT_MEMORY_SIZE = 365
+SPATIAL_MEMORY_MAX_AGE = 365 * 1
 
-# Decision thresholds (coastal)
 SATISFACTION_HOME_THRESHOLD = 0.5
 SATISFACTION_GROWTH_THRESHOLD = 0.5
 SCARCE_PERCEPTION_THRESHOLD = -0.05
 
-# Good spot criteria
-GOOD_SPOT_EFFICIENCY_THRESHOLD = 0.7  # Catch must be 70% of expected
+GOOD_SPOT_EFFICIENCY_THRESHOLD = 0.7
+SIMPLE_FISHING_PROBABILITY = 0.5
 
-# Simple decision probability (for testing)
-SIMPLE_FISHING_PROBABILITY = 0.5    # Probability to fish in simple mode
+MEMORY_RECENT_WINDOW = 5
+MEMORY_OLDER_WINDOW = 10
+MEMORY_WEEKLY_WINDOW = 7
+MEMORY_BIWEEKLY_WINDOW = 14
+MEMORY_MONTHLY_WINDOW = 30
 
-# Memory windows for perception
-MEMORY_RECENT_WINDOW = 5              # Last N trips for recent catches
-MEMORY_OLDER_WINDOW = 10              # N trips before recent for comparison
-MEMORY_WEEKLY_WINDOW = 7              # Last week for revenue calculation
-MEMORY_BIWEEKLY_WINDOW = 14           # Two weeks for satisfaction calculation
-MEMORY_MONTHLY_WINDOW = 30            # One month for regional estimates
-
-# Scarcity perception
-SCARCITY_CATCH_RATIO_THRESHOLD = 0.5  # Catch below 50% of expected = scarcity
-SCARCITY_MIN_MEMORY = 10              # Minimum trips needed to perceive scarcity
-
-# Exploration phase
-EXPLORATION_PHASE_TRIPS = 5           # Number of trips before normal decision-making
-
+SCARCITY_CATCH_RATIO_THRESHOLD = 0.5
+SCARCITY_MIN_MEMORY = 10
+EXPLORATION_PHASE_TRIPS = 5
 
 TRAWLER_PROFIT_THRESHOLD_DAYS = 1
+
+
 # =============================================================================
 # WEATHER PARAMETERS
 # =============================================================================
 
-BAD_WEATHER_PROBABILITY = 0.1         # 10% chance of bad weather per day
+BAD_WEATHER_PROBABILITY = 0.1
+
 
 # =============================================================================
-# HELPER FUNCTIONS
+# SOCIAL ATTRIBUTES
 # =============================================================================
 
-# Social attributes
-PARTNER_PROBABILITY = 0.5 
-
+PARTNER_PROBABILITY = 0.5
 SD_CARCAP = 0.1
 HOTSPOT_HIGH_RADIUS = 1.5
 HOTSPOT_MEDIUM_RADIUS = 3.0
 
 
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
 
-def get_region_initial_capacity(region_name):
-    """
-    Get initial carrying capacity for a region.
-    
+def get_region_initial_capacity(region_name: str) -> int:
+    """Returns the initial carrying capacity for a named region.
+
     Args:
-        region_name (str): Region identifier (A, B, C, D)
-        
+        region_name: Region identifier, one of ``"A"``, ``"B"``,
+            ``"C"``, ``"D"``, ``"LAND"``, or ``"NULL"``.
+
     Returns:
-        int: Initial carrying capacity
+        Initial carrying capacity (fish count). Returns 0 for unknown
+        or non-fishing regions.
     """
-    capacities = {
+    capacities: Dict[str, int] = {
         "A": CARRYING_CAPACITY_A_INITIAL,
         "B": CARRYING_CAPACITY_B_INITIAL,
         "C": CARRYING_CAPACITY_C_INITIAL,
         "D": CARRYING_CAPACITY_D_INITIAL,
         "LAND": 0,
-        "NULL": 0
+        "NULL": 0,
     }
     return capacities.get(region_name, 0)
 
 
-def get_msy_stock(carrying_capacity):
-    """
-    Calculate Maximum Sustainable Yield stock level.
-    MSY occurs at 50% of carrying capacity (K/2).
-    
+def get_msy_stock(carrying_capacity: int) -> int:
+    """Calculates the Maximum Sustainable Yield stock level.
+
+    MSY occurs at 50 % of carrying capacity (K/2).
+
     Args:
-        carrying_capacity (int): Total carrying capacity
-        
+        carrying_capacity: Total carrying capacity of the region.
+
     Returns:
-        int: MSY stock level
+        MSY stock level (rounded to the nearest integer).
     """
     return round(carrying_capacity / 2)
 
 
-def get_fisher_config(fisher_type):
-    """
-    Get all configuration parameters for a fisher type.
-    
+def get_fisher_config(fisher_type: str) -> Dict:
+    """Returns all configuration parameters for a given fisher type.
+
     Args:
-        fisher_type (str): "archipelago", "coastal", or "trawler"
-        
+        fisher_type: One of ``"archipelago"``, ``"coastal"``,
+            or ``"trawler"``.
+
     Returns:
-        dict: Configuration dictionary
+        Dictionary of configuration values. Returns an empty dict if
+        the fisher type is not recognised.
     """
-    configs = {
+    configs: Dict[str, Dict] = {
         "archipelago": {
             "cost_existence": ARCHIPELAGO_COST_EXISTENCE,
             "cost_activity": ARCHIPELAGO_COST_ACTIVITY,
@@ -536,135 +601,159 @@ def get_fisher_config(fisher_type):
             "accessible_regions": TRAWLER_ACCESSIBLE_REGIONS,
             "max_good_spots": TRAWLER_MAX_GOOD_SPOTS,
             "storage_capacity": TRAWLER_STORAGE_CAPACITY,
-        }
+        },
     }
     return configs.get(fisher_type, {})
 
 
-def get_travel_cost(region, fisher_type="coastal"):
-    """
-    Calculate travel cost to a region.
-    
+def get_travel_cost(
+    region: str,
+    fisher_type: str = "coastal",
+) -> float:
+    """Calculates the travel cost to reach a region.
+
     Args:
-        region (str): Target region (A, B, C, D)
-        fisher_type (str): Fisher type (affects cost for region B)
-        
+        region: Target region, one of ``"A"``, ``"B"``, ``"C"``,
+            or ``"D"``.
+        fisher_type: Fisher type; affects cost for region ``"B"``
+            (trawlers pay more).
+
     Returns:
-        float: Travel cost in SEK
+        Travel cost in SEK. Returns 0.0 for unrecognised regions.
     """
     if region == "A":
         return LOW_COST_TRAVEL
-    elif region == "B":
-        if fisher_type == "trawler":
-            return MEDIUM_COST_TRAVEL_BIGVESSEL
-        else:
-            return MEDIUM_COST_TRAVEL
-    elif region in ["C", "D"]:
+    if region == "B":
+        return (
+            MEDIUM_COST_TRAVEL_BIGVESSEL
+            if fisher_type == "trawler"
+            else MEDIUM_COST_TRAVEL
+        )
+    if region in {"C", "D"}:
         return HIGH_COST_TRAVEL
-    else:
-        return 0
+    return 0.0
 
-def get_bankruptcy_threshold(cost_existence):
-    """
-    Calculate bankruptcy threshold for a fisher.
-    
+
+def get_bankruptcy_threshold(cost_existence: float) -> float:
+    """Calculates the negative-capital threshold that triggers bankruptcy.
+
     Args:
-        cost_existence (float): Daily existence cost
-        
+        cost_existence: Daily existence cost for the fisher (SEK).
+
     Returns:
-        float: Negative capital threshold for bankruptcy
+        The (negative) capital level below which the fisher is bankrupt.
     """
     return -(cost_existence * YEAR * BANKRUPTCY_THRESHOLD_YEARS)
 
-def get_safety_buffer(cost_existence):
-    """
-    Calculate safety buffer for trip affordability.
-    
+
+def get_safety_buffer(cost_existence: float) -> float:
+    """Calculates the capital safety buffer for trip-affordability checks.
+
     Args:
-        cost_existence (float): Daily existence cost
-        
+        cost_existence: Daily existence cost for the fisher (SEK).
+
     Returns:
-        float: Safety buffer amount
+        Safety buffer amount in SEK.
     """
     return cost_existence * SAFETY_BUFFER_DAYS
+
 
 # =============================================================================
 # CONFIGURATION VALIDATION
 # =============================================================================
 
-def validate_config():
-    """
-    Validate configuration parameters for consistency.
-    
+def validate_config() -> None:
+    """Validates all configuration parameters for internal consistency.
+
     Raises:
-        ValueError: If configuration is invalid
+        AssertionError: If any parameter violates its constraint.
     """
-    # Check positive values
     assert GROWTH_RATE > 0, "Growth rate must be positive"
     assert FISH_PRICE > 0, "Fish price must be positive"
     assert INITIAL_CAPITAL > 0, "Initial capital must be positive"
-    
-    # Check age range
+
     assert MIN_AGE < MAX_AGE, "MIN_AGE must be less than MAX_AGE"
     assert MIN_AGE >= 0, "MIN_AGE must be non-negative"
-    
-    # Check costs
+
     assert ARCHIPELAGO_COST_EXISTENCE > 0, "Existence costs must be positive"
     assert COASTAL_COST_EXISTENCE > 0, "Existence costs must be positive"
     assert TRAWLER_COST_EXISTENCE > 0, "Existence costs must be positive"
-    
-    # Check catchabilities
+
     assert ARCHIPELAGO_CATCHABILITY > 0, "Catchability must be positive"
     assert COASTAL_CATCHABILITY > 0, "Catchability must be positive"
     assert TRAWLER_CATCHABILITY > 0, "Catchability must be positive"
-    
-    # Check grid dimensions
-    assert GRID_WIDTH > 0 and GRID_HEIGHT > 0, "Grid dimensions must be positive"
-    
-    # Check thresholds
-    assert 0 <= GOOD_SPOT_EFFICIENCY_THRESHOLD <= 1, "Efficiency threshold must be in [0,1]"
-    assert 0 <= SATISFACTION_HOME_THRESHOLD <= 1, "Satisfaction thresholds must be in [0,1]"
-    assert 0 <= SATISFACTION_GROWTH_THRESHOLD <= 1, "Satisfaction thresholds must be in [0,1]"
-    
-    # Check probabilities
-    assert 0 <= BAD_WEATHER_PROBABILITY <= 1, "Weather probability must be in [0,1]"
-    assert 0 <= SIMPLE_FISHING_PROBABILITY <= 1, "Fishing probability must be in [0,1]"
-    assert 0 <= NEGATIVE_CAPITAL_LAYLOW_PROBABILITY <= 1, "Laylow probability must be in [0,1]"
-    
-    assert INIT_STOCK_SIZE in {"random", "halfCarryingCap", "carryingCap", "quartCarryingCap"}, "Invalid initial stock size option"
+
+    assert GRID_WIDTH > 0 and GRID_HEIGHT > 0, (
+        "Grid dimensions must be positive"
+    )
+
+    assert 0 <= GOOD_SPOT_EFFICIENCY_THRESHOLD <= 1, (
+        "Efficiency threshold must be in [0,1]"
+    )
+    assert 0 <= SATISFACTION_HOME_THRESHOLD <= 1, (
+        "Satisfaction thresholds must be in [0,1]"
+    )
+    assert 0 <= SATISFACTION_GROWTH_THRESHOLD <= 1, (
+        "Satisfaction thresholds must be in [0,1]"
+    )
+
+    assert 0 <= BAD_WEATHER_PROBABILITY <= 1, (
+        "Weather probability must be in [0,1]"
+    )
+    assert 0 <= SIMPLE_FISHING_PROBABILITY <= 1, (
+        "Fishing probability must be in [0,1]"
+    )
+    assert 0 <= NEGATIVE_CAPITAL_LAYLOW_PROBABILITY <= 1, (
+        "Laylow probability must be in [0,1]"
+    )
+
+    valid_stock_sizes = {
+        "random", "halfCarryingCap", "carryingCap", "quartCarryingCap"
+    }
+    assert INIT_STOCK_SIZE in valid_stock_sizes, (
+        "Invalid initial stock size option"
+    )
     print("Configuration validated successfully")
 
 
 if __name__ == "__main__":
-    # Run validation when module is executed directly
     validate_config()
-    
-    # Print summary
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("FIBE MODEL CONFIGURATION SUMMARY")
-    print("="*60)
+    print("=" * 60)
     print(f"\nGrid: {GRID_WIDTH} × {GRID_HEIGHT}")
-    print(f"Growth rate: {GROWTH_RATE*100}% per year")
+    print(f"Growth rate: {GROWTH_RATE * 100}% per year")
     print(f"Fish price: {FISH_PRICE} SEK")
     print(f"Initial capital: {INITIAL_CAPITAL} SEK")
-    
+
     print("\nFisher types:")
     for ftype in ["archipelago", "coastal", "trawler"]:
         cfg = get_fisher_config(ftype)
-        print(f"  {ftype.capitalize():12} - Catchability: {cfg['catchability']:3}, "
-              f"Existence: {cfg['cost_existence']:.1f} SEK, "
-              f"Regions: {', '.join(cfg['accessible_regions'])}")
-    
+        print(
+            f"  {ftype.capitalize():12} -"
+            f" Catchability: {cfg['catchability']:3},"
+            f" Existence: {cfg['cost_existence']:.1f} SEK,"
+            f" Regions: {', '.join(cfg['accessible_regions'])}"
+        )
+
     print("\nRegional capacities (initial):")
     for region in ["A", "B", "C", "D"]:
         cap = get_region_initial_capacity(region)
         msy = get_msy_stock(cap)
-        print(f"  Region {region}: {cap:>9,} fish (MSY: {msy:>9,})")
-    
+        print(
+            f"  Region {region}: {cap:>9,} fish (MSY: {msy:>9,})"
+        )
+
     print("\nDecision-making parameters:")
     print(f"  Memory size: {DEFAULT_MEMORY_SIZE} trips")
-    print(f"  Satisfaction thresholds: home={SATISFACTION_HOME_THRESHOLD}, growth={SATISFACTION_GROWTH_THRESHOLD}")
-    print(f"  Good spot efficiency: {GOOD_SPOT_EFFICIENCY_THRESHOLD:.0%}")
+    print(
+        f"  Satisfaction thresholds:"
+        f" home={SATISFACTION_HOME_THRESHOLD},"
+        f" growth={SATISFACTION_GROWTH_THRESHOLD}"
+    )
+    print(
+        f"  Good spot efficiency: {GOOD_SPOT_EFFICIENCY_THRESHOLD:.0%}"
+    )
     print(f"  Scarcity threshold: {SCARCE_PERCEPTION_THRESHOLD}")
-    
-    print("="*60)
+    print("=" * 60)

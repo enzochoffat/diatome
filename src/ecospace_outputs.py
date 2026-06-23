@@ -1,23 +1,63 @@
-import sys
-import os
+"""Ecospace output utilities for the FIBE fishery model.
+
+Provides functions to load, cache, and visualise spatial data from
+Ecospace CSV exports (topology, wind-farm, and species maps).
+"""
+
 import csv
+import os
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path 
 import tkinter as tk
 from tkinter import filedialog
 
-_ecospace_data_cache = None
+
+# ---------------------------------------------------------------------------
+# Module-level state
+# ---------------------------------------------------------------------------
+
+_ecospace_data_cache: Optional[Tuple[np.ndarray, List[str]]] = None
+
 _PROJECT_ROOT = Path(__file__).parent.parent
-TOPOLOGY_MAP_PATH = str(_PROJECT_ROOT / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Depth.csv')
-WINDFARM_MAP_PATH = str(_PROJECT_ROOT / 'Ecospace_outputs/topology/EEC_NS_Mmermaid-Windfarms.csv')
-SPECIES_MAP_PATHS = None
-SPECIES_MAP_NAMES = None
+
+TOPOLOGY_MAP_PATH: str = str(
+    _PROJECT_ROOT / "Ecospace_outputs/topology/EEC_NS_Mmermaid-Depth.csv"
+)
+WINDFARM_MAP_PATH: str = str(
+    _PROJECT_ROOT
+    / "Ecospace_outputs/topology/EEC_NS_Mmermaid-Windfarms.csv"
+)
+SPECIES_MAP_PATHS: Optional[Dict[str, str]] = None
+SPECIES_MAP_NAMES: Optional[List[str]] = None
 
 
-def configure_sources(topology_map_path=None, wind_farm_map_path=None, species_map_paths=None):
-    """Configure the CSV sources used by the module."""
-    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, _ecospace_data_cache
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+def configure_sources(
+    topology_map_path: Optional[str] = None,
+    wind_farm_map_path: Optional[str] = None,
+    species_map_paths: Optional[Dict[str, str]] = None,
+) -> None:
+    """Configures the CSV sources used by the module.
+
+    Updates the relevant module-level path globals and refreshes the
+    Ecospace data cache so subsequent calls use the new sources.
+
+    Args:
+        topology_map_path: Path to the topology CSV file. If None, the
+            current value is kept.
+        wind_farm_map_path: Path to the wind-farm CSV file. If None,
+            the current value is kept.
+        species_map_paths: Mapping of species name to CSV file path.
+            If None, the current value is kept.
+    """
+    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS
+    global _ecospace_data_cache
 
     if topology_map_path is not None:
         TOPOLOGY_MAP_PATH = str(topology_map_path)
@@ -26,166 +66,227 @@ def configure_sources(topology_map_path=None, wind_farm_map_path=None, species_m
     if species_map_paths is not None:
         SPECIES_MAP_PATHS = species_map_paths
 
+    _ecospace_data_cache = get_ecospace_data()
 
-    _ecospace_data_cache = get_ecospace_data()  # Refresh cache when sources are configured
 
-def choose_csv_file():
-    """
-    Ouvre une fenêtre pour sélectionner un ou plusieurs fichiers CSV.
-    Retourne une liste des chemins absolus des fichiers sélectionnés.
-    Retourne une liste vide si aucun fichier n’est sélectionné.
+# ---------------------------------------------------------------------------
+# File selection
+# ---------------------------------------------------------------------------
+
+def choose_csv_file() -> List[str]:
+    """Opens a dialog for the user to select one or more CSV files.
+
+    Returns:
+        List of absolute paths to the selected files, or an empty list
+        if the user cancels the dialog.
     """
     root = tk.Tk()
-    root.withdraw()  # Masque la fenêtre principale
+    root.withdraw()
 
     file_paths = filedialog.askopenfilenames(
         title="Sélectionnez un ou plusieurs fichiers CSV",
-        filetypes=[("Fichiers CSV", "*.csv"), ("Tous les fichiers", "*.*")]
+        filetypes=[
+            ("Fichiers CSV", "*.csv"),
+            ("Tous les fichiers", "*.*"),
+        ],
     )
 
-    # Convertit en chemins absolus et filtre les chaînes vides
-    file_paths = [os.path.abspath(p) for p in file_paths] if file_paths else []
+    return (
+        [os.path.abspath(p) for p in file_paths] if file_paths else []
+    )
 
 
-    return file_paths
+# ---------------------------------------------------------------------------
+# Parsing helpers
+# ---------------------------------------------------------------------------
 
-def safe_float(s):
-    "Retourne un float si possible, sinon la valeur initiale"
+def safe_float(value: str) -> float | str:
+    """Converts a string to float, returning the original value on failure.
+
+    Args:
+        value: The string to convert.
+
+    Returns:
+        A ``float`` if conversion succeeds, otherwise the original
+        string unchanged.
+    """
     try:
-        return float(s)
+        return float(value)
     except (ValueError, TypeError):
-        return s
-    
+        return value
 
 
-def get_ecospace_data():
-    """Charge les données Ecospace une seule fois et les met en cache"""
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+
+def get_ecospace_data() -> Optional[Tuple[np.ndarray, List[str]]]:
+    """Returns the Ecospace data, loading it once and caching it.
+
+    On the first call the data is loaded from ``SPECIES_MAP_PATHS``
+    via ``pop_evol_over_time`` and stored in ``_ecospace_data_cache``.
+    Subsequent calls return the cached result.
+
+    Returns:
+        A tuple of ``(global_map, species_names)`` where ``global_map``
+        is a 3-D NumPy array of shape ``(rows, cols, num_species)``
+        and ``species_names`` is the ordered list of species identifiers.
+        Returns None if no species files are available.
+    """
     global _ecospace_data_cache
     if _ecospace_data_cache is None:
         _ecospace_data_cache = pop_evol_over_time()
     return _ecospace_data_cache
 
-def pop_evol_over_time(): #modifié pour renvoyer une carte par date qui est la somme des cartes de toutes les espèces (avoir la concentration totale de poissons)
-    """
-    Selects CSV files from user and extracts population evolution data over time.
-    
+
+def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
+    """Loads per-species population maps from CSV files.
+
+    Species files are taken from ``SPECIES_MAP_PATHS`` if configured,
+    otherwise the user is prompted via a file-chooser dialog.
+
+    Each CSV is expected to have a header row and a leading index
+    column, both of which are skipped. The remaining values represent
+    fish concentration (g/L) on a spatial grid.
+
     Returns:
-        dict: Dictionary with structure:
-        {
-            'species': [list of species filenames],
-            'maps': {
-                'dates': [[year, month], ...] for each species,
-                'map': [[[matrix for each date]], ...] for each species
-            }
-        }
-        
-        Each matrix has dimensions [MapRows][width] and contains concentration values in g/L
+        A tuple ``(global_map, species_names)`` where:
+
+        - ``global_map`` is a NumPy array of shape
+          ``(rows, cols, num_species)`` stacking all species grids.
+        - ``species_names`` is a list of species identifier strings in
+          the same order as the third axis of ``global_map``.
+
+        Returns None if no files are available or selected.
     """
-    file_paths = SPECIES_MAP_PATHS if SPECIES_MAP_PATHS is not None else choose_csv_file()
-    species_names = SPECIES_MAP_NAMES if SPECIES_MAP_NAMES is not None else None
-    #print(f"Selected files: {file_paths}")
-    #print(f"file_paths type: {type(file_paths)}")
+    # Détermination de la source des fichiers
+    if SPECIES_MAP_PATHS is not None:
+        # Cas configuré : c'est un dictionnaire {nom: chemin}
+        file_paths = SPECIES_MAP_PATHS
+        use_dict = True
+    else:
+        # Cas manuel : c'est une liste [chemin1, chemin2, ...]
+        file_paths = choose_csv_file()
+        use_dict = False
+
     if not file_paths:
-        return None  # Return None if no files are selected
-    
-    species_names = []
-    species_data = []
-    
-    for species_name, fichier in file_paths.items():
-        #print(" ")
-        #print(f"Processing species {species_name} with path {fichier}")
-        species_names.append(species_name)
-        #print(f"file shape: {fichier.shape}")
-        maps = np.genfromtxt(fichier, delimiter=',', skip_header=1)[:, 1:]  # Skip header and first column
-        species_data.append(maps)
+        return None
 
-    global_map = np.stack(species_data, axis=2)  # Stack all species data into a 3D array
+    species_names: List[str] = []
+    species_data: List[np.ndarray] = []
 
-    #print(f"global_map shape: {global_map.shape}")  # Should be (MapRows, width, num_species)
-    #print(f"species_names: {species_names}")
-    idx = {i: name for i, name in enumerate(species_names)}
-    #print(f"{global_map[180, 20, 1]} is the concentration of species tkt at position (180, 20)")
-    #print(f"{global_map[20, 180, 1]} is the concentration of species tkt at position (20, 180)")
+    if use_dict:
+        # Itération sur un dictionnaire
+        for species_name, file_path in file_paths.items():
+            species_names.append(species_name)
+            grid = np.genfromtxt(
+                file_path, delimiter=",", skip_header=1
+            )[:, 1:]
+            species_data.append(grid)
+    else:
+        # Itération sur une liste
+        for file_path in file_paths:
+            # On utilise le nom du fichier (sans extension) comme nom d'espèce
+            species_name = Path(file_path).stem
+            species_names.append(species_name)
+            grid = np.genfromtxt(
+                file_path, delimiter=",", skip_header=1
+            )[:, 1:]
+            species_data.append(grid)
 
+    if not species_data:
+        return None
+        
+    global_map = np.stack(species_data, axis=2)
     return global_map, species_names
 
 
-def masks(topology = False, windfarm = False):
-    """
-    Lit un fichier CSV et retourne une matrice (liste de listes) servant de masque.
-    - Ignore la première ligne (en-tête).
-    - Ignore la première colonne de chaque ligne.
-    - Si la valeur est 0, le masque contient 0.
-    - Si la valeur est non nulle, le masque contient cette valeur.
-    Renvoie un dictionnaire contenant une matrice et le fichier étudié  
+# ---------------------------------------------------------------------------
+# Mask utilities
+# ---------------------------------------------------------------------------
 
-    This is used for topology maps
+def masks(
+    topology: bool = False,
+    windfarm: bool = False,
+) -> Dict[str, List]:
+    """Reads one or more CSV files and returns them as numeric masks.
+
+    The first header row and the leading index column of each file are
+    skipped. Non-empty cells are converted to floats; empty cells are
+    discarded.
+
+    Args:
+        topology: If True, reads the configured topology CSV.
+        windfarm: If True, reads the configured wind-farm CSV.
+            Ignored when ``topology`` is True.
+            If both are False, a file-chooser dialog is shown.
+
+    Returns:
+        A dictionary with two keys:
+
+        - ``"name of the masks"``: list of base filenames.
+        - ``"masks"``: list of 2-D lists (one per file) containing
+          the numeric cell values.
     """
-    masks = []
-    names = []
-    if topology : 
+    mask_list: List[List[List[float]]] = []
+    name_list: List[str] = []
+
+    if topology:
         file_paths = [TOPOLOGY_MAP_PATH]
-    elif windfarm : 
+    elif windfarm:
         file_paths = [WINDFARM_MAP_PATH]
     else:
         file_paths = choose_csv_file()
-    for fichier in file_paths : 
-        name_file = os.path.basename(fichier).split('/')[-1]
-        names.append(name_file)
-        mask_file = []
-        
-        with open(fichier, 'r', newline='', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=',')
-            # Ignorer la première ligne (en-tête)
+
+    for file_path in file_paths:
+        name_list.append(os.path.basename(file_path))
+        mask_grid: List[List[float]] = []
+
+        with open(file_path, "r", newline="", encoding="utf-8") as f:
+            reader = csv.reader(f, delimiter=",")
             next(reader, None)
-        
+
             for row in reader:
-                # Ignorer la première colonne 
-                ligne_masque = []
-                for cell in row[1:]:
-                    if cell : 
-                        val = safe_float(cell)
-                        ligne_masque.append(val)
-                
-                mask_file.append(ligne_masque)
-        masks.append(mask_file)
-    
-    named_masks = {
-        'name of the masks' : names ,
-        'masks' : masks
+                row_values = [
+                    safe_float(cell)
+                    for cell in row[1:]
+                    if cell
+                ]
+                mask_grid.append(row_values)
+
+        mask_list.append(mask_grid)
+
+    return {
+        "name of the masks": name_list,
+        "masks": mask_list,
     }
-    
 
-    return named_masks
 
-def plot_masks(masks=None, title="Masks"):
-    """
-    Plots the given masks using matplotlib.
-    
+def plot_masks(
+    masks: Optional[List[np.ndarray]] = None,
+    title: str = "Masks",
+) -> None:
+    """Displays one or more spatial masks using matplotlib.
+
     Args:
-        masks: List of 2D arrays (masks) to plot. If None, uses the default masks.
-        title: Title for the plot.
+        masks: List of 2-D arrays to plot. If None, the topology and
+            wind-farm masks are loaded and displayed.
+        title: Title applied to each subplot.
     """
     if masks is None:
-        masks = [np.array(m['masks'][0]) for m in masks(topology=True, windfarm=True)['masks']]
-    
+        raw = masks(topology=True, windfarm=True)
+        masks = [np.array(m) for m in raw["masks"]]
+
     num_masks = len(masks)
     fig, axes = plt.subplots(1, num_masks, figsize=(5 * num_masks, 5))
-    
+
     if num_masks == 1:
         axes = [axes]
-    
-    for ax, mask in zip(axes, masks):
-        im = ax.imshow(mask, cmap='viridis', interpolation='nearest')
+
+    for ax, mask_array in zip(axes, masks):
+        img = ax.imshow(mask_array, cmap="viridis", interpolation="nearest")
         ax.set_title(title)
-        plt.colorbar(im, ax=ax)
-    
+        plt.colorbar(img, ax=ax)
+
     plt.tight_layout()
     plt.show()
-
-
-
-### pour ajouter ces informations au code initial, il faut changer la fonction update_fish_stock 
-## on fais un masque grace à la vraie carte étudiée donnée par le fichier ecospace baie de seine 
-# pour chaque espèce on peut alors rassembler certaines cases d'écospace pour faire correspondre avec 
-# la carte du modèle, en prenant la moyenne des concentrations de poissons dans chaque case de la grille finale
