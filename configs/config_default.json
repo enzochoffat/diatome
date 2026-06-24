@@ -111,8 +111,18 @@
           "50":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_50.csv",
           "6":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_6.csv"
       },
-      "habitat_map":{
-          "cod": ".\\Ecospace_outputs\\habitat\\EEC_NS_Mmermaid-habitat_atlantic_cod.csv"
+      "habitat_map":  {
+          "Fine_sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_3_Fine_sand.csv",
+          "KS_Vergoyer_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_10_KS_Vergoyer_stock.csv",
+          "Sandy_mud":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_4_Sandy_mud.csv",
+          "Clay":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_7_Clay.csv",
+          "Muddy_sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_5_Muddy_sand.csv",
+          "KS_Dieppe_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_9_KS_Dieppe_stock.csv",
+          "KS_Greenwich_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_11_KS_Greenwich_stock.csv",
+          "Gravel_and_Pebbles":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_1_Gravel_and_Pebbles.csv",
+          "KS_BdS_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_8_KS_BdS_stock.csv",
+          "Mud":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_6_Mud.csv",
+          "Sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_2_Sand.csv"
       }
 
   }

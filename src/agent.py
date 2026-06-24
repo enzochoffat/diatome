@@ -603,9 +603,8 @@ class FisherAgent(Agent):
         Execute the agent's fishing decision (NetLogo-aligned)
         """
         if self.bankrupt:
-            self.lay_low = True
-            self.will_fish = False
-            self.stay_home(pay_existence_cost=True)
+            self.lay_low = False
+            self.will_fish = True
             return
         
         if self.lay_low:
@@ -825,19 +824,12 @@ class FisherAgent(Agent):
             bool: True if bankrupt
         """
         
-        bankruptcy_threshold = -(self.cost_existence * 365)
+        bankruptcy_threshold = -(self.cost_existence * 7)
         
         if self.capital <  bankruptcy_threshold:
             self.bankrupt = True
-            self.lay_low = True
-            self.lay_low_counter = config.BANKRUPTCY_LAYLOW_DAYS
             #print(f"Agent {self.unique_id} ({self.fisher_type}) is bankrupt!")
-        elif self.capital < 0:
-            if not self.lay_low:
-                if random.random() < config.NEGATIVE_CAPITAL_LAYLOW_PROBABILITY:
-                    self.lay_low = True
-                    self.lay_low_counter = config.NEGATIVE_CAPITAL_LAYLOW_DAYS
-    
+     
     def can_afford_trip(self, cost):
         """
         Check if agent can afford a fishing trip.

@@ -47,6 +47,7 @@ def configure_sources(
     wind_farm_map_path: Optional[str] = None,
     species_map_paths: Optional[Dict[str, str]] = None,
     ports_map_path: Optional[str] = None,
+    habitat_map_path: Optional[Dict[str, str]] = None
 ) -> None:
     """Configures the CSV sources used by the module.
 
@@ -61,8 +62,9 @@ def configure_sources(
         species_map_paths: Mapping of species name to CSV file path.
             If None, the current value is kept.
         ports_map_path: Path to the ports CSV file. If None, the current value is kept.
+        habitat_map_path: Path to the habitat CSV file. If None, the current value is kept.
     """
-    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, PORTS_MAP_PATH
+    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, PORTS_MAP_PATH, HABITAT_MAP_PATH
     global _ecospace_data_cache
 
     if topology_map_path is not None:
@@ -73,6 +75,8 @@ def configure_sources(
         SPECIES_MAP_PATHS = species_map_paths
     if ports_map_path is not None:
         PORTS_MAP_PATH = str(ports_map_path)
+    if habitat_map_path is not None:
+        HABITAT_MAP_PATH = habitat_map_path
 
     _ecospace_data_cache = get_ecospace_data()
 
@@ -208,6 +212,34 @@ def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
     global_map = np.stack(species_data, axis=2)
     return global_map, species_names
 
+def load_habitat_map(habitat_map_path: Dict[str, str]) -> np.ndarray:
+    """Loads habitat maps from CSV files.
+
+    Each CSV is expected to have a header row and a leading index
+    column, both of which are skipped. The remaining values represent
+    habitat suitability on a spatial grid.
+
+    Args:
+        habitat_map_path: Mapping of habitat name to CSV file path.
+
+    Returns:
+        A NumPy array of shape ``(rows, cols, num_habitats)`` stacking all habitat grids.
+    """
+    habitat_names: List[str] = []
+    habitat_data: List[np.ndarray] = []
+
+    for habitat_name, file_path in habitat_map_path.items():
+        habitat_names.append(habitat_name)
+        grid = np.genfromtxt(
+            file_path, delimiter=",", skip_header=1
+        )[:, 1:]
+        habitat_data.append(grid)
+
+    if not habitat_data:
+        return np.array([])
+
+    print(f"Loaded habitat maps for: {', '.join(habitat_names)}")
+    return habitat_data
 
 # ---------------------------------------------------------------------------
 # Mask utilities

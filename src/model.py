@@ -101,6 +101,8 @@ class FisheryModel(Model):
         self.coastal_names = coastal_names
         self.trawler_names = trawler_names
 
+        self.social_influence = config.SOCIAL_INFLUENCE
+
         # Time constants
         self.WEEK = config.WEEK
         self.MONTH = config.MONTH

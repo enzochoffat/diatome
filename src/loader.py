@@ -222,6 +222,7 @@ class ConfigLoader:
 
         maps = self.loaded_config.get("maps", {})
         species_map = maps.get("species_map") or {}
+        habitat_map = maps.get("habitat_map") or {}
 
         return {
             "topology_map": self._resolve_config_path(
@@ -237,6 +238,10 @@ class ConfigLoader:
             "ports_map": self._resolve_config_path(
                 maps.get("ports_map")
             ),
+            "habitat_map": {
+                habitat_name: self._resolve_config_path(habitat_path)
+                for habitat_name, habitat_path in habitat_map.items()
+            }
         }
 
     def get_model_params(self) -> Dict[str, Any]:
@@ -369,7 +374,8 @@ class ConfigLoader:
             topology_map_path=map_params["topology_map"],
             wind_farm_map_path=map_params["wind_farm_map"],
             species_map_paths=map_params["species_map"],
-            ports_map_path=map_params["ports_map"]
+            ports_map_path=map_params["ports_map"],
+            habitat_map_path=map_params["habitat_map"],  # Not used in current model
         )
         default_config.reload_spatial_configuration(
             topology_map_path=map_params["topology_map"],
@@ -379,6 +385,10 @@ class ConfigLoader:
 
         default_config.load_ports_map(
             ports_map_path=map_params["ports_map"]
+        )
+
+        ecospace_outputs.load_habitat_map(
+            habitat_map_path=map_params["habitat_map"]
         )
 
     def save_config(self, output_path: str) -> None:
