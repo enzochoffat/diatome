@@ -11,11 +11,12 @@ from src.Agent.trawler import Trawler
 
 class FisherAgent(Agent):
     
-    def __init__(self, unique_id, model, fisher_type, initial_capital=None, name=None):
+    def __init__(self, unique_id, model, fisher_type, initial_capital=None, name=None, port=None):
         super().__init__(model)
         self.fisher_type = fisher_type # "archipelago", "coastal", "trawler"
         self.unique_id = unique_id
         self.name = name
+        self.port = port
         
         # Basic attributes
         self.wealth = 0
@@ -741,6 +742,15 @@ class FisherAgent(Agent):
         Agent returns home after fishing trip.
         Handles state updates and fish landing (for trawlers)
         """
+        self.calculate_travel_cost(self.current_location, self.port)  # Calculate cost to return home
+        self.update_finances(
+            profit=0,  # No profit on return
+            cost=self.calculate_travel_cost(self.current_location, self.port),
+            revenue=0,
+            is_trip=False
+        )
+        
+        self.move_to(self.port[0], self.port[1])  # Return to home port
         if self.fisher_type == "trawler":
             self.land_fish()
             

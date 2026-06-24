@@ -216,6 +216,7 @@ def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
 def masks(
     topology: bool = False,
     windfarm: bool = False,
+    ports: bool = False,
 ) -> Dict[str, List]:
     """Reads one or more CSV files and returns them as numeric masks.
 
@@ -243,6 +244,8 @@ def masks(
         file_paths = [TOPOLOGY_MAP_PATH]
     elif windfarm:
         file_paths = [WINDFARM_MAP_PATH]
+    elif ports:
+        file_paths = [PORTS_MAP_PATH]
     else:
         file_paths = choose_csv_file()
 

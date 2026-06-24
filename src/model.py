@@ -60,6 +60,7 @@ class FisheryModel(Model):
         coastal_names: Optional[List[str]] = None,
         trawler_names: Optional[List[str]] = None,
         coupling: Optional[bool] = None,
+        config_loader: Optional[ConfigLoader] = None,
     ) -> None:
         """Initialises the fishery model.
 
@@ -90,6 +91,7 @@ class FisheryModel(Model):
         self.verbose = verbose
         self.current_step = 0
         self.end_of_sim = end_of_sim
+        self.config_loader = config_loader
 
         self.num_archipelago = num_archipelago
         self.num_coastal = num_coastal
@@ -711,32 +713,39 @@ class FisheryModel(Model):
         """
         agent_id = 0
 
-        for _ in range(self.num_archipelago):
+        ports_dict = self.config_loader.get_port_assignments() if self.config_loader else {}
+        port_coords = config.get_port_coordinates()
+        
+
+        for i in range(self.num_archipelago):
             name = (
                 self.archipelago_names[agent_id]
                 if self.archipelago_names
                 else None
             )
+            port = ports_dict.get("archipelago_ports", [0])
+            index = port[i]
             agent = FisherAgent(
                 agent_id, self, "archipelago",
-                initial_capital=self.initial_capital, name=name,
+                initial_capital=self.initial_capital, name=name, port=port_coords[index]
             )
-            start_pos = self._get_random_position_in_region("A")
+            start_pos = (0, 0)
             if start_pos:
                 self.grid.place_agent(agent, start_pos)
                 agent.current_location = start_pos
-                agent.current_region = "A"
-                agent.region_preference = "A"
+                agent.current_region = self.get_region(*start_pos)
             agent_id += 1
 
-        for _ in range(self.num_coastal):
+        for i in range(self.num_coastal):
             offset = agent_id - self.num_archipelago
             name = (
                 self.coastal_names[offset] if self.coastal_names else None
             )
+            port = ports_dict.get("coastal_ports", [0])
+            index = port[i]
             agent = FisherAgent(
                 agent_id, self, "coastal",
-                initial_capital=self.initial_capital, name=name,
+                initial_capital=self.initial_capital, name=name, port=port_coords[index]
             )
             region = self.random.choice(["A", "B"])
             start_pos = self._get_random_position_in_region(region)
@@ -746,14 +755,16 @@ class FisheryModel(Model):
                 agent.current_region = region
             agent_id += 1
 
-        for _ in range(self.num_trawler):
+        for i in range(self.num_trawler):
             offset = agent_id - self.num_archipelago - self.num_coastal
             name = (
                 self.trawler_names[offset] if self.trawler_names else None
             )
+            port = ports_dict.get("trawler_ports", [0])
+            index = port[i]
             agent = FisherAgent(
                 agent_id, self, "trawler",
-                initial_capital=self.initial_capital, name=name,
+                initial_capital=self.initial_capital, name=name, port=port_coords[index]
             )
             region = self.random.choice(config.TRAWLER_ACCESSIBLE_REGIONS)
             start_pos = self._get_random_position_in_region(region)

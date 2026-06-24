@@ -292,6 +292,21 @@ class ConfigLoader:
         """
         self._require_loaded()
         return self.loaded_config["metadata"]
+    
+    def get_port_assignments(self) -> Dict[str, List[int]]:
+        """Returns the port assignments for each agent type.
+
+        Returns:
+            Dictionary with keys ``archipelago_ports``, ``coastal_ports``,
+            and ``trawler_ports``, each mapping to a list of port indices.
+        """
+        #ConfigLoader._require_loaded(self)
+        agents = self.loaded_config["agents"]
+        return {
+            "archipelago_ports": agents.get("archipelago_ports", []),
+            "coastal_ports": agents.get("coastal_ports", []),
+            "trawler_ports": agents.get("trawler_ports", []),
+        }
 
     def apply_custom_parameters(self, model: Any) -> None:
         """Applies custom parameter overrides from the config to a model.

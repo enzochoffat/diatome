@@ -58,7 +58,7 @@ def run_from_config(config_path: str, run_id: int = 0) -> FisheryModel:
         print("=" * 80)
         print()
 
-    model = FisheryModel(**model_params)
+    model = FisheryModel(**model_params, config_loader=loader)
 
     loader.apply_custom_parameters(model)
 
