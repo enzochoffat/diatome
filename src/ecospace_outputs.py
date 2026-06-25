@@ -20,6 +20,7 @@ from tkinter import filedialog
 # ---------------------------------------------------------------------------
 
 _ecospace_data_cache: Optional[Tuple[np.ndarray, List[str]]] = None
+_cached_habitat_data: Optional[Tuple[np.ndarray, List[str]]] = None
 
 _PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -66,6 +67,7 @@ def configure_sources(
     """
     global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, PORTS_MAP_PATH, HABITAT_MAP_PATH
     global _ecospace_data_cache
+    global _cached_habitat_data
 
     if topology_map_path is not None:
         TOPOLOGY_MAP_PATH = str(topology_map_path)
@@ -79,6 +81,7 @@ def configure_sources(
         HABITAT_MAP_PATH = habitat_map_path
 
     _ecospace_data_cache = get_ecospace_data()
+    _cached_habitat_data = None
 
 
 # ---------------------------------------------------------------------------
@@ -212,19 +215,26 @@ def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
     global_map = np.stack(species_data, axis=2)
     return global_map, species_names
 
-def load_habitat_map(habitat_map_path: Dict[str, str]) -> np.ndarray:
+def load_habitat_map(habitat_map_path: Optional[Dict[str, str]] = None) -> Tuple[np.ndarray, List[str]]:
     """Loads habitat maps from CSV files.
 
     Each CSV is expected to have a header row and a leading index
     column, both of which are skipped. The remaining values represent
     habitat suitability on a spatial grid.
 
-    Args:
-        habitat_map_path: Mapping of habitat name to CSV file path.
-
     Returns:
-        A NumPy array of shape ``(rows, cols, num_habitats)`` stacking all habitat grids.
+        A tuple containing a NumPy array of shape ``(rows, cols, num_habitats)`` stacking all habitat grids and a list of habitat names.
     """
+
+    global HABITAT_MAP_PATH, _cached_habitat_data
+    if habitat_map_path is None:
+        if HABITAT_MAP_PATH is None:
+            raise ValueError("No habitat map path provided and no default configured.")
+        habitat_map_path = HABITAT_MAP_PATH
+
+    if _cached_habitat_data is not None:
+        return _cached_habitat_data
+ 
     habitat_names: List[str] = []
     habitat_data: List[np.ndarray] = []
 
@@ -236,10 +246,12 @@ def load_habitat_map(habitat_map_path: Dict[str, str]) -> np.ndarray:
         habitat_data.append(grid)
 
     if not habitat_data:
-        return np.array([])
+        return np.array([]), []
 
-    print(f"Loaded habitat maps for: {', '.join(habitat_names)}")
-    return habitat_data
+    habitat_array = np.stack(habitat_data, axis=-1), habitat_names
+    print(f"habitat 0 name: {habitat_array[1][0]}")
+    _cached_habitat_data = habitat_array
+    return _cached_habitat_data
 
 # ---------------------------------------------------------------------------
 # Mask utilities

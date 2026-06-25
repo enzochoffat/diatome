@@ -312,6 +312,21 @@ class ConfigLoader:
             "coastal_ports": agents.get("coastal_ports", []),
             "trawler_ports": agents.get("trawler_ports", []),
         }
+    
+    def get_habitat_assignments(self) -> Dict[str, List[str]]:
+        """Returns the habitat assignments for each agent type.
+
+        Returns:
+            Dictionary with keys ``archipelago_habitats``, ``coastal_habitats``,
+            and ``trawler_habitats``, each mapping to a list of habitat names.
+        """
+        #ConfigLoader._require_loaded(self)
+        agents = self.loaded_config["agents"]
+        return {
+            "archipelago_habitats": agents.get("archipelago_habitats", []),
+            "coastal_habitats": agents.get("coastal_habitats", []),
+            "trawler_habitats": agents.get("trawler_habitats", []),
+        }
 
     def apply_custom_parameters(self, model: Any) -> None:
         """Applies custom parameter overrides from the config to a model.

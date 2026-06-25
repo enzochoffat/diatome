@@ -4,6 +4,14 @@ from src import config
 class Archipelago:
     """Represents an archipelago agent with configurable fishing behavior."""
 
+    def __init__(self, agent) -> None:
+        """Initialises the Archipelago with a reference to itself.
+
+        Args:
+            agent: The archipelago data or identifier passed at construction.
+        """
+        self.agent = agent
+
     def satisfice_lifestyle(self) -> None:
         """Apply the satisficing decision model for fishing behavior.
 

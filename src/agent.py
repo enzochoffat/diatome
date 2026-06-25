@@ -51,6 +51,7 @@ class FisherAgent(Agent):
         initial_capital: Optional[float] = None,
         name: Optional[str] = None,
         port: Optional[Tuple[int, int]] = None,
+        habitat: Optional[List[str]] = None,
     ) -> None:
         """Initialises the fisher agent.
 
@@ -69,6 +70,7 @@ class FisherAgent(Agent):
         self.unique_id = unique_id
         self.name = name
         self.port = port
+        self.restricted_mask = habitat
 
         # Financial state
         self.capital = (
@@ -374,6 +376,20 @@ class FisherAgent(Agent):
     # Movement
     # ------------------------------------------------------------------
 
+    def is_restricted(self, x: int, y: int) -> bool:
+        """Checks whether a location is restricted by habitat or topology.
+
+        Args:
+            x: X-coordinate of the location.
+            y: Y-coordinate of the location.
+        
+        Returns:
+            True if the location is restricted, False otherwise.
+        """
+        if self.restricted_mask is None:
+            return False
+        return self.restricted_mask[y][x]
+
     def move_to(self, x: int, y: int) -> None:
         """Moves the agent to ``(x, y)`` on the Mesa grid.
 
@@ -381,6 +397,9 @@ class FisherAgent(Agent):
             x: Target column.
             y: Target row.
         """
+        if self.is_restricted(x, y):
+            return
+        
         if self.pos is not None:
             self.model.grid.remove_agent(self)
         self.model.grid.place_agent(self, (x, y))
@@ -1048,7 +1067,7 @@ class FisherAgent(Agent):
             dy = random.randint(-exploration_radius, exploration_radius)
             candidate = (base_spot[0] + dx, base_spot[1] + dy)
             patch = self.model.get_patch_info(candidate[0], candidate[1])
-            if patch and patch["region"] == region:
+            if patch and patch["region"] == region and not self.is_restricted(candidate[0], candidate[1]):
                 return candidate
 
         return tuple(base_spot)
@@ -1125,6 +1144,8 @@ class FisherAgent(Agent):
             if fishing_spot is None:
                 return self.explore_random_spot(region)
 
+            if self.is_restricted(*fishing_spot):
+                return self.explore_random_spot(region)
             self.current_location = fishing_spot
 
             if self.fisher_type == "trawler" and self.has_technologie:
@@ -1541,7 +1562,7 @@ class FisherAgent(Agent):
                 f" catch={recent['catch']:.0f},"
                 f" profit={recent['profit']:.2f}"
             )
-
+    
     # ------------------------------------------------------------------
     # Mesa step
     # ------------------------------------------------------------------

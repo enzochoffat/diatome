@@ -717,6 +717,10 @@ class FisheryModel(Model):
 
         ports_dict = self.config_loader.get_port_assignments() if self.config_loader else {}
         port_coords = config.get_port_coordinates()
+
+        habitat_dict = self.config_loader.get_habitat_assignments() if self.config_loader else {}
+
+
         
 
         for i in range(self.num_archipelago):
@@ -727,9 +731,10 @@ class FisheryModel(Model):
             )
             port = ports_dict.get("archipelago_ports", [0])
             index = port[i]
+            habitat = self.restricted_area(habitat_dict.get("archipelago_habitats", [0]))
             agent = FisherAgent(
                 agent_id, self, "archipelago",
-                initial_capital=self.initial_capital, name=name, port=port_coords[index]
+                initial_capital=self.initial_capital, name=name, port=port_coords[index], habitat=habitat
             )
             start_pos = (0, 0)
             if start_pos:
@@ -745,9 +750,10 @@ class FisheryModel(Model):
             )
             port = ports_dict.get("coastal_ports", [0])
             index = port[i]
+            habitat = self.restricted_area(habitat_dict.get("coastal_habitats", [0]))
             agent = FisherAgent(
                 agent_id, self, "coastal",
-                initial_capital=self.initial_capital, name=name, port=port_coords[index]
+                initial_capital=self.initial_capital, name=name, port=port_coords[index], habitat=habitat
             )
             region = self.random.choice(["A", "B"])
             start_pos = self._get_random_position_in_region(region)
@@ -764,9 +770,10 @@ class FisheryModel(Model):
             )
             port = ports_dict.get("trawler_ports", [0])
             index = port[i]
+            habitat = self.restricted_area(habitat_dict.get("trawler_habitats", [0]))
             agent = FisherAgent(
                 agent_id, self, "trawler",
-                initial_capital=self.initial_capital, name=name, port=port_coords[index]
+                initial_capital=self.initial_capital, name=name, port=port_coords[index], habitat=habitat
             )
             region = self.random.choice(config.TRAWLER_ACCESSIBLE_REGIONS)
             start_pos = self._get_random_position_in_region(region)
@@ -796,6 +803,25 @@ class FisheryModel(Model):
         ]
         return random.choice(candidates) if candidates else None
 
+    def restricted_area(self, habitat: List[str]) -> np.ndarray:
+        """Returns a boolean mask of restricted areas based on habitat.
+
+        Args:
+            habitat: List of habitat types to not restrict.
+
+        Returns:
+            A 2D boolean numpy array where True indicates a restricted
+            area.
+        """
+        habitat_array, habitat_names = ecospace_outputs.load_habitat_map()
+        
+        restricted_names = [name for name in habitat_names if name not in habitat]
+        index = [habitat_names.index(name) for name in restricted_names]
+        restricted_layers = habitat_array[:, :, index]
+        mask = np.any(restricted_layers > 0, axis=2)
+
+        return mask
+        
     # ------------------------------------------------------------------
     # Patch initialisation
     # ------------------------------------------------------------------

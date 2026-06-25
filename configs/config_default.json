@@ -21,7 +21,10 @@
     "names": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y"],
     "archipelago_ports": [1, 1, 1, 1, 1, 1, 1, 1, 2, 0],
     "coastal_ports": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-    "trawler_ports": [0, 0, 0, 0, 0]
+    "trawler_ports": [0, 0, 0, 0, 0],
+    "archipelago_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
+    "coastal_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
+    "trawler_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"]
   },
   
   "output": {

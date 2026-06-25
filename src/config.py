@@ -429,7 +429,6 @@ def get_port_coordinates() -> List[Tuple[int, int]]:
     for y, row in enumerate(ports_map):
         for x, cell in enumerate(row):
             if cell != 0:
-                print(f"Port found at (x={x}, y={y}) with value {cell}")
                 list_ports.append((x, y))
     return list_ports
 # =============================================================================
