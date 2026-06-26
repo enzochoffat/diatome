@@ -5,6 +5,7 @@ agent creation, daily stepping, data collection, and optional Ecospace
 coupling.
 """
 
+import logging
 import os
 import random
 from collections import defaultdict
@@ -24,7 +25,7 @@ from src.Couplage.couplage import Coupling
 from src.agent import FisherAgent
 from src.config import get_hotspots_for_step
 
-
+logger = logging.getLogger(__name__)
 class FisheryModel(Model):
     """Agent-based fishery model built on Mesa.
 
@@ -211,11 +212,10 @@ class FisheryModel(Model):
         self._initialize_region_stock_cache()
 
         if self.verbose:
-            print("\n" + "=" * 60)
-            print("HOTSPOT DISTRIBUTION")
-            print("=" * 60)
+            logger.info("\n" + "=" * 60)
+            logger.info("HOTSPOT DISTRIBUTION")
+            logger.info("\n" + "=" * 60)
             self.validate_hotspot_distribution()
-            print("=" * 60 + "\n")
 
         self._recalculate_regional_capacities()
         self._create_agents()
@@ -843,9 +843,12 @@ class FisheryModel(Model):
 
         ecospace_data, _ = ecospace_outputs.get_ecospace_data()
         sum_data = np.sum(ecospace_data, axis=2)
-        print(
-            f"shape sum_data: {sum_data.shape},"
-            f" width: {width}, height: {height}"
+        logger.debug(
+            "Ecospace data loaded",
+            extra={"shape": sum_data.shape,
+                   "width": width,
+                   "height": height
+                   }
         )
 
         patches: Dict[Tuple[int, int], Dict[str, Any]] = {}
@@ -1082,20 +1085,15 @@ class FisheryModel(Model):
 
             total = high_count + medium_count + low_count
             if total > 0:
-                print(f"Region {region_name}:")
-                print(
-                    f"  HIGH:   {high_count:3d} patches"
-                    f" ({high_count / total * 100:5.1f}%)"
+                logger.info(f"Region {region_name}:")
+                logger.info(
+                    "Density distribution",
+                    extra={
+                        "HIGH": high_count,
+                        "MEDIUM": medium_count,
+                        "LOW": low_count
+                    }
                 )
-                print(
-                    f"  MEDIUM: {medium_count:3d} patches"
-                    f" ({medium_count / total * 100:5.1f}%)"
-                )
-                print(
-                    f"  LOW:    {low_count:3d} patches"
-                    f" ({low_count / total * 100:5.1f}%)"
-                )
-
     def get_initial_fish_stock(
         self, carrying_capacity: int, region: str
     ) -> int:
@@ -1363,23 +1361,15 @@ class FisheryModel(Model):
                 self.MSY_STOCK_D = msy
 
         if self.verbose:
-            print("Capacités régionales recalculées:")
-            print(
-                f"  Region A: {self.CARRYING_CAPACITY_A}"
-                f" (MSY: {self.MSY_STOCK_A})"
-            )
-            print(
-                f"  Region B: {self.CARRYING_CAPACITY_B}"
-                f" (MSY: {self.MSY_STOCK_B})"
-            )
-            print(
-                f"  Region C: {self.CARRYING_CAPACITY_C}"
-                f" (MSY: {self.MSY_STOCK_C})"
-            )
-            print(
-                f"  Region D: {self.CARRYING_CAPACITY_D}"
-                f" (MSY: {self.MSY_STOCK_D})"
-            )
+            logger.info(
+                "Regional capacities recalculated", 
+                extra={
+                            "A": (self.CARRYING_CAPACITY_A, self.MSY_STOCK_A),
+                            "B": (self.CARRYING_CAPACITY_B, self.MSY_STOCK_B),
+                            "C": (self.CARRYING_CAPACITY_C, self.MSY_STOCK_C),
+                            "D": (self.CARRYING_CAPACITY_D, self.MSY_STOCK_D)
+                        }
+                        )
 
     def validate_regional_stocks(self) -> List[Dict[str, Any]]:
         """Checks that no region exceeds its carrying capacity.
@@ -1584,20 +1574,24 @@ class FisheryModel(Model):
                     poll_interval=0.5,
                 )
                 fish = Coupling.update_biomass(self, species_maps)
-                print(
-                    f"stock for region A before update:"
-                    f" {self.get_region_stock('A')},"
-                    f" B: {self.get_region_stock('B')},"
-                    f" C: {self.get_region_stock('C')},"
-                    f" D: {self.get_region_stock('D')}"
+                logger.info(
+                    "Stock before coupling update",
+                    extra={
+                        "A": self.get_region_stock("A"),
+                        "B": self.get_region_stock("B"),
+                        "C": self.get_region_stock("C"),
+                        "D": self.get_region_stock("D"),
+                    }
                 )
                 self.update_patches(fish)
-                print(
-                    f"stock for region A after update:"
-                    f" {self.get_region_stock('A')},"
-                    f" B: {self.get_region_stock('B')},"
-                    f" C: {self.get_region_stock('C')},"
-                    f" D: {self.get_region_stock('D')}"
+                logger.info(
+                    "Stock after coupling update",
+                    extra={
+                        "A": self.get_region_stock("A"),
+                        "B": self.get_region_stock("B"),
+                        "C": self.get_region_stock("C"),
+                        "D": self.get_region_stock("D"),
+                    }
                 )
                 self._export_monthly_agent_buffer()
 
@@ -1616,16 +1610,14 @@ class FisheryModel(Model):
             steps = self.end_of_sim
 
         if self.verbose:
-            print(
-                f"Starting simulation for {steps} days"
-                f" ({steps / self.YEAR:.1f} years)"
+            logger.info(
+                "Simulation started",
+                extra={
+                    "steps": steps,
+                    "yaers": steps / self.YEAR,
+                    "agents": len(self.agents),
+                }
             )
-            print(
-                f"Agents: {self.num_archipelago} archipelago,"
-                f" {self.num_coastal} coastal,"
-                f" {self.num_trawler} trawler"
-            )
-            print("=" * 60)
 
         for _ in range(steps):
             self.step()
@@ -1633,10 +1625,12 @@ class FisheryModel(Model):
                 break
 
         if self.verbose:
-            print("=" * 60)
-            print(
-                f"Simulation completed after {self.current_step} days"
-                f" ({self.current_step / self.YEAR:.1f} years)"
+            logger.info(
+                "Simulation completed",
+                extra={
+                    "days": self.current_step,
+                    "years": self.current_step / self.YEAR,
+                }
             )
 
     # ------------------------------------------------------------------
@@ -1877,9 +1871,9 @@ class FisheryModel(Model):
         )
         model_df.to_csv(model_path, index=False)
         if self.verbose:
-            print(
-                f"Exported: {os.path.basename(model_path)}"
-                f" ({len(model_df)} rows)"
+            logger.info(
+                "Export completed",
+                extra={"file": filename_prefix, "rows": len(model_df)},
             )
 
         agent_df = self.datacollector.get_agent_vars_dataframe()
@@ -1888,9 +1882,9 @@ class FisheryModel(Model):
         )
         agent_df.to_csv(agent_path, index=False)
         if self.verbose:
-            print(
-                f"Exported: {os.path.basename(agent_path)}"
-                f" ({len(agent_df)} rows)"
+            logger.info(
+                "Export completed",
+                extra={"file": filename_prefix, "rows": len(agent_df)},
             )
 
         if self.yearly_data:
@@ -1903,9 +1897,9 @@ class FisheryModel(Model):
                 export_dir, f"{filename_prefix}_stock_{timestamp}.csv"
             )
             if self.verbose:
-                print(
-                    f"Exported: {os.path.basename(yearly_path)}"
-                    f" ({len(yearly_df)} rows)"
+                logger.info(
+                    "Export completed",
+                    extra={"file": filename_prefix, "rows": len(yearly_df)},
                 )
 
         if self.verbose:
@@ -1944,9 +1938,7 @@ class FisheryModel(Model):
 
     def print_final_summary(self) -> None:
         """Prints a comprehensive summary at the end of the simulation."""
-        print("\n" + "=" * 80)
-        print("SIMULATION FINALE SUMMARY")
-        print("=" * 80)
+        logger.info("Final summary")
 
         stock_a = self._region_stock_cache.get("A", 0)
         stock_b = self._region_stock_cache.get("B", 0)
