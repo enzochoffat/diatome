@@ -618,7 +618,7 @@ class MainWindow(QMainWindow):
     def load_config(self):
         """Charger un fichier JSON et remplir les champs."""
         path, _ = QFileDialog.getOpenFileName(
-            self, "Ouvrir une configuration", "configs/", "JSON Files (*.json)"
+            self, "Ouvrir une configuration", "config/", "JSON Files (*.json)"
         )
         if not path:
             return

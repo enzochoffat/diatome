@@ -31,7 +31,7 @@ class ConfigLoader:
         "quartCarryingCap",
     }
 
-    def __init__(self, config_dir: str = "configs") -> None:
+    def __init__(self, config_dir: str = "configs_json") -> None:
         """Initialises the configuration loader.
 
         Args:

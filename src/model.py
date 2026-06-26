@@ -495,7 +495,7 @@ class FisheryModel(Model):
 
     def _wait_for_coupling_update(
         self,
-        json_path: str = "configs/config.json",
+        json_path: str = "config/config.json",
         poll_interval: float = 0.5,
     ) -> Tuple[Any, Any]:
         """Blocks until the coupling config file is updated.
@@ -1580,7 +1580,7 @@ class FisheryModel(Model):
 
             if self.coupling:
                 species_maps, _ = self._wait_for_coupling_update(
-                    json_path="configs/config.json",
+                    json_path="config/config.json",
                     poll_interval=0.5,
                 )
                 fish = Coupling.update_biomass(self, species_maps)
