@@ -5,6 +5,7 @@ logic, memory system, economic state, and spatial behaviour of individual
 fishers (archipelago, coastal, or trawler types).
 """
 
+import logging
 import random
 import statistics
 from collections import Counter
@@ -17,6 +18,7 @@ from src.Agent.archipelagos import Archipelago
 from src.Agent.coastal import Coastal
 from src.Agent.trawler import Trawler
 
+logger = logging.getLogger(__name__)
 
 class FisherAgent(Agent):
     """A fisher agent in the FIBE fishery model.
@@ -567,6 +569,13 @@ class FisherAgent(Agent):
         """Flags the agent as bankrupt if capital falls below threshold."""
         bankruptcy_threshold = -(self.cost_existence * 7)
         if self.capital < bankruptcy_threshold:
+            logger.warning(
+                "Agent went bankrupt",
+                extra={
+                    "agent_id": self.unique_id, 
+                    "capital": self.capital
+                },
+            )
             self.bankrupt = True
 
     # ------------------------------------------------------------------
@@ -591,6 +600,13 @@ class FisherAgent(Agent):
         patch = self.model.get_patch_info(location[0], location[1])
 
         if not patch:
+            logger.error(
+                "Invalid fishing location",
+                extra={
+                    "agent_id": self.unique_id,
+                    "location": location,
+                },
+            )
             return {
                 "catch": 0,
                 "costs": 0,
@@ -600,6 +616,15 @@ class FisherAgent(Agent):
             }
 
         current_region = patch["region"]
+
+        logger.debug(
+            "Fishing attempt",
+            extra={
+                "agent_id": self.unique_id,
+                "region": current_region,
+                "stock": patch["fish_stock"],
+            }
+        )
 
         # --- Catch calculation ---
         if self.fisher_type == "coastal":
@@ -622,6 +647,18 @@ class FisherAgent(Agent):
             travel_cost = 0.0
 
         total_cost = self.cost_existence + self.cost_activity + travel_cost
+
+        result = self.calculate_profit(actual_catch, total_cost)
+
+        logger.debug(
+            "Fishing economics",
+            extra={
+                "agent_id": self.unique_id,
+                "catch": actual_catch,
+                "costs": total_cost,
+                "profit": result["profit"],
+            }
+        )
 
         # --- Financial update ---
         if self.fisher_type == "trawler":
@@ -891,6 +928,14 @@ class FisherAgent(Agent):
         ``Trawler.optimise_growth`` depending on ``fisher_type``.
         Sets ``will_fish = False`` for unknown types.
         """
+        logger.debug(
+            "Decision start",
+            extra={
+                "agent_id": self.unique_id,
+                "type": self.fisher_type,
+                "capital": self.capital,
+            },
+        )
         if self.fisher_type == "archipelago":
             Archipelago.satisfice_lifestyle(self)
         elif self.fisher_type == "coastal":
@@ -900,6 +945,15 @@ class FisherAgent(Agent):
         else:
             self.will_fish = False
 
+        logger.debug(
+            "Decision result",
+            extra={
+                "agent_id": self.unique_id,
+                "will_fish": self.will_fish,
+                "region": self.region_preference,
+            }
+        )
+
     def execute_decision(self) -> None:
         """Executes the agent's fishing decision for the current day.
 
@@ -907,11 +961,22 @@ class FisherAgent(Agent):
         and trip affordability checks.
         """
         if self.bankrupt:
+            logger.warning(
+                "Bankrupt agent forced to fish",
+                extra={"agent_id": self.unique_id},
+            )
             self.lay_low = False
             self.will_fish = True
             return
 
         if self.lay_low:
+            logger.info(
+                "Agent laying low",
+                extra={
+                    "agent_id": self.unique_id,
+                    "capital": self.capital,
+                },
+            )
             existence_cost = (
                 0.5 * self.cost_existence
                 if getattr(self, "has_partner", False)
@@ -937,8 +1002,25 @@ class FisherAgent(Agent):
             if target_spot:
                 estimated_cost = self.estimate_trip_cost(target_spot)
                 if not self.can_afford_trip(estimated_cost):
+                    logger.debug(
+                        "Agent cannot afford trip",
+                        extra={
+                            "agent_id": self.unique_id,
+                            "capital": self.capital,
+                            "estimated_cost": estimated_cost,
+                        },
+                    )
                     self.stay_home(pay_existence_cost=True)
                     return
+                
+                logger.info(
+                    "Agent going fishing",
+                    extra={
+                        "agent_id": self.unique_id,
+                        "region": target_region,
+                        "target_spot": target_spot,
+                    },
+                )
 
                 self.at_home = False
                 self.gone_fishing = True
@@ -946,6 +1028,15 @@ class FisherAgent(Agent):
 
                 self.move_to(target_spot[0], target_spot[1])
                 trip_result = self.go_fish(target_spot)
+
+                logger.debug(
+                    "Fishing result",
+                    extra={
+                        "agent_id": self.unique_id,
+                        "catch": trip_result["catch"],
+                        "profit": trip_result["profit"],
+                    }
+                )
                 self.fished_today = True
 
                 self.update_memory({
@@ -959,8 +1050,16 @@ class FisherAgent(Agent):
                     "went_fishing": True,
                 })
             else:
+                logger.debug(
+                    "No fishing spot found",
+                    extra={"agent_id": self.unique_id},
+                )
                 self.stay_home(pay_existence_cost=True)
         else:
+            logger.debug(
+                "Agent stays home",
+                extra={"agent_id": self.unique_id}
+            )
             self.stay_home(pay_existence_cost=True)
 
     def _calculate_region_preference(self) -> str:
