@@ -201,3 +201,17 @@ class Trawler:
             self.jumped = False
         else:
             self.will_fish = False
+
+    def get_travel_cost_between_regions(
+        self, from_region: str, to_region: str
+    ) -> float:
+        """Returns the inter-region travel cost (half the destination cost).
+
+        Args:
+            from_region: Origin region identifier (unused currently).
+            to_region: Destination region identifier.
+
+        Returns:
+            Half the standard travel cost to ``to_region``.
+        """
+        return self.get_travel_cost(to_region) * 0.5

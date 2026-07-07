@@ -16,10 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-from src.configs.logging_config import setup_logging  # noqa: E402
-
-from src.loader import load_config  # noqa: E402
-from src.model import FisheryModel  # noqa: E402
+from src.infrastructure.loader import load_config  # noqa: E402
+from src.core.model import FisheryModel  # noqa: E402
 
 
 logger = logging.getLogger(__name__)
@@ -68,7 +66,7 @@ def run_from_config(config_path: str, run_id: int = 0) -> FisheryModel:
 def main() -> None:
     """Parse command-line arguments and run the simulation."""
 
-    setup_logging(log_level=logging.INFO)
+    #setup_logging(log_level=logging.INFO)
 
     parser = argparse.ArgumentParser(
         description="Run FIBE simulation from JSON configuration",

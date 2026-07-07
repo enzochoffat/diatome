@@ -4,7 +4,7 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
-class Archipelago:
+class Archipelagos:
     """Represents an archipelago agent with configurable fishing behavior."""
 
     def __init__(self, agent) -> None:
@@ -43,12 +43,12 @@ class Archipelago:
                 extra={"agent_id": getattr(self, "unique_id", None)},
             )
 
-            Archipelago._handle_exploration_phase(self)
+            Archipelagos._handle_exploration_phase(self)
             return
 
-        catches_last_period = Archipelago._compute_recent_catches(self)
+        catches_last_period = Archipelagos._compute_recent_catches(self)
         revenue_last_period = catches_last_period * config.FISH_PRICE
-        weekly_needs = Archipelago._compute_weekly_needs(self)
+        weekly_needs = Archipelagos._compute_weekly_needs(self)
 
 
         logger.debug(
@@ -61,7 +61,7 @@ class Archipelago:
             },
         )
         
-        fish_is_scarce = Archipelago._assess_scarcity(self)
+        fish_is_scarce = Archipelagos._assess_scarcity(self)
 
 
         logger.debug(
@@ -83,7 +83,7 @@ class Archipelago:
                 },
             )
 
-            Archipelago._tick_lay_low(self)
+            Archipelagos._tick_lay_low(self)
             return
 
         done_enough = revenue_last_period >= weekly_needs

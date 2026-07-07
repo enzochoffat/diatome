@@ -9,8 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src import ecospace_outputs
-from src import config as default_config
+from src.core import config as default_config
+from src.infrastructure.ecospace import ecospace_outputs
+from src.infrastructure.ports.ports_loader import load_ports_map
+from src.domain.environment import spatial_utils
 
 
 class ConfigLoader:
@@ -392,13 +394,13 @@ class ConfigLoader:
             ports_map_path=map_params["ports_map"],
             habitat_map_path=map_params["habitat_map"],  # Not used in current model
         )
-        default_config.reload_spatial_configuration(
+        spatial_utils.reload_spatial_configuration(
             topology_map_path=map_params["topology_map"],
             windfarm_map_path=map_params["wind_farm_map"],
             apply_windfarm=map_params["wind_farm_map"] is not None
         )
 
-        default_config.load_ports_map(
+        load_ports_map(
             ports_map_path=map_params["ports_map"]
         )
 

@@ -50,7 +50,7 @@
   "maps": {
     "spatial_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Depth\\DepthMap.csv",
     "ports_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Ports\\PortsMap.csv",
-      "wind_farm_map": ".\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
+      "wind_farm_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
       "species_map": 
       {
           "11":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_11.csv",
@@ -130,3 +130,4 @@
 
   }
 }
+
