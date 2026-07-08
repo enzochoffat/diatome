@@ -668,7 +668,7 @@ class FisheryModel(Model):
 
             if self.coupling:
                 species_maps, _ = self._wait_for_coupling_update(
-                    json_path="config/config.json",
+                    json_path="configs_json/config.json",
                     poll_interval=0.5,
                 )
                 fish = update_biomass(self, species_maps)
