@@ -8,6 +8,7 @@
   },
   
   "simulation": {
+    "start_date": "2009-12-01",
     "duration_years": 2,
     "verbose": true,
     "random_seed": null,
@@ -24,7 +25,10 @@
     "trawler_ports": [0, 0, 0, 0, 0],
     "archipelago_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
     "coastal_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
-    "trawler_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"]
+    "trawler_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
+    "archipelagos_wave_height": 2,
+    "coastal_wave_height": 2,
+    "trawler_wave_height": 2
   },
   
   "output": {
@@ -48,6 +52,7 @@
     }
   },
   "maps": {
+    "wave_height_vector": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
     "spatial_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Depth\\DepthMap.csv",
     "ports_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Ports\\PortsMap.csv",
       "wind_farm_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",

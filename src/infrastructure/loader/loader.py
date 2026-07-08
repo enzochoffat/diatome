@@ -13,6 +13,7 @@ from src.core import config as default_config
 from src.infrastructure.ecospace import ecospace_outputs
 from src.infrastructure.ports.ports_loader import load_ports_map
 from src.domain.environment import spatial_utils
+from src.domain.environment.weather import read_wave_height_vector
 
 
 class ConfigLoader:
@@ -243,7 +244,10 @@ class ConfigLoader:
             "habitat_map": {
                 habitat_name: self._resolve_config_path(habitat_path)
                 for habitat_name, habitat_path in habitat_map.items()
-            }
+            },
+            "wave_height_vector": self._resolve_config_path(
+                maps.get("wave_height_vector")
+            )
         }
 
     def get_model_params(self) -> Dict[str, Any]:
@@ -274,6 +278,7 @@ class ConfigLoader:
                 num_archipelago: num_archipelago + num_coastal
             ],
             "trawler_names": agent_names[num_archipelago + num_coastal:],
+            "start_date": config["simulation"].get("start_date"),
         }
 
     def get_output_params(self) -> Dict[str, Any]:
@@ -406,6 +411,9 @@ class ConfigLoader:
 
         ecospace_outputs.load_habitat_map(
             habitat_map_path=map_params["habitat_map"]
+        )
+        read_wave_height_vector(
+            wave_height_vector_path=map_params["wave_height_vector"]
         )
 
     def save_config(self, output_path: str) -> None:

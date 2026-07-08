@@ -9,7 +9,7 @@ import logging
 import os
 import random
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import sleep
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -68,6 +68,8 @@ from src.servicies.metrics import (
 )
 from src.interfaces.cli.report import print_final_summary as print_final_summary_helper
 from src.servicies.coupling_service import wait_for_coupling_update, read_csv_biomass, update_biomass
+from src.infrastructure.loader.loader import ConfigLoader
+
 
 logger = logging.getLogger(__name__)
 class FisheryModel(Model):
@@ -105,6 +107,7 @@ class FisheryModel(Model):
         coastal_names: Optional[List[str]] = None,
         trawler_names: Optional[List[str]] = None,
         coupling: Optional[bool] = None,
+        start_date: Optional[datetime] = None,
         config_loader: Optional[Any] = None,
     ) -> None:
         """Initialises the fishery model.
@@ -135,7 +138,9 @@ class FisheryModel(Model):
         self.coupling = coupling
         self.verbose = verbose
         self.current_step = 0
+        self.current_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         self.end_of_sim = end_of_sim
+        self.start_date = start_date
 
         self.num_archipelago = num_archipelago
         self.num_coastal = num_coastal
@@ -526,6 +531,7 @@ class FisheryModel(Model):
         10. Check end condition.
         11. Monthly updates (hotspots, coupling export).
         """
+        #print(f"Start day {self.current_date}")
         # 1. Weather
         self.determine_weather()
 
@@ -644,6 +650,7 @@ class FisheryModel(Model):
 
         # 9. Increment step
         self.current_step += 1
+        self.current_date += timedelta(days=1)
 
         # 10. End condition
         if self.current_step >= self.end_of_sim:

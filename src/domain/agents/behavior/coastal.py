@@ -3,6 +3,8 @@ import logging
 from typing import Dict
 
 from src import config
+from src.core.config import get_fisher_config
+from src.domain.environment.weather import get_wave_height
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,20 @@ class Coastal:
                 extra={"agent_id": getattr(self, "unique_id", None)},
             )
 
+            self.will_fish = False
+            return
+        
+        date, wave_height = get_wave_height(self.model)
+        max_heigth = get_fisher_config(fisher_type="coastal")["wave_height_threshold"]
+        if wave_height > max_heigth:
+            logger.debug(
+                "Decision blocked by wave height",
+                extra={
+                    "agent_id": getattr(self, "unique_id", None),
+                    "wave_height": wave_height,
+                    "threshold": max_heigth,
+                }
+            )
             self.will_fish = False
             return
 

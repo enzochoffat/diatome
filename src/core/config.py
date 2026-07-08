@@ -246,6 +246,7 @@ def get_fisher_config(fisher_type: str) -> Dict:
             "accessible_regions": ARCHIPELAGO_ACCESSIBLE_REGIONS,
             "max_good_spots": ARCHIPELAGO_MAX_GOOD_SPOTS,
             "storage_capacity": 0,
+            "wave_height_threshold": 1.0,
         },
         "coastal": {
             "cost_existence": COASTAL_COST_EXISTENCE,
@@ -254,6 +255,7 @@ def get_fisher_config(fisher_type: str) -> Dict:
             "accessible_regions": COASTAL_ACCESSIBLE_REGIONS,
             "max_good_spots": COASTAL_MAX_GOOD_SPOTS,
             "storage_capacity": 0,
+            "wave_height_threshold": 1.5,
         },
         "trawler": {
             "cost_existence": TRAWLER_COST_EXISTENCE,
@@ -262,6 +264,7 @@ def get_fisher_config(fisher_type: str) -> Dict:
             "accessible_regions": TRAWLER_ACCESSIBLE_REGIONS,
             "max_good_spots": TRAWLER_MAX_GOOD_SPOTS,
             "storage_capacity": TRAWLER_STORAGE_CAPACITY,
+            "wave_height_threshold": 2.0,
         },
     }
     return configs.get(fisher_type, {})

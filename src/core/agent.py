@@ -441,10 +441,10 @@ class FisherAgent(Agent):
         * memory updates.
         """
         if self.bankrupt:
-            logger.warning(
-                "Bankrupt agent forced to fish",
-                extra={"agent_id": self.unique_id},
-            )
+            # logger.warning(
+            #     "Bankrupt agent forced to fish",
+            #     extra={"agent_id": self.unique_id},
+            # )
             self.lay_low = False
             self.will_fish = True
             return

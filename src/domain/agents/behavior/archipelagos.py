@@ -1,6 +1,8 @@
 import logging
 
 from src import config
+from src.core.config import get_fisher_config
+from src.domain.environment.weather import get_wave_height
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +88,19 @@ class Archipelagos:
             Archipelagos._tick_lay_low(self)
             return
 
+        date, wave_height = get_wave_height(self.model)
+        max_heigth = get_fisher_config(fisher_type="archipelago")["wave_height_threshold"]
+        if wave_height > max_heigth:
+            logger.debug(
+                "Decision blocked by wave height",
+                extra={
+                    "agent_id": getattr(self, "unique_id", None),
+                    "wave_height": wave_height,
+                    "threshold": max_heigth,
+                }
+            )
+            can_fish = False
+
         done_enough = revenue_last_period >= weekly_needs
         needs_money = not done_enough or self.capital < 0
         can_fish = not self.model.bad_weather
@@ -104,13 +119,13 @@ class Archipelagos:
 
         if fish_is_scarce and self.capital >= 0:
 
-            logger.warning(
-                "Entering lay-low due to perceived scarcity",
-                extra={
-                    "agent_id": getattr(self, "unique_id", None),
-                    "capital": self.capital,
-                },
-            )
+            # logger.warning(
+            #     "Entering lay-low due to perceived scarcity",
+            #     extra={
+            #         "agent_id": getattr(self, "unique_id", None),
+            #         "capital": self.capital,
+            #     },
+            # )
 
             self.lay_low = True
             self.lay_low_counter = config.NEGATIVE_CAPITAL_LAYLOW_DAYS
@@ -139,8 +154,19 @@ class Archipelagos:
 
     def _handle_exploration_phase(self) -> None:
         """Set fishing intent during the initial exploration phase."""
+        date, wave_height = get_wave_height(self.model)
+        max_heigth = get_fisher_config(fisher_type="archipelago")["wave_height_threshold"]
+        if wave_height > max_heigth:
+            logger.debug(
+                "Decision blocked by wave height",
+                extra={
+                    "agent_id": getattr(self, "unique_id", None),
+                    "wave_height": wave_height,
+                    "threshold": max_heigth,
+                }
+            )
+            can_fish = False
         can_fish = not self.model.bad_weather
-
         logger.debug(
             "Exploration phase decision",
             extra={

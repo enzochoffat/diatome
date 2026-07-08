@@ -4,6 +4,8 @@ import random
 from typing import Optional
 
 from src import config
+from src.core.config import get_fisher_config
+from src.domain.environment.weather import get_wave_height
 
 
 class Trawler:
@@ -40,6 +42,12 @@ class Trawler:
           delegates to _decide_while_at_home().
         - Otherwise: picks a random region and evaluates basic profitability.
         """
+        date, wave_height = get_wave_height(self.model)
+        max_heigth = get_fisher_config(fisher_type="trawler")["wave_height_threshold"]
+        if wave_height > max_heigth:
+            self.will_fish = False
+            return
+
         if self.gone_fishing:
             Trawler._decide_while_at_sea(self)
             return
