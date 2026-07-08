@@ -6,7 +6,7 @@ import csv
 
 def wait_for_coupling_update(
         self,
-        json_path: str = "config/config.json",
+        json_path: str = "configs_json/config.json",
         poll_interval: float = 0.5,
     ) -> Tuple[Any, Any]:
         """Blocks until the coupling config file is updated.
@@ -67,7 +67,7 @@ def read_csv_biomass(self) -> Tuple[Dict[str, str], int]:
             - A dictionary mapping species IDs to their CSV file paths.
             - The simulation time step.
     """
-    json_path = "configs/config.json"
+    json_path = "configs_json/config.json"
     
     with open(json_path, 'r', encoding='utf-8') as file:
         config = json.load(file)
