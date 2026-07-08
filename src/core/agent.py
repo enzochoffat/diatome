@@ -488,7 +488,7 @@ class FisherAgent(Agent):
             or self.accessible_regions[0]
         )
 
-        target_spot = self.decide_fishing_spot(target_region)
+        target_spot = self.decide_fishSpot(target_region)
 
         if target_spot is None:
             logger.debug(

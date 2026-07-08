@@ -7,7 +7,7 @@ for experiments and sensitivity analysis.
 import math
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Final
 
 import numpy as np
 
@@ -18,11 +18,11 @@ sys.path.insert(0, str(project_root))
 # TIME CONSTANTS
 # =============================================================================
 
-WEEK = 7
-MONTH = 28
-SEASON = 84
-HALFYEAR = 168
-YEAR = 365
+WEEK: Final[int] = 7
+MONTH: Final[int] = 28
+SEASON: Final[int] = 84
+HALFYEAR: Final[int] = 168
+YEAR: Final[int] = 365
 
 
 # =============================================================================
@@ -53,138 +53,138 @@ REGION_D: List[List[int]] = []
 # DENSITY LEVELS
 # =============================================================================
 
-LOW = "low"
-MEDIUM = "medium"
-HIGH = "high"
-MEDIUM_HIGH = "medium_high"
-LOW_MEDIUM = "low_medium"
+LOW: Final[str] = "low"
+MEDIUM: Final[str] = "medium"
+HIGH: Final[str] = "high"
+MEDIUM_HIGH: Final[str] = "medium_high"
+LOW_MEDIUM: Final[str] = "low_medium"
 
 
 # =============================================================================
 # FISH STOCK PARAMETERS
 # =============================================================================
 
-GROWTH_RATE = 1.0
+GROWTH_RATE: Final[float] = 1.0
 
-LOW_CARRYING_CAPACITY = 4
-MEDIUM_CARRYING_CAPACITY = 3276
-HIGH_CARRYING_CAPACITY = 8736
+LOW_CARRYING_CAPACITY: Final[int] = 4
+MEDIUM_CARRYING_CAPACITY: Final[int] = 3276
+HIGH_CARRYING_CAPACITY: Final[int] = 8736
 
-CARRYING_CAPACITY_A_INITIAL = 219000
-CARRYING_CAPACITY_B_INITIAL = 438000
-CARRYING_CAPACITY_C_INITIAL = 876000
-CARRYING_CAPACITY_D_INITIAL = 876000
+CARRYING_CAPACITY_A_INITIAL: Final[int] = 219000
+CARRYING_CAPACITY_B_INITIAL: Final[int] = 438000
+CARRYING_CAPACITY_C_INITIAL: Final[int] = 876000
+CARRYING_CAPACITY_D_INITIAL: Final[int] = 876000
 
-INIT_STOCK_SIZE = "halfCarryingCap"
+INIT_STOCK_SIZE: Final[str] = "halfCarryingCap"
 
 
 # =============================================================================
 # ECONOMIC PARAMETERS
 # =============================================================================
 
-FISH_PRICE = 1.0
-INITIAL_CAPITAL = 1000
+FISH_PRICE: Final[float] = 1.0
+INITIAL_CAPITAL: Final[int] = 1000
 
-MIN_AGE = 18
-MAX_AGE = 65
+MIN_AGE: Final[int] = 18
+MAX_AGE: Final[int] = 65
 
-BANKRUPTCY_THRESHOLD_YEARS = 1
-BANKRUPTCY_LAYLOW_DAYS = 7
-NEGATIVE_CAPITAL_LAYLOW_PROBABILITY = 0.3
-NEGATIVE_CAPITAL_LAYLOW_DAYS = 7
-SAFETY_BUFFER_DAYS = 7
+BANKRUPTCY_THRESHOLD_YEARS: Final[int] = 1
+BANKRUPTCY_LAYLOW_DAYS: Final[int] = 7
+NEGATIVE_CAPITAL_LAYLOW_PROBABILITY: Final[float] = 0.3
+NEGATIVE_CAPITAL_LAYLOW_DAYS: Final[int] = 7
+SAFETY_BUFFER_DAYS: Final[int] = 7
 
 
 # =============================================================================
 # FISHER TYPE: ARCHIPELAGO
 # =============================================================================
 
-ARCHIPELAGO_COST_EXISTENCE = 0.5
-ARCHIPELAGO_COST_ACTIVITY = 0.5
-ARCHIPELAGO_CATCHABILITY = 5
-ARCHIPELAGO_ACCESSIBLE_REGIONS = ["A"]
-ARCHIPELAGO_MAX_GOOD_SPOTS = 5
+ARCHIPELAGO_COST_EXISTENCE: Final[float] = 0.5
+ARCHIPELAGO_COST_ACTIVITY: Final[float] = 0.5
+ARCHIPELAGO_CATCHABILITY: Final[int] = 5
+ARCHIPELAGO_ACCESSIBLE_REGIONS: List[str] = ["A"]
+ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
 
 
 # =============================================================================
 # FISHER TYPE: COASTAL
 # =============================================================================
 
-COASTAL_COST_EXISTENCE = 1.0
-COASTAL_COST_ACTIVITY = 1.0
-COASTAL_CATCHABILITY = 10
-COASTAL_ACCESSIBLE_REGIONS = ["A", "B"]
-COASTAL_MAX_GOOD_SPOTS = 3
+COASTAL_COST_EXISTENCE: Final[float] = 1.0
+COASTAL_COST_ACTIVITY: Final[float] = 1.0
+COASTAL_CATCHABILITY: Final[int] = 10
+COASTAL_ACCESSIBLE_REGIONS: List[str] = ["A", "B"]
+COASTAL_MAX_GOOD_SPOTS: Final[int] = 3
 
 
 # =============================================================================
 # FISHER TYPE: TRAWLER
 # =============================================================================
 
-TRAWLER_COST_EXISTENCE = 5.0
-TRAWLER_COST_ACTIVITY = 5.0
-TRAWLER_CATCHABILITY = 50
-TRAWLER_ACCESSIBLE_REGIONS = ["B", "C", "D"]
-TRAWLER_MAX_GOOD_SPOTS = 2
-TRAWLER_STORAGE_CAPACITY = 50
+TRAWLER_COST_EXISTENCE: Final[float] = 5.0
+TRAWLER_COST_ACTIVITY: Final[float] = 5.0
+TRAWLER_CATCHABILITY: Final[int] = 50
+TRAWLER_ACCESSIBLE_REGIONS: List[str] = ["B", "C", "D"]
+TRAWLER_MAX_GOOD_SPOTS: Final[int] = 2
+TRAWLER_STORAGE_CAPACITY: Final[int] = 50
 
 
 # =============================================================================
 # TRAVEL COSTS
 # =============================================================================
 
-LOW_COST_TRAVEL = 2.5
-MEDIUM_COST_TRAVEL = 5.0
-MEDIUM_COST_TRAVEL_BIGVESSEL = 8.0
-HIGH_COST_TRAVEL = 15.0
-INTER_REGION_TRAVEL_MULTIPLIER = 0.5
-TRAVEL_COST_PER_UNIT = 1.0
+LOW_COST_TRAVEL: Final[float] = 2.5
+MEDIUM_COST_TRAVEL: Final[float] = 5.0
+MEDIUM_COST_TRAVEL_BIGVESSEL: Final[float] = 8.0
+HIGH_COST_TRAVEL: Final[float] = 15.0
+INTER_REGION_TRAVEL_MULTIPLIER: Final[float] = 0.5
+TRAVEL_COST_PER_UNIT: Final[float] = 1.0
 
 
 # =============================================================================
 # DECISION-MAKING PARAMETERS
 # =============================================================================
 
-DEFAULT_MEMORY_SIZE = 365
-SPATIAL_MEMORY_MAX_AGE = 365 * 1
+DEFAULT_MEMORY_SIZE: Final[int] = 365
+SPATIAL_MEMORY_MAX_AGE: Final[int] = 365 * 1
 
-SATISFACTION_HOME_THRESHOLD = 0.5
-SATISFACTION_GROWTH_THRESHOLD = 0.5
-SCARCE_PERCEPTION_THRESHOLD = -0.05
+SATISFACTION_HOME_THRESHOLD: Final[float] = 0.5
+SATISFACTION_GROWTH_THRESHOLD: Final[float] = 0.5
+SCARCE_PERCEPTION_THRESHOLD: Final[float] = -0.05
 
-GOOD_SPOT_EFFICIENCY_THRESHOLD = 0.7
-SIMPLE_FISHING_PROBABILITY = 0.5
+GOOD_SPOT_EFFICIENCY_THRESHOLD: Final[float] = 0.7
+SIMPLE_FISHING_PROBABILITY: Final[float] = 0.5
 
-MEMORY_RECENT_WINDOW = 5
-MEMORY_OLDER_WINDOW = 10
-MEMORY_WEEKLY_WINDOW = 7
-MEMORY_BIWEEKLY_WINDOW = 14
-MEMORY_MONTHLY_WINDOW = 30
+MEMORY_RECENT_WINDOW: Final[int] = 5
+MEMORY_OLDER_WINDOW: Final[int] = 10
+MEMORY_WEEKLY_WINDOW: Final[int] = 7
+MEMORY_BIWEEKLY_WINDOW: Final[int] = 14
+MEMORY_MONTHLY_WINDOW: Final[int] = 30
 
-SCARCITY_CATCH_RATIO_THRESHOLD = 0.5
-SCARCITY_MIN_MEMORY = 10
-EXPLORATION_PHASE_TRIPS = 5
+SCARCITY_CATCH_RATIO_THRESHOLD: Final[float] = 0.5
+SCARCITY_MIN_MEMORY: Final[int] = 10
+EXPLORATION_PHASE_TRIPS: Final[int] = 5
 
-TRAWLER_PROFIT_THRESHOLD_DAYS = 1
+TRAWLER_PROFIT_THRESHOLD_DAYS: Final[int] = 1
 
-SOCIAL_INFLUENCE = "descriptiveNorm"
+SOCIAL_INFLUENCE: Final[str] = "descriptiveNorm"
 
 
 # =============================================================================
 # WEATHER PARAMETERS
 # =============================================================================
 
-BAD_WEATHER_PROBABILITY = 0.1
+BAD_WEATHER_PROBABILITY: Final[float] = 0.1
 
 
 # =============================================================================
 # SOCIAL ATTRIBUTES
 # =============================================================================
 
-PARTNER_PROBABILITY = 0.5
-SD_CARCAP = 0.1
-HOTSPOT_HIGH_RADIUS = 1.5
-HOTSPOT_MEDIUM_RADIUS = 3.0
+PARTNER_PROBABILITY: Final[float] = 0.5
+SD_CARCAP: Final[float] = 0.1
+HOTSPOT_HIGH_RADIUS: Final[float] = 1.5
+HOTSPOT_MEDIUM_RADIUS: Final[float] = 3.0
 
 
 # =============================================================================

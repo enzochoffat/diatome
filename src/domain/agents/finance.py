@@ -1,7 +1,22 @@
-from typing import Dict, Any
+from typing import Any
 
 
-def calculate_profit(agent, catch: float, costs: float) -> Dict[str, Any]:
+def calculate_profit(
+    agent,
+    catch: float,
+    costs: float,
+) -> dict[str, Any]:
+    """Calculate revenue and profit for a fishing trip.
+
+    Args:
+        agent: Fisher agent instance.
+        catch: Quantity of fish caught.
+        costs: Total trip costs.
+
+    Returns:
+        Dictionary containing revenue, costs, profit, catch amount,
+        fish price, and location information.
+    """
     revenue = catch * agent.model.FISH_PRICE
     profit = revenue - costs
 
@@ -22,6 +37,16 @@ def update_finances(
     revenue: float,
     is_trip: bool = True,
 ) -> None:
+    """Update the financial state of an agent.
+
+    Args:
+        agent: Fisher agent instance.
+        profit: Profit to apply.
+        cost: Cost to apply.
+        revenue: Revenue to apply.
+        is_trip: Whether the financial update corresponds to a fishing
+            trip.
+    """
     agent.capital += profit
     agent.total_profit += profit
     agent.total_cost += cost
@@ -38,14 +63,33 @@ def update_finances(
 
 
 def check_bankruptcy(agent) -> None:
+    """Update the bankruptcy status of an agent.
+
+    Args:
+        agent: Fisher agent instance.
+    """
     bankruptcy_threshold = -(agent.cost_existence * 7)
 
     if agent.capital < bankruptcy_threshold:
         agent.bankrupt = True
 
 
-def get_financial_summary(agent) -> Dict[str, Any]:
-    total_trips = agent.profitable_trip + agent.unprofitable_trip
+def get_financial_summary(
+    agent,
+) -> dict[str, Any]:
+    """Return a summary of the agent's financial state.
+
+    Args:
+        agent: Fisher agent instance.
+
+    Returns:
+        Dictionary containing financial metrics and performance
+        indicators.
+    """
+    total_trips = (
+        agent.profitable_trip
+        + agent.unprofitable_trip
+    )
 
     return {
         "capital": agent.capital,
@@ -58,10 +102,14 @@ def get_financial_summary(agent) -> Dict[str, Any]:
         "unprofitable_trips": agent.unprofitable_trip,
         "total_trips": total_trips,
         "success_rate": (
-            agent.profitable_trip / total_trips if total_trips > 0 else 0
+            agent.profitable_trip / total_trips
+            if total_trips > 0
+            else 0.0
         ),
         "avg_profit_per_trip": (
-            agent.total_profit / total_trips if total_trips > 0 else 0
+            agent.total_profit / total_trips
+            if total_trips > 0
+            else 0.0
         ),
         "bankrupt": agent.bankrupt,
     }
