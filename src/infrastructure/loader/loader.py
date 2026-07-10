@@ -14,6 +14,7 @@ from src.infrastructure.ecospace import ecospace_outputs
 from src.infrastructure.ports.ports_loader import load_ports_map
 from src.domain.environment import spatial_utils
 from src.domain.environment.weather import read_wave_height_vector
+from src.domain.environment.ocean_currents import load_ocean_current_map
 
 
 class ConfigLoader:
@@ -414,6 +415,9 @@ class ConfigLoader:
         )
         read_wave_height_vector(
             wave_height_vector_path=map_params["wave_height_vector"]
+        )
+        load_ocean_current_map(
+            file_path=map_params.get("ocean_current_map")
         )
 
     def save_config(self, output_path: str) -> None:

@@ -285,3 +285,16 @@ def reload_spatial_configuration(
     print(f"  Total water cells: {all_water_depths.size}")
 
     return TOPOLOGY, min_depth, max_depth
+
+def read_depth_map():
+    """Reads the depth map from the configured source file.
+
+    Returns:
+        List[List[int]]: A 2-D grid of depth values.
+    """
+    global TOPOLOGY
+    topo = TOPOLOGY
+
+    return topo
+
+

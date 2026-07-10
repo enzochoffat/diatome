@@ -6,6 +6,7 @@ from typing import Optional
 from src import config
 from src.core.config import get_fisher_config
 from src.domain.environment.weather import get_wave_height
+from src.domain.environment.spatial_utils import read_depth_map
 
 
 class Trawler:

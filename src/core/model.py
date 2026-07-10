@@ -69,6 +69,7 @@ from src.servicies.metrics import (
 from src.interfaces.cli.report import print_final_summary as print_final_summary_helper
 from src.servicies.coupling_service import wait_for_coupling_update, read_csv_biomass, update_biomass
 from src.infrastructure.loader.loader import ConfigLoader
+from src.domain.environment.ocean_currents import read_currents_map
 
 
 logger = logging.getLogger(__name__)
@@ -533,6 +534,7 @@ class FisheryModel(Model):
         """
         #print(f"Start day {self.current_date}")
         # 1. Weather
+        self.currents_map = read_currents_map(self.current_date.strftime("%Y-%m-%d"))
         self.determine_weather()
 
         is_new_year = (

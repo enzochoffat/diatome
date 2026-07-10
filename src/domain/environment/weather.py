@@ -11,11 +11,11 @@ def determine_weather(model) -> bool:
     )
     return model.bad_weather
 
-# On aura un vecteur journalier d'hauteur de vagues moyennes dans la zone d'études. Pour chaque flottille un seuil d'hauteur de vagues.
+# v On aura un vecteur journalier d'hauteur de vagues moyennes dans la zone d'études. Pour chaque flottille un seuil d'hauteur de vagues.
 
-# Dans chaque flottille un paramètre d'hauteur de vagues
+# v Dans chaque flottille un paramètre d'hauteur de vagues
 
-# Créer un fichier pour les courants marins, load d'une carte jounalière.
+# v Créer un fichier pour les courants marins, load d'une carte jounalière.
 
 # Faut que chaque agent puisse lire la carte des profondeur et espèces
 
