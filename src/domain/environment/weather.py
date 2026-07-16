@@ -80,7 +80,6 @@ def get_wave_height(model) -> float:
     if date not in VECTOR_WAVE_HEIGHT:
         print(f"Warning: Date {date} not found in wave height vector. Returning default value of 0.0.")
         return date, 0.0  # Default to 0.0 if the date is not found in the vector
-    print(f"Retrieved wave height for date {date}: {VECTOR_WAVE_HEIGHT[date]}")
     return date, VECTOR_WAVE_HEIGHT[date]
 
 

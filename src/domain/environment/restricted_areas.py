@@ -37,8 +37,20 @@ def load_restricted_area_vector(restricted_area_vector_path: Optional[str]) -> n
     if restricted_area_vector_path is None:
         raise ValueError("No restricted area vector path provided.")
 
-    vector = np.genfromtxt(restricted_area_vector_path, delimiter=",", skip_header=1)[:]
-    _restricted_area_vector = vector.astype(int).flatten()
+    _restricted_area_vector = {}
+
+    with open(restricted_area_vector_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            try:
+                date_str, status_str = line.strip().split(';')
+                date = datetime.strptime(date_str, '%d/%m/%Y').date()
+                #print(f"Read wave height for date {date}: {wave_height_str}")
+                status = int(status_str)
+                _restricted_area_vector[date] = status
+            except ValueError:
+                # Handle the case where conversion to float fails
+                #print(f"Warning: Could not convert wave height to float for line: {line.strip()}")
+                continue
     return _restricted_area_vector
 
 def restricted_area_status(date: datetime) -> str:

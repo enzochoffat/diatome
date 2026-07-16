@@ -709,9 +709,9 @@ class FisherAgent(Agent):
                     candidate[1],
                 )
                 and not restricted_areas.is_restricted_area(
-                    self,
                     candidate[0],
                     candidate[1],
+                    self.model.current_date
                 )
             ):
                 return candidate
@@ -792,9 +792,7 @@ class FisherAgent(Agent):
 
             if movement.is_restricted(self, *fishing_spot):
                 return self.explore_random_spot(region)
-            
-            if self.unique_id == 0:  # Debugging for agent with unique_id 0
-                print(f"Agent {self.unique_id} selected fishing spot: {fishing_spot[1]}")
+        
             if restricted_areas.is_restricted_area(fishing_spot[0], fishing_spot[1], self.model.current_date):
                 return self.explore_random_spot(region)
             self.current_location = fishing_spot
