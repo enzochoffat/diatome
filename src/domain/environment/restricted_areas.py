@@ -18,8 +18,9 @@ def load_restricted_area_map(restricted_area_map_path: Optional[str]) -> np.ndar
     if restricted_area_map_path is None:
         raise ValueError("No restricted area map path provided.")
 
-    grid = np.genfromtxt(restricted_area_map_path, delimiter=",", skip_header=1)[:, 1:]
-    _restricted_area_map = grid > 0
+    _restricted_area_map = np.genfromtxt(restricted_area_map_path, delimiter=",", skip_header=1)
+    save_restricted_area_map(file_path="C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\RestrictedAreasMap.csv",
+                             restricted_area_map=_restricted_area_map)
     return _restricted_area_map
 
 def load_restricted_area_vector(restricted_area_vector_path: Optional[str]) -> np.ndarray:
@@ -71,10 +72,21 @@ def is_restricted_area(x: int, y: int, date: datetime) -> bool:
     Returns:
         bool: True if the position is in a restricted area, False otherwise.
     """
-    # global _restricted_area_map
-    # if (x, y) in _restricted_area_map:
-    #     if _restricted_area_vector[date] == 2:  # Open
-    #         return False  # Open to navigation
-    #     return True  # Closed or restricted
-    # return False  # Not in restricted area
-    return None
+    #print(f"Checking restricted area status for position ({x}, {y}) on {date}.")
+    if _restricted_area_map[int(y), int(x)] > 0.5:
+        print(f"Position ({x}, {y}) is in a restricted area on {date}.")
+        return True
+    return False
+
+def save_restricted_area_map(restricted_area_map: np.ndarray, file_path: str) -> None:
+    """Saves the restricted area map to a CSV file.
+
+    Args:
+        restricted_area_map: The 2D boolean numpy array representing the
+            restricted area map.
+        file_path: The path to save the CSV file.
+    """
+    with open(file_path, 'w', encoding='utf-8') as file:
+        for row in restricted_area_map:
+            row_str = ';'.join(str(value) for value in row)
+            file.write(row_str + '\n')
