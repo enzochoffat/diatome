@@ -44,8 +44,8 @@ class Trawler:
         - Otherwise: picks a random region and evaluates basic profitability.
         """
         date, wave_height = get_wave_height(self.model)
-        max_heigth = get_fisher_config(fisher_type="trawler")["wave_height_threshold"]
-        if wave_height > max_heigth:
+        max_wave_height = get_fisher_config(fisher_type="trawler")["wave_height_threshold"]
+        if wave_height > max_wave_height:
             self.will_fish = False
             return
 

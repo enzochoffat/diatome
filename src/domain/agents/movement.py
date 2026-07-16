@@ -23,7 +23,7 @@ def move_to(self, x: int, y: int) -> None:
             y: Target row.
         """
         if is_restricted(self, x, y):
-            return
+            return 
         
         if self.pos is not None:
             self.model.grid.remove_agent(self)

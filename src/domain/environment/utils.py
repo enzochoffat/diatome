@@ -25,7 +25,7 @@ def get_random_position_in_region(
     ]
     return random.choice(candidates) if candidates else None
 
-def restricted_area(self, habitat: List[str]) -> np.ndarray:
+def restricted_habitat(self, habitat: List[str]) -> np.ndarray:
     """Returns a boolean mask of restricted areas based on habitat.
 
     Args:

@@ -31,6 +31,8 @@ def determine_weather(model) -> bool:
 
 # Calculer la distance du port à la zone de pêche, A* (pour éviter les zones interdites)
 
+# faire une liste de comment ajouter une nouvelle flottille
+
 
 def read_wave_height_vector(wave_height_vector_path: str) -> Dict[datetime, float]:
     """Reads the wave height vector from a CSV file specified in the model's configuration.

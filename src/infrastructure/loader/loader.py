@@ -15,6 +15,7 @@ from src.infrastructure.ports.ports_loader import load_ports_map
 from src.domain.environment import spatial_utils
 from src.domain.environment.weather import read_wave_height_vector
 from src.domain.environment.ocean_currents import load_ocean_current_map
+from src.domain.environment.restricted_areas import load_restricted_area_map, load_restricted_area_vector
 
 
 class ConfigLoader:
@@ -248,7 +249,13 @@ class ConfigLoader:
             },
             "wave_height_vector": self._resolve_config_path(
                 maps.get("wave_height_vector")
-            )
+            ),
+            "restricted_area_vector": self._resolve_config_path(
+                maps.get("restricted_area_vector")
+            ),
+            "restricted_area_map": self._resolve_config_path(
+                maps.get("restricted_area_map")
+            ),
         }
 
     def get_model_params(self) -> Dict[str, Any]:
@@ -392,6 +399,7 @@ class ConfigLoader:
             return
 
         map_params = self.get_map_params()
+        print(f"Applying map configuration: {map_params.get('restricted_area_map')}, {map_params.get('restricted_area_vector')}")
 
         ecospace_outputs.configure_sources(
             topology_map_path=map_params["topology_map"],
@@ -418,6 +426,12 @@ class ConfigLoader:
         )
         load_ocean_current_map(
             file_path=map_params.get("ocean_current_map")
+        )
+        load_restricted_area_map(
+            restricted_area_map_path=map_params.get("restricted_area_map")
+        )
+        load_restricted_area_vector(
+            restricted_area_vector_path=map_params.get("restricted_area_vector")
         )
 
     def save_config(self, output_path: str) -> None:

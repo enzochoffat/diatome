@@ -23,6 +23,7 @@ from src.domain.agents import finance
 from src.domain.agents import fishing
 from src.domain.agents import memory
 from src.domain.agents import movement
+from src.domain.environment import restricted_areas
 from src.domain.agents.behavior.archipelagos import Archipelagos
 from src.domain.agents.behavior.coastal import Coastal
 from src.domain.agents.behavior.trawler import Trawler
@@ -58,6 +59,8 @@ class FisherAgent(Agent):
         name: str | None = None,
         port: tuple[int, int] | None = None,
         habitat: list[str] | None = None,
+        restricted_status: str | None = None,
+        distance_map: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Initialize a fisher agent.
 
@@ -70,6 +73,7 @@ class FisherAgent(Agent):
             name: Optional display name.
             port: Home port coordinates.
             habitat: Optional restricted habitat mask.
+            distance_map: Optional distance map.
         """
         super().__init__(model)
 
@@ -78,6 +82,7 @@ class FisherAgent(Agent):
         self.name = name
         self.port = port
         self.restricted_mask = habitat
+        self.restricted_status = restricted_status
 
         # Financial state.
         self.capital: float = (
@@ -703,6 +708,11 @@ class FisherAgent(Agent):
                     candidate[0],
                     candidate[1],
                 )
+                and not restricted_areas.is_restricted_area(
+                    self,
+                    candidate[0],
+                    candidate[1],
+                )
             ):
                 return candidate
 
@@ -781,6 +791,9 @@ class FisherAgent(Agent):
                 return self.explore_random_spot(region)
 
             if movement.is_restricted(self, *fishing_spot):
+                return self.explore_random_spot(region)
+            
+            if restricted_areas.is_restricted_area(self, *fishing_spot):
                 return self.explore_random_spot(region)
             self.current_location = fishing_spot
 

@@ -3,6 +3,7 @@ from src.core.agent import FisherAgent
 from src.infrastructure.ports.ports_loader import (
     get_port_coordinates,
 )
+from src.domain.environment.distance import create_distance_map, save_distance_map
 
 
 def create_agents(self) -> None:
@@ -42,12 +43,22 @@ def create_agents(self) -> None:
         ports = ports_dict.get("archipelago_ports", [0])
         port_index = ports[i]
 
-        habitat = self.restricted_area(
+        habitat = self.restricted_habitat(
             habitat_dict.get(
                 "archipelago_habitats",
                 [0],
             )
         )
+
+        distance_map = create_distance_map(
+            self,
+            port_location=port_coordinates[port_index],
+        )
+        if i == 0:
+            save_distance_map(
+                distance_map,
+                file_path="C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\Distance.csv",
+            )
 
         agent = FisherAgent(
             agent_id,
@@ -57,6 +68,7 @@ def create_agents(self) -> None:
             name=name,
             port=port_coordinates[port_index],
             habitat=habitat,
+            distance_map=distance_map,
         )
 
         start_pos = (0, 0)
@@ -79,7 +91,7 @@ def create_agents(self) -> None:
         ports = ports_dict.get("coastal_ports", [0])
         port_index = ports[i]
 
-        habitat = self.restricted_area(
+        habitat = self.restricted_habitat(
             habitat_dict.get(
                 "coastal_habitats",
                 [0],
@@ -94,6 +106,10 @@ def create_agents(self) -> None:
             name=name,
             port=port_coordinates[port_index],
             habitat=habitat,
+            distance_map=create_distance_map(
+                self,
+                port_location=port_coordinates[port_index],
+            ),
         )
 
         region = self.random.choice(["A", "B"])
@@ -122,7 +138,7 @@ def create_agents(self) -> None:
         ports = ports_dict.get("trawler_ports", [0])
         port_index = ports[i]
 
-        habitat = self.restricted_area(
+        habitat = self.restricted_habitat(
             habitat_dict.get(
                 "trawler_habitats",
                 [0],
@@ -137,6 +153,10 @@ def create_agents(self) -> None:
             name=name,
             port=port_coordinates[port_index],
             habitat=habitat,
+            distance_map=create_distance_map(
+                self,
+                port_location=port_coordinates[port_index],
+            ),
         )
 
         region = self.random.choice(

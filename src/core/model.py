@@ -42,7 +42,10 @@ from src.domain.environment.stock_ops import (
 )
 from src.domain.environment.utils import (
     get_random_position_in_region as get_random_position_in_region_helper,
-    restricted_area as restricted_area_helper,
+    restricted_habitat as restricted_habitat_helper,
+)
+from src.domain.environment.restricted_areas import (
+    restricted_area_status as restricted_area_status_helper,
 )
 from src.domain.environment.weather import determine_weather as determine_weather_helper
 from src.domain.environment.fish_dynamics import (
@@ -321,8 +324,11 @@ class FisheryModel(Model):
     def _get_random_position_in_region(self, region: str):
         return get_random_position_in_region_helper(self, region)
 
-    def restricted_area(self, habitat):
-        return restricted_area_helper(self, habitat)
+    def restricted_habitat(self, habitat):
+        return restricted_habitat_helper(self, habitat)
+
+    def restricted_area_status(self, date: datetime) -> str:
+        return restricted_area_status_helper(date)
 
     def get_region(self, x: int, y: int) -> str:
         return get_region_helper(self, x, y)

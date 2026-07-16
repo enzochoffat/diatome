@@ -48,7 +48,9 @@ def configure_sources(
     wind_farm_map_path: Optional[str] = None,
     species_map_paths: Optional[Dict[str, str]] = None,
     ports_map_path: Optional[str] = None,
-    habitat_map_path: Optional[Dict[str, str]] = None
+    habitat_map_path: Optional[Dict[str, str]] = None,
+    restricted_area_map_path: Optional[str] = None,
+    restricted_area_vector_path: Optional[str] = None,
 ) -> None:
     """Configures the CSV sources used by the module.
 
@@ -64,8 +66,10 @@ def configure_sources(
             If None, the current value is kept.
         ports_map_path: Path to the ports CSV file. If None, the current value is kept.
         habitat_map_path: Path to the habitat CSV file. If None, the current value is kept.
+        restricted_area_map_path: Path to the restricted area CSV file. If None, the current value is kept.
+        restricted_area_vector_path: Path to the restricted area vector CSV file. If None, the current value is kept.
     """
-    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, PORTS_MAP_PATH, HABITAT_MAP_PATH
+    global TOPOLOGY_MAP_PATH, WINDFARM_MAP_PATH, SPECIES_MAP_PATHS, PORTS_MAP_PATH, HABITAT_MAP_PATH, RESTRICTED_AREA_MAP_PATH, RESTRICTED_AREA_VECTOR_PATH
     global _ecospace_data_cache
     global _cached_habitat_data
 
@@ -79,6 +83,10 @@ def configure_sources(
         PORTS_MAP_PATH = str(ports_map_path)
     if habitat_map_path is not None:
         HABITAT_MAP_PATH = habitat_map_path
+    if restricted_area_map_path is not None:
+        RESTRICTED_AREA_MAP_PATH = str(restricted_area_map_path)
+    if restricted_area_vector_path is not None:
+        RESTRICTED_AREA_VECTOR_PATH = str(restricted_area_vector_path)
 
     _ecospace_data_cache = get_ecospace_data()
     _cached_habitat_data = None
@@ -252,6 +260,34 @@ def load_habitat_map(habitat_map_path: Optional[Dict[str, str]] = None) -> Tuple
     print(f"habitat 0 name: {habitat_array[1][0]}")
     _cached_habitat_data = habitat_array
     return _cached_habitat_data
+
+def load_restricted_area_map(restricted_area_map_path: Optional[str] = None) -> np.ndarray:
+    """Loads the restricted area map from a CSV file.
+
+    Args:
+        restricted_area_map_path: The path to the restricted area map CSV file.
+    Returns:
+        np.ndarray: A 2D boolean numpy array where True indicates a restricted area.
+    """
+    if restricted_area_map_path is None:
+        raise ValueError("No restricted area map path provided.")
+
+    grid = np.genfromtxt(restricted_area_map_path, delimiter=",", skip_header=1)[:, 1:]
+    return grid > 0
+
+def load_restricted_area_vector(restricted_area_vector_path: Optional[str] = None) -> np.ndarray:
+    """Loads the restricted area vector from a CSV file.
+
+    Args:
+        restricted_area_vector_path: The path to the restricted area vector CSV file.
+    Returns:
+        np.ndarray: A 1D boolean numpy array where 0 indicates a restricted area is closed, 1 indicates open to navigation, and 2 indicates open.
+    """
+    if restricted_area_vector_path is None:
+        raise ValueError("No restricted area vector path provided.")
+
+    vector = np.genfromtxt(restricted_area_vector_path, delimiter=",", skip_header=1)[:, 1:]
+    return vector.astype(int).flatten()
 
 # ---------------------------------------------------------------------------
 # Mask utilities
