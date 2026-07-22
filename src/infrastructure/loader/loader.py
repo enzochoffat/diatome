@@ -9,6 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
+import pandas as pd
+
 from src.core import config as default_config
 from src.infrastructure.ecospace import ecospace_outputs
 from src.infrastructure.ports.ports_loader import load_ports_map
@@ -274,6 +277,8 @@ class ConfigLoader:
         num_archipelago: int = config["agents"]["num_archipelago"]
         num_coastal: int = config["agents"]["num_coastal"]
 
+        species_params = self.get_species_params()
+
         return {
             "end_of_sim": config["simulation"]["duration_years"] * 365,
             "num_archipelago": num_archipelago,
@@ -287,6 +292,9 @@ class ConfigLoader:
             ],
             "trawler_names": agent_names[num_archipelago + num_coastal:],
             "start_date": config["simulation"].get("start_date"),
+            "catchability_matrix": species_params["catchability_matrix"],
+            "price_matrix": species_params["price_matrix"],
+            "species_names": species_params["species_names"],
         }
 
     def get_output_params(self) -> Dict[str, Any]:
@@ -328,6 +336,61 @@ class ConfigLoader:
             "trawler_ports": agents.get("trawler_ports", []),
         }
     
+    def _load_species_flotilla_matrix(
+        self, csv_path: str, species_names: List[str]
+    ) -> np.ndarray:
+        """Loads a species × flotilla CSV into a (F, N) numpy array.
+
+        Expected CSV format:
+          - First row: header with flotilla names (e.g. archipelago, coastal, trawler)
+          - First column: species IDs matching ``species_names`` order.
+          - Values: catchability or price.
+
+        The returned array is indexed as ``array[flotilla_index, species_index]``.
+        """
+        df = pd.read_csv(csv_path, index_col=0)
+        # Convert species_names (string IDs) to int to match CSV numeric index
+        species_ids = [int(s) for s in species_names]
+        df = df.reindex(index=species_ids, fill_value=0.0)
+        # Transpose from (N, F) to (F, N) so that [flotilla_idx] gives a species vector
+        return df.to_numpy(dtype=np.float64).T
+
+    def get_species_params(self) -> Dict[str, Any]:
+        """Loads and returns species-related parameters.
+
+        Reads the catchability and price CSV paths from the loaded
+        config, resolves them, and loads them into numpy arrays.
+
+        Returns:
+            Dict with keys ``catchability_matrix`` (F, N), ``price_matrix`` (F, N),
+            and ``species_names`` (List[str]).
+        """
+        maps = self.loaded_config.get("maps", {})
+        species_maps = maps.get("species_map", {})
+        species_names = list(species_maps.keys())
+
+        species_tables = maps.get("species_tables", {})
+        catchability_path = self._resolve_config_path(
+            species_tables.get("catchability")
+        )
+        price_path = self._resolve_config_path(
+            species_tables.get("price")
+        )
+
+        return {
+            "catchability_matrix": (
+                self._load_species_flotilla_matrix(catchability_path, species_names)
+                if catchability_path
+                else np.zeros((3, len(species_names)), dtype=np.float64)
+            ),
+            "price_matrix": (
+                self._load_species_flotilla_matrix(price_path, species_names)
+                if price_path
+                else np.ones((3, len(species_names)), dtype=np.float64)
+            ),
+            "species_names": species_names,
+        }
+
     def get_habitat_assignments(self) -> Dict[str, List[str]]:
         """Returns the habitat assignments for each agent type.
 

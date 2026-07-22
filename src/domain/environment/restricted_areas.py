@@ -1,8 +1,12 @@
+import logging
+
 import numpy as np
 from datetime import datetime
 from typing import Optional
 
 from src.infrastructure.ecospace import ecospace_outputs
+
+logger = logging.getLogger(__name__)
 
 def load_restricted_area_map(restricted_area_map_path: Optional[str]) -> np.ndarray:
     """Loads the restricted area map from a CSV file.
@@ -86,7 +90,7 @@ def is_restricted_area(x: int, y: int, date: datetime) -> bool:
     """
     #print(f"Checking restricted area status for position ({x}, {y}) on {date}.")
     if _restricted_area_map[int(y), int(x)] > 0.5:
-        print(f"Position ({x}, {y}) is in a restricted area on {date}.")
+        logger.debug("Position (%d, %d) is in a restricted area on %s.", x, y, date)
         return True
     return False
 

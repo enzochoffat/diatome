@@ -16,6 +16,8 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 import statistics
 
+import numpy as np
+
 from mesa import Agent
 
 from src import config
@@ -166,6 +168,7 @@ class FisherAgent(Agent):
 
         # Trawler-specific.
         self.fish_onboard = 0.0
+        self.accumulated_value = 0.0
         self.storing_capacity = (
             config.TRAWLER_STORAGE_CAPACITY
             if fisher_type == "trawler"
@@ -175,11 +178,17 @@ class FisherAgent(Agent):
 
     def _set_type_attributes(self) -> None:
         """Set type-specific economic and behavioral attributes."""
+        f_idx = self.model.flotilla_indices[self.fisher_type]
+        self.catchability_vector = self.model.catchability_matrix[f_idx].copy()
+        self.catchability = float(np.sum(self.catchability_vector))
+        self.expected_revenue = float(
+            np.sum(self.catchability_vector * self.model.price_matrix[f_idx])
+        )
+
         if self.fisher_type == "archipelago":
             self.cost_existence = self.model.LOW_COST_EXISTENCE
             self.cost_activity = self.model.LOW_COST_ACTIVITY
-            self.catchability = self.model.CATCHABILITY_ARCHEPELAGO
-            self.accessible_regions = ["A"]
+            self.accessible_regions = ["A", "B", "C", "D"]
             self.lifestyle_preference = "high"
             self.max_good_spots = 5
             self.has_partner = True
@@ -189,8 +198,7 @@ class FisherAgent(Agent):
         elif self.fisher_type == "coastal":
             self.cost_existence = self.model.MEDIUM_COST_EXISTENCE
             self.cost_activity = self.model.MEDIUM_COST_ACTIVITY
-            self.catchability = self.model.CATCHABILITY_COASTAL
-            self.accessible_regions = ["A", "B"]
+            self.accessible_regions = ["A", "B", "C", "D"]
             self.lifestyle_preference = "medium"
             self.max_good_spots = 3
             self.wanna_be_home = False
@@ -207,8 +215,7 @@ class FisherAgent(Agent):
         elif self.fisher_type == "trawler":
             self.cost_existence = self.model.HIGH_COST_EXISTENCE
             self.cost_activity = self.model.HIGH_COST_ACTIVITY
-            self.catchability = self.model.CATCHABILITY_TRAWLER
-            self.accessible_regions = ["B", "C", "D"]
+            self.accessible_regions = ["A", "B", "C", "D"]
             self.lifestyle_preference = "low"
             self.max_good_spots = 2
             self.has_partner = False
@@ -556,6 +563,7 @@ class FisherAgent(Agent):
             {
                 "location": target_spot,
                 "catch": trip_result["catch"],
+                "revenue": trip_result["revenue"],
                 "cost": trip_result["costs"],
                 "profit": trip_result["profit"],
                 "days": 1,
@@ -569,40 +577,39 @@ class FisherAgent(Agent):
     def _calculate_region_preference(self) -> str:
         """Select the preferred fishing region.
 
-        The selection follows the NetLogo catch-expectation logic and
-        compares expected catches across accessible regions.
+        Compares expected revenue across accessible regions.
 
         Returns:
             Preferred region identifier.
         """
-        expected_catches = {
-            region: self._estimate_catch(region)
+        expected_revenues = {
+            region: self._estimate_value(region)
             for region in self.accessible_regions
         }
 
-        catch_b = expected_catches.get("B", self.catchability)
-        catch_c = expected_catches.get("C", self.catchability)
-        catch_d = expected_catches.get("D", self.catchability)
+        rev_b = expected_revenues.get("B", self.expected_revenue)
+        rev_c = expected_revenues.get("C", self.expected_revenue)
+        rev_d = expected_revenues.get("D", self.expected_revenue)
 
-        if catch_b >= catch_c:
+        if rev_b >= rev_c:
             return (
                 "B"
-                if catch_c >= catch_d or catch_b >= catch_d
+                if rev_c >= rev_d or rev_b >= rev_d
                 else "D"
             )
 
-        return "C" if catch_c >= catch_d else "D"
+        return "C" if rev_c >= rev_d else "D"
 
 
-    def _estimate_catch(self, region: str) -> float:
-        """Estimate expected catch in a region from memory.
+    def _estimate_value(self, region: str) -> float:
+        """Estimate expected revenue in a region from memory.
 
         Args:
             region: Region identifier.
 
         Returns:
-            Average catch over the last ten trips in the region. Returns
-            catchability when no memory is available.
+            Average revenue over the last ten trips in the region.
+            Returns ``expected_revenue`` when no memory is available.
         """
         region_memory = [
             trip
@@ -612,11 +619,11 @@ class FisherAgent(Agent):
 
         if region_memory:
             return statistics.mean(
-                trip["catch"]
+                trip.get("revenue", 0.0)
                 for trip in region_memory[-10:]
             )
 
-        return self.catchability
+        return self.expected_revenue
 
 
     def select_fishing_spot(
@@ -761,9 +768,15 @@ class FisherAgent(Agent):
                 if self.current_location
                 else None
             )
-            fish_here = patch_here["fish_stock"] if patch_here else 0
+            value_here = (
+                self.model.get_cell_value(
+                    self.current_location[0], self.current_location[1], self.fisher_type
+                )
+                if self.current_location
+                else 0.0
+            )
             fish_wish = self.storing_capacity - self.fish_onboard
-            if fish_here < fish_wish:
+            if value_here < self.expected_revenue * (fish_wish / max(self.storing_capacity, 1)):
                 stay_put = True
 
         if not stay_put:
@@ -908,13 +921,13 @@ class FisherAgent(Agent):
     def get_fishSpot_uphill_climbing(
         self, region: str
     ) -> Optional[Tuple[int, int]]:
-        """Moves to the neighbouring patch with the highest fish stock.
+        """Moves to the neighbouring patch with the highest perceived value.
 
         Args:
             region: Must match the neighbour's region to be eligible.
 
         Returns:
-            ``(x, y)`` of the best-stocked eligible neighbour, or the
+            ``(x, y)`` of the best-valued eligible neighbour, or the
             result of knowledge-based selection as a fallback.
         """
         if self.current_location:
@@ -922,7 +935,7 @@ class FisherAgent(Agent):
                 self.current_location, radius=1
             )
             valid_neighbors = [
-                (pos, self.model.get_patch_info(pos[0], pos[1])["fish_stock"])
+                (pos, self.model.get_cell_value(pos[0], pos[1], self.fisher_type))
                 for pos in neighbors
                 if (
                     patch := self.model.get_patch_info(pos[0], pos[1])

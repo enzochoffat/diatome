@@ -68,44 +68,42 @@ class Coastal:
 
         self.update_satisfaction()
 
-        expected_catches = Coastal._compute_expected_catches(self)
+        expected_revenues = Coastal._compute_expected_revenues(self)
 
         logger.debug(
-            "Expected catches computed",
+            "Expected revenues computed",
             extra={
                 "agent_id": getattr(self, "unique_id", None),
-                "expected_catches": expected_catches,
+                "expected_revenues": expected_revenues,
             }
         )
 
-        if expected_catches.get("A", 0) >= expected_catches.get("B", 0):
+        if expected_revenues.get("A", 0) >= expected_revenues.get("B", 0):
             self.region_preference = "A"
         else:
             self.region_preference = "B"
 
-        expected_catch = expected_catches.get(
-            self.region_preference, self.catchability
+        expected_revenue = expected_revenues.get(
+            self.region_preference, self.expected_revenue
         )
         travel_cost = self.get_travel_cost(self.region_preference)
         expected_cost = (
             self.cost_existence + self.cost_activity + travel_cost
         )
-        expected_income = expected_catch * self.model.FISH_PRICE
 
         expected_profit_stay = -self.cost_existence
-        expected_profit_go = expected_income - expected_cost
+        expected_profit_go = expected_revenue - expected_cost
 
         logger.debug(
             "Economic estimation",
             extra={
-                "agent_id": getattr(self, "unique_id", None),
-                "region": self.region_preference,
-                "expected_catch": expected_catch,
-                "expected_cost": expected_cost,
-                "expected_income": expected_income,
-                "expected_profit_stay": expected_profit_stay,
-                "expected_profit_go": expected_profit_go,
-            }
+            "agent_id": getattr(self, "unique_id", None),
+            "region": self.region_preference,
+            "expected_revenue": expected_revenue,
+            "expected_cost": expected_cost,
+            "expected_profit_stay": expected_profit_stay,
+            "expected_profit_go": expected_profit_go,
+        }
         )
 
         if self.capital < 0:
@@ -141,25 +139,25 @@ class Coastal:
             self.wanna_be_home = False
             self.expect_no_profit = True
 
-    def _compute_expected_catches(self) -> dict[str, float]:
-        """Computes expected catches per region based on memory.
+    def _compute_expected_revenues(self) -> dict[str, float]:
+        """Computes expected revenues per region based on memory.
 
         For each accessible region, calculates the mean of the last 30
-        remembered catches. If no memory exists for a region, falls back
-        to catchability as a conservative estimate.
+        remembered revenues. If no memory exists for a region, falls back
+        to ``expected_revenue`` as a conservative estimate.
 
         Returns:
-            A dictionary mapping each region to its expected catch value.
+            A dictionary mapping each region to its expected revenue (€).
         """
-        expected_catches: dict[str, float] = {}
+        expected_revenues: dict[str, float] = {}
         for region in self.accessible_regions:
             region_memory = [
                 trip for trip in self.memory
                 if trip.get("region") == region
             ]
             if region_memory:
-                expected_catches[region] = statistics.mean(
-                    trip["catch"] for trip in region_memory[-30:]
+                expected_revenues[region] = statistics.mean(
+                    trip.get("revenue", 0.0) for trip in region_memory[-30:]
                 )
 
                 logger.debug(
@@ -167,24 +165,24 @@ class Coastal:
                     extra={
                         "agent_id": getattr(self, "unique_id", None),
                         "region": region,
-                        "value": expected_catches[region],
+                        "value": expected_revenues[region],
                         "sample": len(region_memory),
                     }
                 )
 
             else:
-                expected_catches[region] = self.catchability
+                expected_revenues[region] = self.expected_revenue
 
                 logger.debug(
-                    "Fallback to catchability",
+                    "Fallback to expected_revenue",
                     extra={
                         "agent_id": getattr(self, "unique_id", None),
                         "region": region,
-                        "value": expected_catches[region],
+                        "value": expected_revenues[region],
                     }
                 )
 
-        return expected_catches
+        return expected_revenues
 
     def _decide_when_profitable(self) -> None:
         """Decides whether to fish based on satisfaction, when profitable.

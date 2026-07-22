@@ -9,7 +9,7 @@
   
   "simulation": {
     "start_date": "2009-12-01",
-    "duration_years": 2,
+    "duration_years": 25,
     "verbose": true,
     "random_seed": null,
     "coupling": false
@@ -134,6 +134,10 @@
           "KS_BdS_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_8_KS_BdS_stock.csv",
           "Mud":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_6_Mud.csv",
           "Sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_2_Sand.csv"
+      },
+      "species_tables": {
+        "catchability": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Landings.csv",
+        "price": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\OffVesselPrice\\EcospaceOffVesselPrice.csv"
       }
 
   }

@@ -63,15 +63,13 @@ class Trawler:
         else:
             self.region_preference = random.choice(self.accessible_regions)
 
-            expected_catch = self.catchability
-            expected_income = expected_catch * config.FISH_PRICE
             expected_cost = (
                 self.cost_activity
                 + self.cost_existence
                 + self.get_travel_cost(self.region_preference)
             )
 
-            expected_profit_go = expected_income - expected_cost
+            expected_profit_go = self.expected_revenue - expected_cost
             expected_profit_stay = -self.cost_existence
 
             self.will_fish = expected_profit_go > expected_profit_stay
@@ -83,45 +81,40 @@ class Trawler:
     def _decide_while_at_sea(self) -> None:
         """Applies decision logic when the trawler is already at sea.
 
-        Evaluates fish availability in the current vicinity and compares it
+        Evaluates value availability in the current vicinity and compares it
         against the remaining storage capacity. Switches region if a more
         profitable alternative exists, otherwise stays in the current region.
         Lands fish if continuing to fish is no longer profitable.
         """
+        if self.fish_onboard >= self.storing_capacity:
+            self.will_fish = False
+            self.land_fish()
+            return
+
         current_region = (
             self.current_region if self.current_region
             else self.region_preference
         )
         fish_wish = self.storing_capacity - self.fish_onboard
 
-        fish_vicinity = 0
+        vicinity_value = 0
         if self.current_location:
-            patch = self.model.get_patch_info(*self.current_location)
-            fish_vicinity = patch["fish_stock"] if patch else 0
-
-            neighbors = self.get_neighbor_positions_in_radius(
-                self.current_location, radius=1
+            vicinity_value = self.model.get_vicinity_value(
+                self.current_location[0], self.current_location[1],
+                self.fisher_type, radius=1
             )
-            for neighbor_pos in neighbors:
-                neighbor_patch = self.model.get_patch_info(*neighbor_pos)
-                if (
-                    neighbor_patch
-                    and neighbor_patch["region"] == current_region
-                ):
-                    fish_vicinity += neighbor_patch["fish_stock"]
 
         expected_travel_cost = 0
 
-        if fish_vicinity >= fish_wish:
-            expected_catch = fish_wish
+        if vicinity_value >= self.expected_revenue * (fish_wish / max(self.storing_capacity, 1)):
             self.region_preference = current_region
 
         else:
             other_regions = [
                 r for r in self.accessible_regions if r != current_region
             ]
-            expected_catches = {
-                region: self._estimate_catch(region)
+            expected_revenues = {
+                region: self._estimate_value(region)
                 for region in other_regions
             }
             travel_costs = {
@@ -132,22 +125,19 @@ class Trawler:
             }
 
             best_expected_other = (
-                max(expected_catches.values()) if expected_catches else 0
+                max(expected_revenues.values()) if expected_revenues else 0
             )
 
-            if best_expected_other < fish_wish:
-                expected_catch = fish_vicinity
+            if best_expected_other < self.expected_revenue * (fish_wish / max(self.storing_capacity, 1)):
                 expected_travel_cost = self.get_travel_cost(current_region) / 2
                 self.region_preference = current_region
 
             else:
-                expected_catch = fish_wish
-
                 best_switch_profit = float("-inf")
                 best_switch_region: Optional[str] = None
 
                 for region in other_regions:
-                    revenue = expected_catches[region] * config.FISH_PRICE
+                    revenue = expected_revenues[region]
                     profit = (
                         revenue - self.cost_activity - travel_costs[region]
                     )
@@ -156,7 +146,7 @@ class Trawler:
                         best_switch_region = region
 
                 stay_profit = (
-                    fish_vicinity * config.FISH_PRICE - self.cost_activity
+                    vicinity_value - self.cost_activity
                 )
 
                 if (
@@ -175,8 +165,12 @@ class Trawler:
         expected_cost = (
             self.cost_activity + self.cost_existence + expected_travel_cost
         )
-        expected_income = expected_catch * config.FISH_PRICE
-        expected_profit_go = expected_income - expected_cost
+        expected_revenue = (
+            self._estimate_value(self.region_preference)
+            if self.region_preference
+            else self.expected_revenue
+        )
+        expected_profit_go = expected_revenue - expected_cost
         expected_profit_stay = -self.cost_existence
 
         if expected_profit_go > expected_profit_stay:
@@ -194,10 +188,9 @@ class Trawler:
         """
         best_region = self._calculate_region_preference()
 
-        expected_catch = self._estimate_catch(best_region)
+        expected_revenue = self._estimate_value(best_region)
         travel_cost = self.get_travel_cost(best_region)
         total_cost = self.cost_existence + self.cost_activity + travel_cost
-        expected_revenue = expected_catch * config.FISH_PRICE
         expected_profit = expected_revenue - total_cost
 
         expected_profit_stay = -self.cost_existence
@@ -206,6 +199,7 @@ class Trawler:
             self.will_fish = True
             self.region_preference = best_region
             self.fish_onboard = 0
+            self.accumulated_value = 0.0
             self.days_at_sea_current_trip = 0
             self.jumped = False
         else:

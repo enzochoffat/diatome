@@ -48,8 +48,7 @@ class Archipelagos:
             Archipelagos._handle_exploration_phase(self)
             return
 
-        catches_last_period = Archipelagos._compute_recent_catches(self)
-        revenue_last_period = catches_last_period * config.FISH_PRICE
+        revenue_last_period = Archipelagos._compute_recent_revenue(self)
         weekly_needs = Archipelagos._compute_weekly_needs(self)
 
 
@@ -57,7 +56,6 @@ class Archipelagos:
             "Recent performance",
             extra={
                 "agent_id": getattr(self, "unique_id", None),
-                "recent_catches": catches_last_period,
                 "recent_revenue": revenue_last_period,
                 "weekly_needs": weekly_needs,
             },
@@ -179,21 +177,21 @@ class Archipelagos:
         if self.will_fish:
             self.region_preference = "A"
 
-    def _compute_recent_catches(self) -> float:
-        """Sum catches over the most recent observation window.
+    def _compute_recent_revenue(self) -> float:
+        """Sum revenues over the most recent observation window.
 
         Returns:
-            Total catch quantity across the last 5 remembered days
+            Total revenue (€) across the last 5 remembered days
             (or fewer if memory is shorter). Days without fishing
             contribute 0.
         """
         last_days_count = min(len(self.memory), 5)
         recent_days = self.memory[-last_days_count:]
 
-        total = sum(day["catch"] for day in recent_days)
+        total = sum(day.get("revenue", 0.0) for day in recent_days)
 
         logger.debug(
-            "Recent catches computed",
+            "Recent revenues computed",
             extra={
                 "agent_id": getattr(self, "unique_id", None),
                 "days": last_days_count,

@@ -1,5 +1,7 @@
 from typing import Dict, List, Tuple, Any
 
+import numpy as np
+
 
 def reduce_stock(
         self, x: int, y: int, catch_amount: float
@@ -22,6 +24,35 @@ def reduce_stock(
         return actual_catch
     return 0
 
+
+def reduce_stock_by_species(
+    self, x: int, y: int, catch_vector: np.ndarray
+) -> np.ndarray:
+    """Reduces species biomass at a location by a per-species catch vector.
+
+    Args:
+        x: Column index.
+        y: Row index.
+        catch_vector: Desired catch per species, shape (N,).
+
+    Returns:
+        Actual catch per species, capped at available biomass per species.
+    """
+    pos = (x, y)
+    if pos not in self.patches:
+        return np.zeros_like(catch_vector)
+
+    region = self.patches[pos].get("region")
+    if region in ("LAND", "NULL"):
+        return np.zeros_like(catch_vector)
+
+    available = self.species_biomass[x, y, :]
+    actual_catch = np.minimum(catch_vector, available)
+    self.species_biomass[x, y, :] -= actual_catch
+    # Sync the summed fish_stock
+    self.patches[pos]["fish_stock"] = float(np.sum(self.species_biomass[x, y, :]))
+    return actual_catch
+
 def update_patches(
     self, new_fish_stocks: Dict[Tuple[int, int], float]
 ) -> None:
@@ -39,6 +70,27 @@ def update_patches(
         if pos in self.patches:
             self._set_patch_fish_stock(pos, stock)
     print(f"Total stock for region A after update: {sum_a}")
+
+
+def update_patches_species(
+    self, species_biomass: np.ndarray, species_names: List[str]
+) -> None:
+    """Replaces the model's species_biomass 3D array with coupling data.
+
+    Args:
+        species_biomass: New 3D array (H, W, N).
+        species_names: List of species IDs.
+    """
+    self.species_biomass = species_biomass.copy()
+
+    # Recompute species_ratio
+    total_biomass = np.sum(species_biomass, axis=2, keepdims=True) + 1e-10
+    self.species_ratio = species_biomass / total_biomass
+
+    # Sync all patch fish_stock
+    for (x, y), patch in self.patches.items():
+        if patch["region"] not in ("LAND", "NULL"):
+            patch["fish_stock"] = float(np.sum(self.species_biomass[x, y, :]))
 
 # ------------------------------------------------------------------
 # Regional capacity recalculation

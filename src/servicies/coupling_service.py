@@ -4,6 +4,8 @@ import os
 from time import sleep
 import csv
 
+import numpy as np
+
 def wait_for_coupling_update(
         self,
         json_path: str = "configs_json/config.json",
@@ -126,3 +128,38 @@ def update_biomass(self, species_maps: Dict[str, str]) -> Dict[Tuple[int, int], 
                     # new_fish_stocks[(x, y)][species_id] = cell_value
 
     return new_fish_stocks
+
+
+def update_biomass_species(
+    self, species_maps: Dict[str, str], species_names: List[str]
+) -> np.ndarray:
+    """Reads biomass CSV files and returns a 3D array (H, W, N).
+
+    Replaces the old summed approach: each species CSV is loaded into
+    a 2D grid, then all are stacked along axis=2.
+
+    Args:
+        species_maps: Dict mapping species ID → CSV file path.
+        species_names: Ordered list of species IDs matching the
+            model's ``species_names``.
+
+    Returns:
+        ``np.ndarray`` of shape ``(H, W, N)``.
+    """
+    species_data: List[np.ndarray] = []
+    for species_id in species_names:
+        path = species_maps.get(species_id, "")
+        if not path or not os.path.exists(path):
+            species_data.append(
+                np.zeros((self.grid.height, self.grid.width), dtype=np.float64)
+            )
+            continue
+        grid = np.genfromtxt(path, delimiter=",", skip_header=1)[:, 1:]
+        # Replace NaN with 0
+        grid = np.nan_to_num(grid, nan=0.0)
+        species_data.append(grid)
+
+    if not species_data:
+        return np.zeros((self.grid.height, self.grid.width, 1), dtype=np.float64)
+
+    return np.stack(species_data, axis=2)

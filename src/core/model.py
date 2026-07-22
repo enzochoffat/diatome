@@ -38,6 +38,7 @@ from src.domain.environment.spatial_index import (
 from src.domain.environment.stock_ops import (
     _recalculate_regional_capacities as recalculate_regional_capacities_helper,
     update_patches as update_patches_helper,
+    update_patches_species as update_patches_species_helper,
     validate_regional_stocks as validate_regional_stocks_helper,
 )
 from src.domain.environment.utils import (
@@ -57,6 +58,7 @@ from src.servicies.coupling_service import (
     wait_for_coupling_update as wait_for_coupling_update_helper,
     read_csv_biomass as read_csv_biomass_helper,
     update_biomass as update_biomass_helper,
+    update_biomass_species as update_biomass_species_helper,
 )
 from src.servicies.metrics import (
     append_daily_agent_rows_for_monthly_export as append_daily_agent_rows_for_monthly_export_helper,
@@ -113,6 +115,9 @@ class FisheryModel(Model):
         coupling: Optional[bool] = None,
         start_date: Optional[datetime] = None,
         config_loader: Optional[Any] = None,
+        catchability_matrix: Optional[np.ndarray] = None,
+        price_matrix: Optional[np.ndarray] = None,
+        species_names: Optional[List[str]] = None,
     ) -> None:
         """Initialises the fishery model.
 
@@ -136,12 +141,17 @@ class FisheryModel(Model):
             coastal_names: Optional list of names for coastal agents.
             trawler_names: Optional list of names for trawler agents.
             coupling: Whether to enable Ecospace biomass coupling.
+            catchability_matrix: Per-species catchability (F, N).
+            price_matrix: Per-species price (F, N).
+            species_names: List of species IDs in 3D array order.
         """
         super().__init__()
 
         self.coupling = coupling
         self.verbose = verbose
         self.current_step = 0
+        if start_date is None:
+            start_date = "2024-01-01"
         self.current_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         self.end_of_sim = end_of_sim
         self.start_date = start_date
@@ -217,11 +227,22 @@ class FisheryModel(Model):
         self.MSY_STOCK_C = config.get_msy_stock(self.CARRYING_CAPACITY_C)
         self.MSY_STOCK_D = config.get_msy_stock(self.CARRYING_CAPACITY_D)
 
-        # Catchability
-        self.CATCHABILITY_ARCHEPELAGO = config.ARCHIPELAGO_CATCHABILITY
-        self.CATCHABILITY_COASTAL = config.COASTAL_CATCHABILITY
-        self.CATCHABILITY_TRAWLER = config.TRAWLER_CATCHABILITY
+        # Catchability (kept for backward compat)
         self.SD_CARCAP = config.SD_CARCAP
+
+        # Species matrices
+        self.catchability_matrix = catchability_matrix
+        self.price_matrix = price_matrix
+        self.species_names = species_names
+        self.flotilla_indices = {
+            "archipelago": 1,
+            "coastal": 2,
+            "trawler": 3,
+        }
+
+        # Set from init_patches
+        self.species_biomass: Optional[np.ndarray] = None
+        self.species_ratio: Optional[np.ndarray] = None
 
         # Initial hotspots
         self.HOTSPOTS_A = get_hotspots_for_step(0, "A")
@@ -301,6 +322,41 @@ class FisheryModel(Model):
     def _set_patch_fish_stock(self, pos, new_stock):
         return set_patch_fish_stock(self, pos, new_stock)
 
+    def get_cell_value(self, x: int, y: int, fisher_type: str) -> float:
+        """Returns the perceived economic value of a cell for a flotilla.
+
+        V = Σ min(catchability[f,s], species_biomass[x,y,s]) × price[f,s]
+        """
+        region = self.get_region(x, y)
+        if region in ("LAND", "NULL"):
+            return 0.0
+        f_idx = self.flotilla_indices[fisher_type]
+        catchability_vec = self.catchability_matrix[f_idx]
+        price_vec = self.price_matrix[f_idx]
+        biomass_vec = self.species_biomass[x, y, :]
+        potential_catch = np.minimum(catchability_vec, biomass_vec)
+        return float(np.sum(potential_catch * price_vec))
+
+    def get_vicinity_value(
+        self, x: int, y: int, fisher_type: str, radius: int = 1
+    ) -> float:
+        """Sums cell values over a Chebyshev neighbourhood."""
+        total = 0.0
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid.width and 0 <= ny < self.grid.height:
+                    total += self.get_cell_value(nx, ny, fisher_type)
+        return total
+
+    def _sync_patch_fish_stock(self, x: int, y: int) -> None:
+        """Syncs a patch's fish_stock from the summed species_biomass."""
+        pos = (x, y)
+        if pos in self.patches:
+            self.patches[pos]["fish_stock"] = float(
+                np.sum(self.species_biomass[x, y, :])
+            )
+
     def _initialize_region_stock_cache(self) -> None:
         self._region_stock_cache = {
             region: sum(
@@ -357,6 +413,9 @@ class FisheryModel(Model):
     def update_patches(self, new_fish_stocks):
         return update_patches_helper(self, new_fish_stocks)
 
+    def update_patches_species(self, species_biomass, species_names):
+        return update_patches_species_helper(self, species_biomass, species_names)
+
     def validate_regional_stocks(self):
         return validate_regional_stocks_helper(self)
 
@@ -368,6 +427,9 @@ class FisheryModel(Model):
 
     def _update_biomass(self, species_maps):
         return update_biomass_helper(self, species_maps)
+
+    def _update_biomass_species(self, species_maps):
+        return update_biomass_species_helper(self, species_maps, self.species_names)
 
     def _build_datacollector(self):
         return build_datacollector_helper(self)
@@ -686,7 +748,7 @@ class FisheryModel(Model):
                     json_path="configs_json/config.json",
                     poll_interval=0.5,
                 )
-                fish = update_biomass(self, species_maps)
+                new_species_biomass = self._update_biomass_species(species_maps)
                 logger.info(
                     "Stock before coupling update",
                     extra={
@@ -696,7 +758,7 @@ class FisheryModel(Model):
                         "D": self.get_region_stock("D"),
                     }
                 )
-                self.update_patches(fish)
+                self.update_patches_species(new_species_biomass, self.species_names)
                 logger.info(
                     "Stock after coupling update",
                     extra={

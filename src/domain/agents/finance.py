@@ -3,29 +3,30 @@ from typing import Any
 
 def calculate_profit(
     agent,
-    catch: float,
+    revenue: float,
     costs: float,
 ) -> dict[str, Any]:
-    """Calculate revenue and profit for a fishing trip.
+    """Calculate profit for a fishing trip.
+
+    Revenue is pre-computed from per-species catch × price.
 
     Args:
         agent: Fisher agent instance.
-        catch: Quantity of fish caught.
+        revenue: Total revenue from the trip (€).
         costs: Total trip costs.
 
     Returns:
         Dictionary containing revenue, costs, profit, catch amount,
-        fish price, and location information.
+        and location information.
     """
-    revenue = catch * agent.model.FISH_PRICE
     profit = revenue - costs
 
     return {
         "revenue": revenue,
         "costs": costs,
         "profit": profit,
-        "catch": catch,
-        "price_per_unit": agent.model.FISH_PRICE,
+        "catch": 0.0,
+        "price_per_unit": 0.0,
         "location": None,
     }
 

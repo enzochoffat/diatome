@@ -12,32 +12,32 @@ def update_memory(agent, trip_info: Dict[str, Any]) -> None:
 def update_memory_good_spots(
     agent,
     location: Tuple[int, int],
-    catch: float,
-    expected_catch: float,
+    revenue: float,
+    expected_revenue: float,
 ) -> None:
-    catch_efficiency = catch / expected_catch if expected_catch > 0 else 0.0
+    value_efficiency = revenue / expected_revenue if expected_revenue > 0 else 0.0
 
     if location in agent.good_spots_memory:
         spot = agent.good_spots_memory[location]
         total_visits = spot["visits"]
 
-        spot["avg_catch"] = (
-            spot["avg_catch"] * total_visits + catch
+        spot["avg_value"] = (
+            spot["avg_value"] * total_visits + revenue
         ) / (total_visits + 1)
 
         spot["visits"] += 1
         spot["last_visit"] = agent.model.current_step
-        spot["efficiency"] = catch_efficiency
+        spot["efficiency"] = value_efficiency
     else:
         agent.good_spots_memory[location] = {
-            "avg_catch": catch,
+            "avg_value": revenue,
             "visits": 1,
             "last_visit": agent.model.current_step,
-            "efficiency": catch_efficiency,
+            "efficiency": value_efficiency,
         }
 
     agent.good_spots_memory[location]["is_good"] = (
-        catch_efficiency >= agent.good_spots_threshold
+        value_efficiency >= agent.good_spots_threshold
     )
 
 
@@ -63,7 +63,7 @@ def get_good_spots(
 
         good_spots.append((location, memory))
 
-    good_spots.sort(key=lambda item: item[1]["avg_catch"], reverse=True)
+    good_spots.sort(key=lambda item: item[1]["avg_value"], reverse=True)
 
     return good_spots
 

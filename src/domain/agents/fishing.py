@@ -1,5 +1,7 @@
 from typing import Dict, Any, Tuple
 
+import numpy as np
+
 from src.domain.agents import finance
 
 
@@ -17,16 +19,13 @@ def go_fish(agent, location: Tuple[int, int]) -> Dict[str, Any]:
 
     current_region = patch["region"]
 
-    # --- Catch calculation ---
+    # --- Catch calculation (per species) ---
     if agent.fisher_type == "coastal":
-        actual_catch = _coastal_catch(agent, location, patch, current_region)
+        catch_vec, total_catch, total_revenue = _coastal_catch(agent, location, patch, current_region)
     else:
-        available_stock = patch["fish_stock"]
-        potential_catch = min(agent.catchability, available_stock)
+        catch_vec, total_catch, total_revenue = _simple_catch(agent, location)
 
-        actual_catch = agent.model.reduce_stock(
-            location[0], location[1], potential_catch
-        )
+    actual_catch = total_catch
 
     # --- Travel cost ---
     if agent.fisher_type in ("archipelago", "coastal"):
@@ -52,10 +51,11 @@ def go_fish(agent, location: Tuple[int, int]) -> Dict[str, Any]:
 
         agent.accumulated_catch += actual_catch
         agent.fish_onboard += actual_catch
+        agent.accumulated_value += total_revenue
         agent.days_at_sea += 1
 
     else:
-        result = finance.calculate_profit(agent, actual_catch, total_cost)
+        result = finance.calculate_profit(agent, total_revenue, total_cost)
 
         if result["profit"] > 0:
             agent.profitable_trip += 1
@@ -72,14 +72,14 @@ def go_fish(agent, location: Tuple[int, int]) -> Dict[str, Any]:
         agent.days_at_sea += 1
         agent.total_catch += actual_catch
 
-    agent.update_memory_good_spots(location, actual_catch, agent.catchability)
+    agent.update_memory_good_spots(location, total_revenue, agent.expected_revenue)
 
     if agent.fisher_type == "trawler":
         profit_out = -total_cost
         revenue_out = 0.0
     else:
-        profit_out = actual_catch * agent.model.FISH_PRICE - total_cost
-        revenue_out = actual_catch * agent.model.FISH_PRICE
+        profit_out = total_revenue - total_cost
+        revenue_out = total_revenue
 
     return {
         "catch": actual_catch,
@@ -90,39 +90,77 @@ def go_fish(agent, location: Tuple[int, int]) -> Dict[str, Any]:
     }
 
 
-def _coastal_catch(agent, location, patch, current_region) -> float:
-    stock_here = patch["fish_stock"]
+def _simple_catch(agent, location) -> Tuple[np.ndarray, float, float]:
+    """Per-species catch for non-coastal agents.
+
+    Returns:
+        (catch_vector, total_catch_tonnes, total_revenue)
+    """
+    f_idx = agent.model.flotilla_indices[agent.fisher_type]
+    catchability_vec = agent.catchability_vector
+    price_vec = agent.model.price_matrix[f_idx]
+    biomass_vec = agent.model.species_biomass[location[0], location[1], :]
+
+    available = np.maximum(biomass_vec, 0.0)
+    catch_vec = np.minimum(catchability_vec, available)
+    agent.model.species_biomass[location[0], location[1], :] -= catch_vec
+    agent.model._sync_patch_fish_stock(location[0], location[1])
+
+    total_catch = float(np.sum(catch_vec))
+    total_revenue = float(np.sum(catch_vec * price_vec))
+    return catch_vec, total_catch, total_revenue
+
+
+def _coastal_catch(agent, location, patch, current_region) -> Tuple[np.ndarray, float, float]:
+    """Per-species catch split over two cells for coastal agents.
+
+    Returns:
+        (catch_vector, total_catch_tonnes, total_revenue)
+    """
+    f_idx = agent.model.flotilla_indices[agent.fisher_type]
+    catchability_vec = agent.catchability_vector
+    price_vec = agent.model.price_matrix[f_idx]
 
     neighbors = agent.get_neighbor_positions_in_radius(location, radius=1)
 
     same_region_neighbors = [
-        ((nx, ny), agent.model.get_patch_info(nx, ny))
+        (nx, ny)
         for nx, ny in neighbors
         if (n_patch := agent.model.get_patch_info(nx, ny))
         and n_patch["region"] == current_region
     ]
 
     if same_region_neighbors:
-        other_pos, other_patch = same_region_neighbors[0]
+        other_pos = same_region_neighbors[0]
+        catch_here_vec = catchability_vec * 0.5
+        catch_other_vec = catchability_vec - catch_here_vec
 
-        stock_other = other_patch["fish_stock"]
+        biomass_here = agent.model.species_biomass[location[0], location[1], :]
+        biomass_other = agent.model.species_biomass[other_pos[0], other_pos[1], :]
 
-        catch_here = round(0.5 * agent.catchability)
-        catch_other = agent.catchability - catch_here
+        available_here = np.maximum(biomass_here, 0.0)
+        available_other = np.maximum(biomass_other, 0.0)
 
-        actual_here = agent.model.reduce_stock(
-            location[0], location[1], catch_here
-        )
+        actual_here = np.minimum(catch_here_vec, available_here)
+        agent.model.species_biomass[location[0], location[1], :] -= actual_here
 
-        actual_other = agent.model.reduce_stock(
-            other_pos[0], other_pos[1], catch_other
-        )
+        actual_other = np.minimum(catch_other_vec, available_other)
+        agent.model.species_biomass[other_pos[0], other_pos[1], :] -= actual_other
 
-        return actual_here + actual_other
+        agent.model._sync_patch_fish_stock(location[0], location[1])
+        agent.model._sync_patch_fish_stock(other_pos[0], other_pos[1])
 
-    return agent.model.reduce_stock(
-        location[0], location[1], min(agent.catchability, stock_here)
-    )
+        catch_vec = actual_here + actual_other
+    else:
+        biomass_here = agent.model.species_biomass[location[0], location[1], :]
+        available_here = np.maximum(biomass_here, 0.0)
+        catch_vec = np.minimum(catchability_vec, available_here)
+        agent.model.species_biomass[location[0], location[1], :] -= catch_vec
+        agent.model._sync_patch_fish_stock(location[0], location[1])
+
+    total_catch = float(np.sum(catch_vec))
+    total_revenue = float(np.sum(catch_vec * price_vec))
+    return catch_vec, total_catch, total_revenue
 
 
 def _trawler_travel_cost(agent, location, actual_catch, current_region) -> float:
@@ -147,8 +185,9 @@ def land_fish(agent) -> None:
     if agent.fisher_type != "trawler" or agent.fish_onboard <= 0:
         return
 
-    revenue = agent.fish_onboard * agent.model.FISH_PRICE
-
+    # Revenue is already tracked per-day during fishing.
+    # At landing, just add the accumulated value.
+    revenue = agent.accumulated_value
     agent.capital += revenue
     agent.wealth += revenue
     agent.total_revenue += revenue
@@ -161,6 +200,7 @@ def land_fish(agent) -> None:
 
     agent.fish_onboard = 0.0
     agent.accumulated_catch = 0.0
+    agent.accumulated_value = 0.0
     agent.days_in_current_trip = 0
     agent.jumped = False
     agent.gone_fishing = False

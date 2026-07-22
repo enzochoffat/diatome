@@ -1,8 +1,11 @@
 
+import logging
 import random
 
 from typing import Dict, Any
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 def determine_weather(model) -> bool:
@@ -61,7 +64,7 @@ def read_wave_height_vector(wave_height_vector_path: str) -> Dict[datetime, floa
                 continue
 
     VECTOR_WAVE_HEIGHT = wave_height_vector
-    print(f"Loaded wave height vector with {len(VECTOR_WAVE_HEIGHT)} entries.")
+    logger.info("Loaded wave height vector with %d entries.", len(VECTOR_WAVE_HEIGHT))
 
     return VECTOR_WAVE_HEIGHT
 
@@ -78,7 +81,7 @@ def get_wave_height(model) -> float:
     date = model.current_date
 
     if date not in VECTOR_WAVE_HEIGHT:
-        print(f"Warning: Date {date} not found in wave height vector. Returning default value of 0.0.")
+        logger.debug("Date %s not found in wave height vector. Returning default value of 0.0.", date)
         return date, 0.0  # Default to 0.0 if the date is not found in the vector
     return date, VECTOR_WAVE_HEIGHT[date]
 
