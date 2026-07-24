@@ -26,7 +26,7 @@ def _grow_species_at_patch(
         model.species_biomass[x, y, s] = max(0.0, biomass[s] + growth)
         total_growth += growth
 
-    model._sync_patch_fish_stock(x, y)
+    model._sync_patch_fish_stock(y, x)
     return total_growth
 
 

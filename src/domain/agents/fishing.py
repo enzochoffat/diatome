@@ -99,11 +99,11 @@ def _simple_catch(agent, location) -> Tuple[np.ndarray, float, float]:
     f_idx = agent.model.flotilla_indices[agent.fisher_type]
     catchability_vec = agent.catchability_vector
     price_vec = agent.model.price_matrix[f_idx]
-    biomass_vec = agent.model.species_biomass[location[0], location[1], :]
+    biomass_vec = agent.model.species_biomass[location[1], location[0], :]
 
     available = np.maximum(biomass_vec, 0.0)
     catch_vec = np.minimum(catchability_vec, available)
-    agent.model.species_biomass[location[0], location[1], :] -= catch_vec
+    agent.model.species_biomass[location[1], location[0], :] -= catch_vec
     agent.model._sync_patch_fish_stock(location[0], location[1])
 
     total_catch = float(np.sum(catch_vec))
@@ -135,27 +135,27 @@ def _coastal_catch(agent, location, patch, current_region) -> Tuple[np.ndarray, 
         catch_here_vec = catchability_vec * 0.5
         catch_other_vec = catchability_vec - catch_here_vec
 
-        biomass_here = agent.model.species_biomass[location[0], location[1], :]
-        biomass_other = agent.model.species_biomass[other_pos[0], other_pos[1], :]
+        biomass_here = agent.model.species_biomass[location[1], location[0], :]
+        biomass_other = agent.model.species_biomass[other_pos[1], other_pos[0], :]
 
         available_here = np.maximum(biomass_here, 0.0)
         available_other = np.maximum(biomass_other, 0.0)
 
         actual_here = np.minimum(catch_here_vec, available_here)
-        agent.model.species_biomass[location[0], location[1], :] -= actual_here
+        agent.model.species_biomass[location[1], location[0], :] -= actual_here
 
         actual_other = np.minimum(catch_other_vec, available_other)
-        agent.model.species_biomass[other_pos[0], other_pos[1], :] -= actual_other
+        agent.model.species_biomass[other_pos[1], other_pos[0], :] -= actual_other
 
         agent.model._sync_patch_fish_stock(location[0], location[1])
         agent.model._sync_patch_fish_stock(other_pos[0], other_pos[1])
 
         catch_vec = actual_here + actual_other
     else:
-        biomass_here = agent.model.species_biomass[location[0], location[1], :]
+        biomass_here = agent.model.species_biomass[location[1], location[0], :]
         available_here = np.maximum(biomass_here, 0.0)
         catch_vec = np.minimum(catchability_vec, available_here)
-        agent.model.species_biomass[location[0], location[1], :] -= catch_vec
+        agent.model.species_biomass[location[1], location[0], :] -= catch_vec
         agent.model._sync_patch_fish_stock(location[0], location[1])
 
     total_catch = float(np.sum(catch_vec))

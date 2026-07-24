@@ -333,7 +333,7 @@ class FisheryModel(Model):
         f_idx = self.flotilla_indices[fisher_type]
         catchability_vec = self.catchability_matrix[f_idx]
         price_vec = self.price_matrix[f_idx]
-        biomass_vec = self.species_biomass[x, y, :]
+        biomass_vec = self.species_biomass[y, x, :]
         potential_catch = np.minimum(catchability_vec, biomass_vec)
         return float(np.sum(potential_catch * price_vec))
 
@@ -354,7 +354,7 @@ class FisheryModel(Model):
         pos = (x, y)
         if pos in self.patches:
             self.patches[pos]["fish_stock"] = float(
-                np.sum(self.species_biomass[x, y, :])
+                np.sum(self.species_biomass[y, x, :])
             )
 
     def _initialize_region_stock_cache(self) -> None:

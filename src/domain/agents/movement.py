@@ -1,5 +1,6 @@
 from typing import Optional, Tuple
 from src import config
+from src.domain.environment import distance
 
 def is_restricted(self, x: int, y: int) -> bool:
         """Checks whether a location is restricted by habitat or topology.
@@ -47,10 +48,8 @@ def calculate_travel_cost(
         """
         if from_pos is None or to_pos is None:
             return 0.0
-        dx = to_pos[0] - from_pos[0]
-        dy = to_pos[1] - from_pos[1]
-        distance = (dx ** 2 + dy ** 2) ** 0.5
-        return distance * config.TRAVEL_COST_PER_UNIT
+        price = distance.get_distance(to_pos[0], to_pos[1])
+        return price
 
 def get_travel_cost(self, region: str) -> float:
         """Returns the fixed travel cost to a named region.

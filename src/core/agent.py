@@ -803,12 +803,6 @@ class FisherAgent(Agent):
             if fishing_spot is None:
                 return self.explore_random_spot(region)
 
-            if movement.is_restricted(self, *fishing_spot):
-                return self.explore_random_spot(region)
-        
-            if restricted_areas.is_restricted_area(fishing_spot[0], fishing_spot[1], self.model.current_date):
-                return self.explore_random_spot(region)
-            self.current_location = fishing_spot
 
             if self.fisher_type == "trawler" and self.has_technologie:
                 uphill_spot = self.get_fishSpot_uphill_climbing(region)
@@ -824,6 +818,12 @@ class FisherAgent(Agent):
                     ):
                         self.current_location = uphill_spot
 
+            if movement.is_restricted(self, *fishing_spot):
+                return self.explore_random_spot(region)
+        
+            if restricted_areas.is_restricted_area(fishing_spot[0], fishing_spot[1], self.model.current_date):
+                return self.explore_random_spot(region)
+            self.current_location = fishing_spot
         self.at_sea = True
         return self.current_location
 
