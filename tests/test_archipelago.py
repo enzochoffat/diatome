@@ -32,11 +32,9 @@ def test_agent_creation():
     print(f"Type: {agent.fisher_type}")
     print(f"Capital initial: {agent.capital}")
     print(f"Catchability: {agent.catchability}")
-    print(f"Régions accessibles: {agent.accessible_regions}")
     print(f"Max good spots: {agent.max_good_spots}")
     
     assert agent.fisher_type == "archipelago"
-    assert agent.accessible_regions == ["A"]
     assert agent.at_home == True
     assert agent.gone_fishing == False
     
@@ -60,23 +58,23 @@ def test_spot_selection():
     # Test exploration (pas de mémoire encore)
     print("Exploration (pas de mémoire):")
     for i in range(5):
-        spot = agent.select_fishing_spot(region="A")
+        spot = agent.select_fishing_spot()
         print(f"  Tentative {i+1}: {spot}")
         assert spot is not None, "Devrait trouver un spot"
-        assert spot in [tuple(h) for h in model.HOTSPOTS_A], "Devrait être un hotspot de région A"
+        assert spot in [tuple(h) for h in model.HOTSPOTS], "Devrait être un hotspot"
     
     # Ajouter des spots en mémoire
     print("\nAjout de spots en mémoire:")
     agent.update_memory_good_spots((7, 3), 500, 400)
     agent.update_memory_good_spots((16, 3), 450, 400)
     
-    good_spots = agent.get_good_spots(region="A")
+    good_spots = agent.get_good_spots()
     print(f"Bons spots en mémoire: {len(good_spots)}")
     
     # Test sélection depuis mémoire
     print("\nSélection depuis mémoire:")
     for i in range(5):
-        spot = agent.select_fishing_spot(region="A")
+        spot = agent.select_fishing_spot()
         print(f"  Tentative {i+1}: {spot}")
         assert spot in [(7, 3), (16, 3)], "Devrait choisir depuis les spots connus"
     
@@ -201,19 +199,19 @@ def test_30_days_simulation():
     
     agent = list(model.agents)[0]
     
-    initial_stock_A = model.get_region_stock("A")
-    print(f"Stock initial région A: {initial_stock_A}")
+    initial_total = model.get_total_stock()
+    print(f"Stock initial total: {initial_total}")
     
     # Simuler 30 jours
     for day in range(30):
         model.step()
     
-    final_stock_A = model.get_region_stock("A")
-    stock_reduction = initial_stock_A - final_stock_A
+    final_total = model.get_total_stock()
+    stock_reduction = initial_total - final_total
     
     print(f"\nAprès 30 jours:")
-    print(f"  Stock final région A: {final_stock_A}")
-    print(f"  Réduction stock: {stock_reduction} ({stock_reduction/initial_stock_A*100:.1f}%)")
+    print(f"  Stock final total: {final_total}")
+    print(f"  Réduction stock: {stock_reduction} ({stock_reduction/initial_total*100:.1f}%)")
     print(f"  Total capture agent: {agent.total_catch}")
     print(f"  Capital agent: {agent.capital:.2f}")
     print(f"  Jours en mer: {agent.days_at_sea}")
@@ -229,8 +227,8 @@ def test_30_days_simulation():
         print(f"  Taux succès: {stats['success_rate']:.1%}")
     
     assert agent.total_catch > 0, "Devrait avoir capturé des poissons"
-    assert final_stock_A < initial_stock_A, "Le stock devrait diminuer"
-    assert final_stock_A >= 0, "Le stock ne devrait pas être négatif"
+    assert final_total < initial_total, "Le stock devrait diminuer"
+    assert final_total >= 0, "Le stock ne devrait pas être négatif"
     
     print("✓ Test réussi\n")
 
@@ -252,18 +250,18 @@ def test_memory_limit():
     print(f"Limite spots archipelago: {agent.max_good_spots}")
     
     # Simuler visites de beaucoup de spots
-    hotspots = model.HOTSPOTS_A
+    hotspots = list(model.HOTSPOTS)[:30]
     
     for i, hotspot in enumerate(hotspots):
         location = tuple(hotspot)
-        catch = 400 + i * 10  # Tous bons spots
+        catch = 400 + i * 10
         expected = 400
         agent.update_memory_good_spots(location, catch, expected)
     
     print(f"Hotspots visités: {len(hotspots)}")
     print(f"Spots en mémoire: {len(agent.good_spots_memory)}")
     
-    good_spots = agent.get_good_spots(region="A")
+    good_spots = agent.get_good_spots()
     print(f"Bons spots: {len(good_spots)}")
     
     # Note: Pour l'instant, pas de limite imposée dans update_memory_good_spots

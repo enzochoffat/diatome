@@ -6,33 +6,9 @@ import os
 
 
 def build_datacollector(self) -> DataCollector:
-        """Constructs and returns the Mesa DataCollector.
-
-        Returns:
-            A configured ``DataCollector`` instance covering model-level
-            and agent-level reporters.
-        """
         return DataCollector(
             model_reporters={
-                # Fish stocks
-                "stock_A": lambda m: m._region_stock_cache["A"],
-                "stock_B": lambda m: m._region_stock_cache["B"],
-                "stock_C": lambda m: m._region_stock_cache["C"],
-                "stock_D": lambda m: m._region_stock_cache["D"],
                 "total_stock": lambda m: m._region_stock_cache["TOTAL"],
-                "stock_below_MSY_A": lambda m: (
-                    1 if m._region_stock_cache["A"] < m.MSY_STOCK_A else 0
-                ),
-                "stock_below_MSY_B": lambda m: (
-                    1 if m._region_stock_cache["B"] < m.MSY_STOCK_B else 0
-                ),
-                "stock_below_MSY_C": lambda m: (
-                    1 if m._region_stock_cache["C"] < m.MSY_STOCK_C else 0
-                ),
-                "stock_below_MSY_D": lambda m: (
-                    1 if m._region_stock_cache["D"] < m.MSY_STOCK_D else 0
-                ),
-                # Agent counts
                 "num_agents": lambda m: m._daily_agent_metrics["num_agents"],
                 "num_archipelago": lambda m: m._daily_agent_metrics[
                     "num_archipelago"
@@ -45,7 +21,6 @@ def build_datacollector(self) -> DataCollector:
                 "num_bankrupt": lambda m: m._daily_agent_metrics[
                     "num_bankrupt"
                 ],
-                # Catches
                 "total_catch_daily": lambda m: m._daily_agent_metrics[
                     "total_catch_daily"
                 ],
@@ -59,19 +34,6 @@ def build_datacollector(self) -> DataCollector:
                     if m._daily_agent_metrics["num_agents"]
                     else 0
                 ),
-                "catch_region_A": lambda m: m._daily_agent_metrics[
-                    "catch_region_A"
-                ],
-                "catch_region_B": lambda m: m._daily_agent_metrics[
-                    "catch_region_B"
-                ],
-                "catch_region_C": lambda m: m._daily_agent_metrics[
-                    "catch_region_C"
-                ],
-                "catch_region_D": lambda m: m._daily_agent_metrics[
-                    "catch_region_D"
-                ],
-                # Economics
                 "total_capital": lambda m: m._daily_agent_metrics[
                     "total_capital"
                 ],
@@ -89,13 +51,11 @@ def build_datacollector(self) -> DataCollector:
                     "total_revenue"
                 ],
                 "total_costs": lambda m: m._daily_agent_metrics["total_costs"],
-                # Inequality
                 "gini_capital": lambda m: m._daily_agent_metrics[
                     "gini_capital"
                 ],
                 "gini_wealth": lambda m: m._daily_agent_metrics["gini_wealth"],
                 "gini_catch": lambda m: m._daily_agent_metrics["gini_catch"],
-                # Activity
                 "avg_days_at_sea": lambda m: m._daily_agent_metrics[
                     "avg_days_at_sea"
                 ],
@@ -103,7 +63,6 @@ def build_datacollector(self) -> DataCollector:
                 "avg_success_rate": lambda m: m._daily_agent_metrics[
                     "avg_success_rate"
                 ],
-                # Memory and perception
                 "avg_growth_perception": lambda m: m._daily_agent_metrics[
                     "avg_growth_perception"
                 ],
@@ -113,26 +72,22 @@ def build_datacollector(self) -> DataCollector:
                 "avg_memory_size": lambda m: m._daily_agent_metrics[
                     "avg_memory_size"
                 ],
-                # Weather and time
                 "bad_weather": lambda m: 1 if m.bad_weather else 0,
                 "current_step": lambda m: m.current_step,
                 "current_year": lambda m: m.current_step // m.YEAR,
                 "current_day_of_year": lambda m: m.current_step % m.YEAR,
             },
             agent_reporters={
-                # Identity
                 "step": lambda a: a.model.current_step,
                 "unique_id": "unique_id",
                 "fisher_type": "fisher_type",
                 "age": "age",
-                # Financial
                 "capital": "capital",
                 "wealth": "wealth",
                 "total_profit": "total_profit",
                 "total_revenue": "total_revenue",
                 "total_cost": "total_cost",
                 "bankrupt": "bankrupt",
-                # Activity
                 "total_catch": "total_catch",
                 "days_at_sea": "days_at_sea",
                 "profitable_trips": "profitable_trip",
@@ -147,24 +102,15 @@ def build_datacollector(self) -> DataCollector:
                 "catch": lambda a: (
                     a.accumulated_catch if a.gone_fishing else 0
                 ),
-                # Decision-making
                 "will_fish": "will_fish",
-                "region_preference": "region_preference",
-                "current_region": "current_region",
                 "growth_perception": "growth_perception",
                 "lay_low": "lay_low",
-                # Memory
                 "memory_size": lambda a: len(a.memory),
                 "good_spots_count": lambda a: len(a.good_spots_memory),
             },
         )
 
 def build_daily_agent_metrics_cache(self) -> None:
-        """Computes and caches per-step aggregate metrics across all agents.
-
-        Populates ``_daily_agent_metrics`` with totals, averages, Gini
-        coefficients, and per-region catch breakdowns.
-        """
         agents = list(self.agents)
 
         capitals: List[float] = []
@@ -179,9 +125,6 @@ def build_daily_agent_metrics_cache(self) -> None:
 
         by_type_count: Dict[str, int] = {
             "archipelago": 0, "coastal": 0, "trawler": 0
-        }
-        by_region_catch: Dict[str, float] = {
-            "A": 0, "B": 0, "C": 0, "D": 0
         }
 
         num_bankrupt = 0
@@ -232,11 +175,6 @@ def build_daily_agent_metrics_cache(self) -> None:
                 success_rate_sum += agent.profitable_trip / trips
                 success_rate_count += 1
 
-            if agent.current_region in by_region_catch:
-                by_region_catch[agent.current_region] += (
-                    agent.accumulated_catch
-                )
-
             if min_capital is None or agent.capital < min_capital:
                 min_capital = agent.capital
             if max_capital is None or agent.capital > max_capital:
@@ -272,18 +210,9 @@ def build_daily_agent_metrics_cache(self) -> None:
             "avg_growth_perception": self._safe_mean(growth_perceptions),
             "num_perceive_scarcity": num_perceive_scarcity,
             "avg_memory_size": self._safe_mean(memory_sizes),
-            "catch_region_A": by_region_catch["A"],
-            "catch_region_B": by_region_catch["B"],
-            "catch_region_C": by_region_catch["C"],
-            "catch_region_D": by_region_catch["D"],
         }
 
 def append_daily_agent_rows_for_monthly_export(self) -> None:
-        """Appends one row per agent to the monthly export buffer.
-
-        Stores the current-step snapshot in ``_monthly_agent_rows`` to
-        avoid reconstructing history from the DataCollector later.
-        """
         step_value = self.current_step
         for agent in self.agents:
             self._monthly_agent_rows.append({
@@ -312,8 +241,6 @@ def append_daily_agent_rows_for_monthly_export(self) -> None:
                     agent.accumulated_catch if agent.gone_fishing else 0
                 ),
                 "will_fish": agent.will_fish,
-                "region_preference": agent.region_preference,
-                "current_region": agent.current_region,
                 "growth_perception": agent.growth_perception,
                 "lay_low": agent.lay_low,
                 "memory_size": len(agent.memory),
@@ -321,11 +248,6 @@ def append_daily_agent_rows_for_monthly_export(self) -> None:
             })
 
 def export_monthly_agent_buffer(self) -> None:
-        """Flushes the monthly agent buffer to a CSV file and clears it.
-
-        Writes to ``./results/biomass/agent_<step>.csv``. Does nothing
-        if the buffer is empty.
-        """
         if not self._monthly_agent_rows:
             return
 
@@ -345,19 +267,8 @@ def export_monthly_agent_buffer(self) -> None:
         self._monthly_agent_rows.clear()
 
 def collect_yearly_data(self) -> Dict[str, Any]:
-        """Collects a detailed yearly snapshot and appends it to ``yearly_data``.
-
-        Returns:
-            Dictionary containing year, step, regional stocks, agent
-            counts, catch totals, economic totals, Gini coefficients,
-            and activity metrics.
-        """
         year = self.current_step // self.YEAR
 
-        stock_a = self._region_stock_cache["A"]
-        stock_b = self._region_stock_cache["B"]
-        stock_c = self._region_stock_cache["C"]
-        stock_d = self._region_stock_cache["D"]
         total_stock = self._region_stock_cache["TOTAL"]
 
         by_type_count: Dict[str, int] = {
@@ -420,31 +331,7 @@ def collect_yearly_data(self) -> Dict[str, Any]:
         yearly_summary: Dict[str, Any] = {
             "year": year,
             "step": self.current_step,
-            "stock_A": stock_a,
-            "stock_B": stock_b,
-            "stock_C": stock_c,
-            "stock_D": stock_d,
             "total_stock": total_stock,
-            "stock_A_pct_K": (
-                stock_a / self.CARRYING_CAPACITY_A
-                if self.CARRYING_CAPACITY_A > 0
-                else 0
-            ),
-            "stock_B_pct_K": (
-                stock_b / self.CARRYING_CAPACITY_B
-                if self.CARRYING_CAPACITY_B > 0
-                else 0
-            ),
-            "stock_C_pct_K": (
-                stock_c / self.CARRYING_CAPACITY_C
-                if self.CARRYING_CAPACITY_C > 0
-                else 0
-            ),
-            "stock_D_pct_K": (
-                stock_d / self.CARRYING_CAPACITY_D
-                if self.CARRYING_CAPACITY_D > 0
-                else 0
-            ),
             "num_agents": num_agents,
             "num_archipelago": by_type_count["archipelago"],
             "num_coastal": by_type_count["coastal"],
@@ -501,12 +388,6 @@ def collect_yearly_data(self) -> Dict[str, Any]:
         return yearly_summary
 
 def get_total_catch_all_agents(self) -> float:
-        """Returns total catch since the last annual snapshot.
-
-        Returns:
-            Sum of incremental catches relative to ``last_year_catches``,
-            or the raw cumulative total if no snapshot exists yet.
-        """
         if not getattr(self, "last_year_catches", None):
             return sum(a.total_catch for a in self.agents)
 
@@ -519,27 +400,11 @@ def get_total_catch_all_agents(self) -> float:
         )
 
 def safe_mean(self, values: List[float]) -> float:
-    """Returns the arithmetic mean of a list, or 0 if empty.
-
-    Args:
-        values: Numeric list to average.
-
-    Returns:
-        Mean value, or 0.0 for an empty list.
-    """
     if not values:
         return 0.0
     return sum(values) / len(values)
 
 def safe_median(self, values: List[float]) -> float:
-    """Returns the median of a list, or 0 if empty.
-
-    Args:
-        values: Numeric list.
-
-    Returns:
-        Median value, or 0.0 for an empty list.
-    """
     if not values:
         return 0.0
     sorted_values = sorted(values)
@@ -549,17 +414,6 @@ def safe_median(self, values: List[float]) -> float:
     return sorted_values[mid]
 
 def calculate_gini(self, values: List[float]) -> float:
-    """Calculates the Gini coefficient for a distribution.
-
-    Args:
-        values: Non-negative numeric list (capital, wealth, catch,
-            etc.). Negative values are clamped to 0.
-
-    Returns:
-        Gini coefficient in [0, 1] where 0 is perfect equality and
-        1 is perfect inequality. Returns 0 for empty or all-zero
-        lists.
-    """
     if not values:
         return 0.0
 

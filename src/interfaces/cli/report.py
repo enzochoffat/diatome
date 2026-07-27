@@ -2,13 +2,6 @@ from typing import Dict, List, Any
 
 
 def print_final_summary(self) -> None:
-    """Prints a comprehensive summary at the end of the simulation."""
-
-
-    stock_a = self._region_stock_cache.get("A", 0)
-    stock_b = self._region_stock_cache.get("B", 0)
-    stock_c = self._region_stock_cache.get("C", 0)
-    stock_d = self._region_stock_cache.get("D", 0)
     total_stock = self._region_stock_cache.get("TOTAL", 0)
     agents_list = list(self.agents)
 
@@ -19,18 +12,7 @@ def print_final_summary(self) -> None:
     print(f"Agents: {len(agents_list)} total")
 
     print("\n--- FISH STOCKS ---")
-    for label, stock, capacity in (
-        ("A", stock_a, self.CARRYING_CAPACITY_A),
-        ("B", stock_b, self.CARRYING_CAPACITY_B),
-        ("C", stock_c, self.CARRYING_CAPACITY_C),
-        ("D", stock_d, self.CARRYING_CAPACITY_D),
-    ):
-        pct = stock / capacity if capacity > 0 else 0
-        print(
-            f"Region {label}: {stock:>10,.0f} / {capacity:,.0f}"
-            f" ({pct:.1%})"
-        )
-    print(f"TOTAL:    {total_stock:>10,.0f}")
+    print(f"Total stock: {total_stock:>10,.0f}")
 
     print("\n--- ECONOMICS ---")
     total_catch = sum(a.total_catch for a in agents_list)

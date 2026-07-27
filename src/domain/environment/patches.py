@@ -11,11 +11,7 @@ def set_patch_fish_stock(model, pos: Tuple[int, int], new_stock: float) -> float
     patch["fish_stock"] = new_stock
 
     if delta:
-        region = patch["region"]
-
-        if region in ("A", "B", "C", "D"):
-            model._region_stock_cache[region] += delta
-            model._region_stock_cache["TOTAL"] += delta
+        model._region_stock_cache["TOTAL"] += delta
 
     return patch["fish_stock"]
 

@@ -124,10 +124,6 @@ def test_model_constants(model):
         ('LOW_COST_EXISTENCE', 0.5),
         ('MEDIUM_COST_EXISTENCE', 1.0),
         ('HIGH_COST_EXISTENCE', 5.0),
-        ('MSY_STOCK_A', 109500),
-        ('MSY_STOCK_B', 219000),
-        ('MSY_STOCK_C', 438000),
-        ('MSY_STOCK_D', 438000),
     ]
     
     all_ok = True

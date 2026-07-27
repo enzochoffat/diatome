@@ -7,7 +7,7 @@ for experiments and sensitivity analysis.
 import math
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Final
+from typing import Dict, List, Final
 
 import numpy as np
 
@@ -35,6 +35,7 @@ GRID_HEIGHT: int = 0
 TOPOLOGY: List[List[int]] = []
 ORIGINAL_TOPOLOGY: List[List[int]] = []
 LAND: List[List[int]] = []
+WATER_CELLS: List[List[int]] = []
 WATER: List[List[int]] = []
 
 single_slice: int = 0
@@ -44,10 +45,7 @@ max_depth: int = 0
 min_depth: int = 0
 percentile_90_depth: float = 0.0
 
-REGION_A: List[List[int]] = []
-REGION_B: List[List[int]] = []
-REGION_C: List[List[int]] = []
-REGION_D: List[List[int]] = []
+
 
 # =============================================================================
 # DENSITY LEVELS
@@ -69,11 +67,6 @@ GROWTH_RATE: Final[float] = 1.0
 LOW_CARRYING_CAPACITY: Final[int] = 4
 MEDIUM_CARRYING_CAPACITY: Final[int] = 3276
 HIGH_CARRYING_CAPACITY: Final[int] = 8736
-
-CARRYING_CAPACITY_A_INITIAL: Final[int] = 219000
-CARRYING_CAPACITY_B_INITIAL: Final[int] = 438000
-CARRYING_CAPACITY_C_INITIAL: Final[int] = 876000
-CARRYING_CAPACITY_D_INITIAL: Final[int] = 876000
 
 INIT_STOCK_SIZE: Final[str] = "halfCarryingCap"
 
@@ -99,10 +92,9 @@ SAFETY_BUFFER_DAYS: Final[int] = 7
 # FISHER TYPE: ARCHIPELAGO
 # =============================================================================
 
-ARCHIPELAGO_COST_EXISTENCE: Final[float] = 0.5
-ARCHIPELAGO_COST_ACTIVITY: Final[float] = 0.5
+ARCHIPELAGO_COST_EXISTENCE: Final[float] = 0.05
+ARCHIPELAGO_COST_ACTIVITY: Final[float] = 0.05
 ARCHIPELAGO_CATCHABILITY: Final[int] = 5
-ARCHIPELAGO_ACCESSIBLE_REGIONS: List[str] = ["A", "B", "C", "D"]
 ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
 
 
@@ -113,7 +105,6 @@ ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
 COASTAL_COST_EXISTENCE: Final[float] = 1.0
 COASTAL_COST_ACTIVITY: Final[float] = 1.0
 COASTAL_CATCHABILITY: Final[int] = 10
-COASTAL_ACCESSIBLE_REGIONS: List[str] = ["A", "B", "C", "D"]
 COASTAL_MAX_GOOD_SPOTS: Final[int] = 3
 
 
@@ -122,9 +113,8 @@ COASTAL_MAX_GOOD_SPOTS: Final[int] = 3
 # =============================================================================
 
 TRAWLER_COST_EXISTENCE: Final[float] = 5.0
-TRAWLER_COST_ACTIVITY: Final[float] = 5.0
+TRAWLER_COST_ACTIVITY: Final[float] = 2.0
 TRAWLER_CATCHABILITY: Final[int] = 50
-TRAWLER_ACCESSIBLE_REGIONS: List[str] = ["A", "B", "C", "D"]
 TRAWLER_MAX_GOOD_SPOTS: Final[int] = 2
 TRAWLER_STORAGE_CAPACITY: Final[int] = 50
 
@@ -191,28 +181,6 @@ HOTSPOT_MEDIUM_RADIUS: Final[float] = 3.0
 # HELPER FUNCTIONS
 # =============================================================================
 
-def get_region_initial_capacity(region_name: str) -> int:
-    """Returns the initial carrying capacity for a named region.
-
-    Args:
-        region_name: Region identifier, one of ``"A"``, ``"B"``,
-            ``"C"``, ``"D"``, ``"LAND"``, or ``"NULL"``.
-
-    Returns:
-        Initial carrying capacity (fish count). Returns 0 for unknown
-        or non-fishing regions.
-    """
-    capacities: Dict[str, int] = {
-        "A": CARRYING_CAPACITY_A_INITIAL,
-        "B": CARRYING_CAPACITY_B_INITIAL,
-        "C": CARRYING_CAPACITY_C_INITIAL,
-        "D": CARRYING_CAPACITY_D_INITIAL,
-        "LAND": 0,
-        "NULL": 0,
-    }
-    return capacities.get(region_name, 0)
-
-
 def get_msy_stock(carrying_capacity: int) -> int:
     """Calculates the Maximum Sustainable Yield stock level.
 
@@ -243,7 +211,6 @@ def get_fisher_config(fisher_type: str) -> Dict:
             "cost_existence": ARCHIPELAGO_COST_EXISTENCE,
             "cost_activity": ARCHIPELAGO_COST_ACTIVITY,
             "catchability": ARCHIPELAGO_CATCHABILITY,
-            "accessible_regions": ARCHIPELAGO_ACCESSIBLE_REGIONS,
             "max_good_spots": ARCHIPELAGO_MAX_GOOD_SPOTS,
             "storage_capacity": 0,
             "wave_height_threshold": 1.0,
@@ -252,7 +219,6 @@ def get_fisher_config(fisher_type: str) -> Dict:
             "cost_existence": COASTAL_COST_EXISTENCE,
             "cost_activity": COASTAL_COST_ACTIVITY,
             "catchability": COASTAL_CATCHABILITY,
-            "accessible_regions": COASTAL_ACCESSIBLE_REGIONS,
             "max_good_spots": COASTAL_MAX_GOOD_SPOTS,
             "storage_capacity": 0,
             "wave_height_threshold": 1.5,
@@ -261,7 +227,6 @@ def get_fisher_config(fisher_type: str) -> Dict:
             "cost_existence": TRAWLER_COST_EXISTENCE,
             "cost_activity": TRAWLER_COST_ACTIVITY,
             "catchability": TRAWLER_CATCHABILITY,
-            "accessible_regions": TRAWLER_ACCESSIBLE_REGIONS,
             "max_good_spots": TRAWLER_MAX_GOOD_SPOTS,
             "storage_capacity": TRAWLER_STORAGE_CAPACITY,
             "wave_height_threshold": 2.0,
@@ -371,16 +336,7 @@ if __name__ == "__main__":
         print(
             f"  {ftype.capitalize():12} -"
             f" Catchability: {cfg['catchability']:3},"
-            f" Existence: {cfg['cost_existence']:.1f} SEK,"
-            f" Regions: {', '.join(cfg['accessible_regions'])}"
-        )
-
-    print("\nRegional capacities (initial):")
-    for region in ["A", "B", "C", "D"]:
-        cap = get_region_initial_capacity(region)
-        msy = get_msy_stock(cap)
-        print(
-            f"  Region {region}: {cap:>9,} fish (MSY: {msy:>9,})"
+            f" Existence: {cfg['cost_existence']:.1f} SEK"
         )
 
     print("\nDecision-making parameters:")

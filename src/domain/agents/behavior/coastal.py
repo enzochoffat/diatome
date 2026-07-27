@@ -1,6 +1,4 @@
-import statistics
 import logging
-from typing import Dict
 
 from src import config
 from src.core.config import get_fisher_config
@@ -8,27 +6,14 @@ from src.domain.environment.weather import get_wave_height
 
 logger = logging.getLogger(__name__)
 
+
 class Coastal:
     """Coastal decision model balancing lifestyle and profit."""
 
     def __init__(self, coastal: object) -> None:
-        """Initializes the coastal agent.
-
-        Args:
-            coastal: The object representing the coastal agent.
-        """
         self.coastal = coastal
 
     def optimise_lifestyle_and_growth(self) -> None:
-        """Optimizes the fishing decision based on lifestyle and growth.
-
-        Coastal decision model: trade-off between staying home and
-        maximizing catch. Does not fish in bad weather. During the
-        exploration phase, always fishes in the first accessible region.
-        Afterwards, selects the region and fishing decision based on
-        satisfaction levels and expected profitability.
-        """
-
         logger.debug(
             "Coastal decision start",
             extra={
@@ -43,10 +28,9 @@ class Coastal:
                 "Decision blocked by weather",
                 extra={"agent_id": getattr(self, "unique_id", None)},
             )
-
             self.will_fish = False
             return
-        
+
         date, wave_height = get_wave_height(self.model)
         max_heigth = get_fisher_config(fisher_type="coastal")["wave_height_threshold"]
         if wave_height > max_heigth:
@@ -63,167 +47,43 @@ class Coastal:
 
         if len(self.memory) < config.EXPLORATION_PHASE_TRIPS:
             self.will_fish = True
-            self.region_preference = self.accessible_regions[0]
             return
 
         self.update_satisfaction()
 
-        expected_revenues = Coastal._compute_expected_revenues(self)
+        expected_revenue = self.expected_revenue
+        expected_cost = self.cost_existence + self.cost_activity
 
         logger.debug(
-            "Expected revenues computed",
+            "Economic estimation",
             extra={
                 "agent_id": getattr(self, "unique_id", None),
-                "expected_revenues": expected_revenues,
+                "expected_revenue": expected_revenue,
+                "expected_cost": expected_cost,
             }
-        )
-
-        if expected_revenues.get("A", 0) >= expected_revenues.get("B", 0):
-            self.region_preference = "A"
-        else:
-            self.region_preference = "B"
-
-        expected_revenue = expected_revenues.get(
-            self.region_preference, self.expected_revenue
-        )
-        travel_cost = self.get_travel_cost(self.region_preference)
-        expected_cost = (
-            self.cost_existence + self.cost_activity + travel_cost
         )
 
         expected_profit_stay = -self.cost_existence
         expected_profit_go = expected_revenue - expected_cost
 
         logger.debug(
-            "Economic estimation",
-            extra={
-            "agent_id": getattr(self, "unique_id", None),
-            "region": self.region_preference,
-            "expected_revenue": expected_revenue,
-            "expected_cost": expected_cost,
-            "expected_profit_stay": expected_profit_stay,
-            "expected_profit_go": expected_profit_go,
-        }
-        )
-
-        if self.capital < 0:
-            self.will_fish = expected_profit_go > expected_profit_stay
-
-            logger.info(
-                "Negative capital decision",
-                extra={
-                    "agent_id": getattr(self, "unique_id", None),
-                    "capital": self.capital,
-                    "will_fish": self.will_fish,
-                }
-            )
-            self.wanna_be_home = False
-            return
-
-        if expected_profit_go > expected_profit_stay:
-            logger.debug(
-                "fishing more profitable than staying home",
-                extra={
-                    "agent_id": getattr(self, "unique_id", None),
-                }
-            )
-            Coastal._decide_when_profitable(self)
-        else:
-            logger.debug(
-                "Staying home more profitable than fishing",
-                extra={
-                    "agent_id": getattr(self, "unique_id", None),
-                }
-            )
-            self.will_fish = False
-            self.wanna_be_home = False
-            self.expect_no_profit = True
-
-    def _compute_expected_revenues(self) -> dict[str, float]:
-        """Computes expected revenues per region based on memory.
-
-        For each accessible region, calculates the mean of the last 30
-        remembered revenues. If no memory exists for a region, falls back
-        to ``expected_revenue`` as a conservative estimate.
-
-        Returns:
-            A dictionary mapping each region to its expected revenue (€).
-        """
-        expected_revenues: dict[str, float] = {}
-        for region in self.accessible_regions:
-            region_memory = [
-                trip for trip in self.memory
-                if trip.get("region") == region
-            ]
-            if region_memory:
-                expected_revenues[region] = statistics.mean(
-                    trip.get("revenue", 0.0) for trip in region_memory[-30:]
-                )
-
-                logger.debug(
-                    "Computed regional expectation",
-                    extra={
-                        "agent_id": getattr(self, "unique_id", None),
-                        "region": region,
-                        "value": expected_revenues[region],
-                        "sample": len(region_memory),
-                    }
-                )
-
-            else:
-                expected_revenues[region] = self.expected_revenue
-
-                logger.debug(
-                    "Fallback to expected_revenue",
-                    extra={
-                        "agent_id": getattr(self, "unique_id", None),
-                        "region": region,
-                        "value": expected_revenues[region],
-                    }
-                )
-
-        return expected_revenues
-
-    def _decide_when_profitable(self) -> None:
-        """Decides whether to fish based on satisfaction, when profitable.
-
-        When going fishing is more profitable than staying home, arbitrates
-        between home-time satisfaction and growth satisfaction to determine
-        the final fishing decision.
-        """
-        home_sat = getattr(self, "satisfaction_home", 0.5)
-        growth_sat = getattr(self, "satisfaction_growth", 0.5)
-        threshold = self.satisfaction_home_threshold
-
-        logger.debug(
-            "Satisfaction evaluation",
+            "Profit comparison",
             extra={
                 "agent_id": getattr(self, "unique_id", None),
-                "home_satisfaction": home_sat,
-                "growth_satisfaction": growth_sat,
-                "threshold": threshold,
+                "expected_profit_go": expected_profit_go,
+                "expected_profit_stay": expected_profit_stay,
             }
         )
 
-        if growth_sat >= threshold and home_sat >= threshold:
+        if expected_profit_go > expected_profit_stay:
             self.will_fish = True
-            self.wanna_be_home = False
-            reason ="balenced_satisfaction"
-        elif home_sat < threshold:
-            self.will_fish = False
-            self.wanna_be_home = True
-            reason ="low_home_satisfaction"
         else:
-            self.will_fish = True
-            self.wanna_be_home = False
-            reason = "growth_priority"
+            self.will_fish = False
 
-        logger.info(
-            "Final fishing decision",
+        logger.debug(
+            "Decision final",
             extra={
                 "agent_id": getattr(self, "unique_id", None),
                 "will_fish": self.will_fish,
-                "wanna_be_home": self.wanna_be_home,
-                "reason": reason,
             }
         )

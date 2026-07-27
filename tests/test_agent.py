@@ -221,49 +221,6 @@ def test_forgetting_mechanism():
     
     print("✓ Test réussi\n")
 
-def test_region_filtering():
-    """Test le filtrage des spots par région"""
-    print("=" * 60)
-    print("TEST 6: Filtrage par région")
-    print("=" * 60)
-    
-    model = FisheryModel(
-        end_of_sim=365*25,
-        num_archipelago=0,
-        num_coastal=1,
-        num_trawler=0
-    )
-    
-    agent = FisherAgent(1, model, "coastal")
-    
-    # Ajouter des spots dans différentes régions
-    # Région A: y < 8
-    agent.update_memory_good_spots((7, 3), 500, 400)
-    agent.update_memory_good_spots((16, 3), 450, 400)
-    
-    # Région B: 8 <= y < 24
-    agent.update_memory_good_spots((3, 19), 550, 400)
-    agent.update_memory_good_spots((8, 11), 500, 400)
-    
-    print(f"Total spots: {len(agent.good_spots_memory)}")
-    
-    # Filtrer par région A
-    spots_A = agent.get_good_spots(region="A")
-    print(f"Spots en région A: {len(spots_A)}")
-    for loc, mem in spots_A:
-        print(f"  {loc}")
-    
-    # Filtrer par région B
-    spots_B = agent.get_good_spots(region="B")
-    print(f"Spots en région B: {len(spots_B)}")
-    for loc, mem in spots_B:
-        print(f"  {loc}")
-    
-    assert len(spots_A) == 2, "Devrait avoir 2 spots en région A"
-    assert len(spots_B) == 2, "Devrait avoir 2 spots en région B"
-    
-    print("✓ Test réussi\n")
-
 def run_all_tests():
     """Exécute tous les tests du Step 3"""
     print("\n" + "=" * 60)
@@ -276,7 +233,6 @@ def run_all_tests():
         test_spatial_memory_rolling_average()
         test_memory_statistics()
         test_forgetting_mechanism()
-        test_region_filtering()
         
         print("=" * 60)
         print("RÉSUMÉ")

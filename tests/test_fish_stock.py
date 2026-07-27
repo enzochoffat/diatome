@@ -24,32 +24,6 @@ def test_grid_creation():
     print(f"✓ Nombre total de patches: {len(model.patches)}")
     print()
 
-def test_regions():
-    """Test la répartition des régions"""
-    print("=" * 50)
-    print("TEST 2: Répartition des régions")
-    print("=" * 50)
-    
-    model = FisheryModel(
-        end_of_sim=365*25,
-        num_archipelago=0,
-        num_coastal=0,
-        num_trawler=0
-    )
-    
-    region_counts = {"A": 0, "B": 0, "C": 0, "D": 0, "LAND": 0, "NULL": 0}
-    
-    for patch in model.patches.values():
-        region = patch['region']
-        if region in region_counts:
-            region_counts[region] += 1
-    
-    print("Nombre de patches par région:")
-    for region, count in region_counts.items():
-        print(f"  - {region}: {count} patches")
-    
-    print()
-
 def test_hotspots():
     """Test la génération des hotspots"""
     print("=" * 50)
@@ -75,11 +49,8 @@ def test_hotspots():
         if density:
             print(f"  - {density}: {count} patches")
     
-    print("\nVérification des hotspots définis:")
-    print(f"  - Region A: {len(model.HOTSPOTS_A)} hotspots")
-    print(f"  - Region B: {len(model.HOTSPOTS_B)} hotspots")
-    print(f"  - Region C: {len(model.HOTSPOTS_C)} hotspots")
-    print(f"  - Region D: {len(model.HOTSPOTS_D)} hotspots")
+    print(f"\nVérification des hotspots définis:")
+    print(f"Total hotspots: {len(model.HOTSPOTS)}")
     
     print()
 
@@ -96,12 +67,7 @@ def test_fish_stocks():
         num_trawler=0
     )
     
-    print("Stocks initiaux par région:")
-    print(f"  - Region A: {model.get_region_stock('A')} (MSY: {model.MSY_STOCK_A})")
-    print(f"  - Region B: {model.get_region_stock('B')} (MSY: {model.MSY_STOCK_B})")
-    print(f"  - Region C: {model.get_region_stock('C')} (MSY: {model.MSY_STOCK_C})")
-    print(f"  - Region D: {model.get_region_stock('D')} (MSY: {model.MSY_STOCK_D})")
-    print(f"  - Total: {model.get_total_stock()}")
+    print(f"Stock total: {model.get_total_stock()}")
     
     print()
 
@@ -132,10 +98,8 @@ def test_patch_access():
         patch_info = model.get_patch_info(x, y)
         if patch_info:
             print(f"\n  Patch ({x}, {y}):")
-            print(f"    - Region: {patch_info['region']}")
             print(f"    - Density: {patch_info['density']}")
             print(f"    - Fish stock: {patch_info['fish_stock']}")
-            print(f"    - Carrying capacity: {patch_info['carrying_capacity']}")
     
     print()
 
@@ -172,7 +136,6 @@ def run_all_tests():
     
     try:
         test_grid_creation()
-        test_regions()
         test_hotspots()
         test_fish_stocks()
         test_patch_access()

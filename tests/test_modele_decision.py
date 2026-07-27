@@ -36,8 +36,7 @@ def test_archipelago_satisficing():
             'cost': 50,
             'profit': 50,
             'days': 1,
-            'tick': model.current_step,
-            'region': "A"
+            'tick': model.current_step
         }
         agent.update_memory(trip_info)
     
@@ -67,8 +66,7 @@ def test_archipelago_satisficing():
             'cost': 6,
             'profit': -5.7,
             'days': 1,
-            'tick': model.current_step,
-            'region': "A"
+            'tick': model.current_step
         }
         agent.update_memory(trip_info)
         
@@ -90,7 +88,6 @@ def test_archipelago_satisficing():
     # DEBUG: Afficher l'état après la décision
     print(f"  DEBUG - État après décision:")
     print(f"    Will fish: {agent.will_fish}")
-    print(f"    Region preference: {agent.region_preference}")
     
     print(f"  Will fish: {agent.will_fish} (attendu: True)")
     assert agent.will_fish, "Devrait pêcher si captures insuffisantes"
@@ -128,26 +125,10 @@ def test_coastal_optimization():
     print(f"  Catchability: {agent.catchability}")
     print(f"  Cost existence: {agent.cost_existence}")
     print(f"  Cost activity: {agent.cost_activity}")
-    print(f"  Accessible regions: {agent.accessible_regions}")
     
     agent.optimise_lifestyle_and_growth()
     
     print(f"  Will fish: {agent.will_fish}")
-    print(f"  Region preference: {agent.region_preference}")
-    
-    if not agent.will_fish:
-        print(f"\n  DEBUG - Pourquoi ne pêche pas ?")
-        # Recalculer pour debug
-        for region in agent.accessible_regions:
-            expected_catch = agent.catchability * 0.8
-            travel_cost = agent.get_travel_cost(region)
-            total_cost = agent.cost_existence + agent.cost_activity + travel_cost
-            profit = expected_catch - total_cost
-            print(f"    Region {region}:")
-            print(f"      Expected catch: {expected_catch:.2f}")
-            print(f"      Total cost: {total_cost:.2f}")
-            print(f"      Expected profit: {profit:.2f}")
-            print(f"      Worthwhile? {profit > agent.cost_existence}")
     
     # Test 2: Ajouter mémoire de pêche réussie en région A
     print("\nTest 2: Avec mémoire région A")
@@ -159,8 +140,7 @@ def test_coastal_optimization():
             'cost': 50,
             'profit': 100,
             'days': 1,
-            'tick': model.current_step,
-            'region': "A"
+            'tick': model.current_step
         }
         agent.update_memory(trip_info)
     
@@ -173,8 +153,7 @@ def test_coastal_optimization():
             'cost': 50,
             'profit': 70,
             'days': 1,
-            'tick': model.current_step,
-            'region': "B"
+            'tick': model.current_step
         }
         agent.update_memory(trip_info)
     
@@ -184,9 +163,6 @@ def test_coastal_optimization():
     
     print(f"\n  Résultat:")
     print(f"    Will fish: {agent.will_fish}")
-    print(f"    Region preference: {agent.region_preference}")
-    
-    assert agent.region_preference in ["A", "B"], "Devrait choisir une région"
     
     # Test 3: avec capital négatif
     print("\nTest 3: Capital négatif")
@@ -226,14 +202,12 @@ def test_trawler_optimization():
             'cost': 100,
             'profit': 400,
             'days': 1,
-            'tick': model.current_step,
-            'region': "C"
+            'tick': model.current_step
         }
         agent.update_memory(trip_info)
     
     agent.optimise_growth()
     print(f"  Will fish: {agent.will_fish}")
-    print(f"  Region preference: {agent.region_preference}")
     
     # Test: Décision en mer avec stockage non plein
     print("\nScénario 2: En mer, stockage non plein")
@@ -241,7 +215,6 @@ def test_trawler_optimization():
     agent.at_sea = True
     agent.fish_onboard = 1000
     agent.days_at_sea_current_trip = 2
-    agent.region_preference = "C"
     
     agent.optimise_growth()
     print(f"  Will fish: {agent.will_fish}")
@@ -282,7 +255,7 @@ def test_spot_selection_knowledge():
     print("\nSélection de 10 spots:")
     selected_spots = []
     for i in range(10):
-        spot = agent.decide_fishSpot("A")
+        spot = agent.decide_fishSpot()
         selected_spots.append(spot)
         print(f"  {i+1}. {spot}")
     
@@ -315,21 +288,19 @@ def test_spot_selection_expertise():
     expert = agents[1]
     expert.total_catch = 5000
     expert.gone_fishing = True
-    expert.current_region = "A"
     expert.pos = (7, 3)
     
     # Agent 2 a peu de captures
     novice = agents[2]
     novice.total_catch = 100
     novice.gone_fishing = True
-    novice.current_region = "A"
     novice.pos = (16, 3)
     
     # Sélection du follower
     print(f"\nExpert position: {expert.pos} (catch: {expert.total_catch})")
     print(f"Novice position: {novice.pos} (catch: {novice.total_catch})")
     
-    spot = follower.decide_fishSpot("A")
+    spot = follower.decide_fishSpot()
     print(f"Follower selected: {spot}")
     
     assert spot == expert.pos, "Devrait suivre l'expert"
@@ -358,12 +329,10 @@ def test_spot_selection_descriptive_norm():
     # 3 agents au spot (7, 3)
     for i in range(1, 4):
         agents[i].gone_fishing = True
-        agents[i].current_region = "A"
         agents[i].pos = (7, 3)
     
     # 1 agent au spot (16, 3)
     agents[4].gone_fishing = True
-    agents[4].current_region = "A"
     agents[4].pos = (16, 3)
     
     # Sélection du follower
@@ -371,7 +340,7 @@ def test_spot_selection_descriptive_norm():
     print(f"  (7, 3): 3 agents")
     print(f"  (16, 3): 1 agent")
     
-    spot = follower.decide_fishSpot("A")
+    spot = follower.decide_fishSpot()
     print(f"\nFollower selected: {spot} (attendu: (7, 3))")
     
     assert spot == (7, 3), "Devrait aller où il y a le plus d'agents"
@@ -417,11 +386,7 @@ def test_integrated_decision_making():
             print(f"  Avg profit: {stats['avg_profit']:.2f}")
             print(f"  Success rate: {stats['success_rate']:.1%}")
     
-    print("\nStocks régionaux:")
-    for region in ["A", "B", "C", "D"]:
-        stock = model.get_region_stock(region)
-        capacity = model.get_region_carrying_capacity(region)
-        print(f"  {region}: {stock:,} / {capacity:,} ({stock/capacity*100:.1f}%)")
+    print(f"\nStock total: {model.get_total_stock():,}")
     
     print("✓ Test réussi\n")
 
@@ -476,16 +441,7 @@ def test_multi_agent_simulation():
             print(f"  Jours en mer moyen: {avg_days:.1f}")
     
     # Stocks finaux
-    print("\n\nStocks finaux:")
-    total_initial = model.MSY_STOCK_A + model.MSY_STOCK_B + model.MSY_STOCK_C + model.MSY_STOCK_D
-    total_final = model.get_total_stock()
-    
-    for region in ["A", "B", "C", "D"]:
-        stock = model.get_region_stock(region)
-        capacity = model.get_region_carrying_capacity(region)
-        print(f"  {region}: {stock:,} / {capacity:,} ({stock/capacity*100:.1f}%)")
-    
-    print(f"\n  Total: {total_final:,} ({(total_final/total_initial-1)*100:+.1f}% vs initial)")
+    print(f"\n\nStock final total: {model.get_total_stock():,}")
     
     print("✓ Test réussi\n")
 

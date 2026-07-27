@@ -7,16 +7,6 @@ from src.domain.environment.distance import create_distance_map, save_distance_m
 
 
 def create_agents(self) -> None:
-    """Create and place all fisher agents on the grid.
-
-    The method creates archipelago, coastal, and trawler agents,
-    assigns them a home port and habitat restrictions, and places
-    them at an appropriate starting location.
-
-    Archipelago fishers always start at (0, 0), while coastal and
-    trawler fishers start at a random position within one of their
-    accessible regions.
-    """
     agent_id = 0
 
     ports_dict = (
@@ -75,7 +65,6 @@ def create_agents(self) -> None:
 
         self.grid.place_agent(agent, start_pos)
         agent.current_location = start_pos
-        agent.current_region = self.get_region(*start_pos)
 
         agent_id += 1
 
@@ -112,13 +101,12 @@ def create_agents(self) -> None:
             ),
         )
 
-        region = self.random.choice(["A", "B"])
-        start_pos = self._get_random_position_in_region(region)
+        water_cells = config.WATER_CELLS
+        start_pos = tuple(self.random.choice(water_cells)) if water_cells else None
 
         if start_pos is not None:
             self.grid.place_agent(agent, start_pos)
             agent.current_location = start_pos
-            agent.current_region = region
 
         agent_id += 1
 
@@ -159,15 +147,11 @@ def create_agents(self) -> None:
             ),
         )
 
-        region = self.random.choice(
-            config.TRAWLER_ACCESSIBLE_REGIONS,
-        )
-
-        start_pos = self._get_random_position_in_region(region)
+        water_cells = config.WATER_CELLS
+        start_pos = tuple(self.random.choice(water_cells)) if water_cells else None
 
         if start_pos is not None:
             self.grid.place_agent(agent, start_pos)
             agent.current_location = start_pos
-            agent.current_region = region
 
         agent_id += 1

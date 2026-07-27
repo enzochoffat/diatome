@@ -48,50 +48,34 @@ class SimulationCanvas(FigureCanvas):
     # ------------------------------------------------------------------
 
     def _init_stock_plot(self) -> None:
-        """Crée les 4 subplots et les Line2D vides (appelé une seule fois)."""
         self.fig.clear()
         self._stock_lines = {}
 
-        regions = [
-            ("stock_A", "Region A (Archipelago)", "#d9eef9", "#246eb9", config.CARRYING_CAPACITY_A_INITIAL),
-            ("stock_B", "Region B (Coastal 1)",   "#e3f5df", "#2a7f62", config.CARRYING_CAPACITY_B_INITIAL),
-            ("stock_C", "Region C (Coastal 2)",   "#fff3d6", "#d99000", config.CARRYING_CAPACITY_C_INITIAL),
-            ("stock_D", "Region D (Open Sea)",    "#ffe7dd", "#cb4b16", config.CARRYING_CAPACITY_D_INITIAL),
-        ]
-
-        for i, (key, title, bg_color, line_color, carrying_capacity) in enumerate(regions):
-            ax = self.fig.add_subplot(2, 2, i + 1)
-            ax.set_facecolor(bg_color)
-            # Line2D initialisée vide — sera remplie par set_data()
-            (line,) = ax.plot([], [], color=line_color, linewidth=1.5)
-            msy = carrying_capacity / 2
-            ax.axhline(y=msy, color="#b30000", linestyle="--", linewidth=1,
-                       label=f"MSY = {msy:,.0f}")
-            ax.set_title(title, fontsize=9)
-            ax.set_xlabel("Jours", fontsize=8)
-            ax.set_ylabel("Stock", fontsize=8)
-            ax.grid(True, alpha=0.4)
-            ax.tick_params(labelsize=7)
-            self._stock_lines[key] = (ax, line)
+        ax = self.fig.add_subplot(1, 1, 1)
+        ax.set_facecolor("#eef6ff")
+        (line,) = ax.plot([], [], color="#246eb9", linewidth=1.5)
+        ax.set_title("Stock total", fontsize=10)
+        ax.set_xlabel("Jours", fontsize=8)
+        ax.set_ylabel("Stock", fontsize=8)
+        ax.grid(True, alpha=0.4)
+        ax.tick_params(labelsize=7)
+        self._stock_lines["total_stock"] = (ax, line)
 
         self.fig.tight_layout(pad=2.0)
         self.draw()
 
     def plot_stocks(self, model_data: dict) -> None:
-        """Mise à jour O(1) des lignes — aucune recréation d'objets Axes."""
-        required_keys = ["stock_A", "stock_B", "stock_C", "stock_D"]
         if not (
             model_data
-            and all(k in model_data for k in required_keys)
-            and any(len(model_data[k]) > 0 for k in required_keys)
+            and "total_stock" in model_data
+            and len(model_data["total_stock"]) > 0
         ):
             return
 
-        # Initialisation paresseuse : une seule fois par session
         if self._stock_lines is None:
             self._init_stock_plot()
 
-        steps = list(range(len(model_data["stock_A"])))
+        steps = list(range(len(model_data["total_stock"])))
         for key, (ax, line) in self._stock_lines.items():
             line.set_data(steps, model_data[key])
             ax.relim()
@@ -304,12 +288,9 @@ class MainWindow(QMainWindow):
         plot_economics à chaque rafraîchissement graphique.
         """
         self.model_data: dict[str, list] = {
-            "stock_A":     [],
-            "stock_B":     [],
-            "stock_C":     [],
-            "stock_D":     [],
+            "total_stock": [],
             "total_catch": [],
-            "daily_catch": [],   # [P5] différence journalière pré-calculée
+            "daily_catch": [],
             "avg_capital": [],
         }
 
@@ -791,11 +772,7 @@ class MainWindow(QMainWindow):
 
         avg_capital = total_capital / n_agents if n_agents else 0
 
-        # --- Stocks régionaux ---
-        self.model_data["stock_A"].append(self.model.get_region_stock("A"))
-        self.model_data["stock_B"].append(self.model.get_region_stock("B"))
-        self.model_data["stock_C"].append(self.model.get_region_stock("C"))
-        self.model_data["stock_D"].append(self.model.get_region_stock("D"))
+        self.model_data["total_stock"].append(self.model.get_total_stock())
 
         # --- Captures : cumul + différence journalière [P5] ---
         prev_total = self.model_data["total_catch"][-1] if self.model_data["total_catch"] else 0
@@ -869,11 +846,7 @@ class MainWindow(QMainWindow):
             f"A pêché aujourd'hui : {summary.get('num_fished_today', 0)}\n"
             f"À la maison : {summary['num_at_home']}\n\n"
             f"=== STOCKS ===\n"
-            f"Total : {summary['total_stock']:,.0f}\n"
-            f"Région A : {summary['stock_A']:,.0f}\n"
-            f"Région B : {summary['stock_B']:,.0f}\n"
-            f"Région C : {summary['stock_C']:,.0f}\n"
-            f"Région D : {summary['stock_D']:,.0f}\n\n"
+            f"Total : {summary['total_stock']:,.0f}\n\n"
             f"=== ÉCONOMIE ===\n"
             f"Captures totales : {summary['total_catch']:,.0f}\n"
             f"Capital moyen : {summary['avg_capital']:,.2f}\n\n"

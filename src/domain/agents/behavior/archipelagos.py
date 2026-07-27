@@ -6,63 +6,33 @@ from src.domain.environment.weather import get_wave_height
 
 logger = logging.getLogger(__name__)
 
+
 class Archipelagos:
     """Represents an archipelago agent with configurable fishing behavior."""
 
     def __init__(self, agent) -> None:
-        """Initialises the Archipelago with a reference to itself.
-
-        Args:
-            agent: The archipelago data or identifier passed at construction.
-        """
         self.agent = agent
 
     def satisfice_lifestyle(self) -> None:
-        """Apply the satisficing decision model for fishing behavior.
-
-        This method implements a satisficing strategy: the agent fishes
-        only when necessary to meet its basic weekly needs. During the
-        exploration phase it always fishes (weather permitting). After
-        that phase it evaluates recent revenue against weekly costs,
-        checks for scarcity signals, and may enter a lay-low period.
-        """
-
-
         logger.debug(
-                    "Archipelago decision start",
-                    extra={
-                        "agent_id": getattr(self, "unique_id", None),
-                        "capital": self.capital,
-                        "memory_size": len(self.memory),
-                        "lay_low": self.lay_low,
-                    },
-                )
-
+            "Archipelago decision start",
+            extra={
+                "agent_id": getattr(self, "unique_id", None),
+                "capital": self.capital,
+                "memory_size": len(self.memory),
+                "lay_low": self.lay_low,
+            },
+        )
 
         if len(self.memory) < config.EXPLORATION_PHASE_TRIPS:
             logger.debug(
                 "Exploration phase",
                 extra={"agent_id": getattr(self, "unique_id", None)},
             )
-
             Archipelagos._handle_exploration_phase(self)
             return
 
-        revenue_last_period = Archipelagos._compute_recent_revenue(self)
-        weekly_needs = Archipelagos._compute_weekly_needs(self)
-
-
-        logger.debug(
-            "Recent performance",
-            extra={
-                "agent_id": getattr(self, "unique_id", None),
-                "recent_revenue": revenue_last_period,
-                "weekly_needs": weekly_needs,
-            },
-        )
-        
         fish_is_scarce = Archipelagos._assess_scarcity(self)
-
 
         logger.debug(
             "Scarcity assessment",
@@ -72,9 +42,7 @@ class Archipelagos:
             },
         )
 
-
         if self.lay_low:
-
             logger.info(
                 "Agent in lay-low phase",
                 extra={
@@ -82,7 +50,6 @@ class Archipelagos:
                     "remaining_days": self.lay_low_counter,
                 },
             )
-
             Archipelagos._tick_lay_low(self)
             return
 
@@ -95,75 +62,31 @@ class Archipelagos:
                     "agent_id": getattr(self, "unique_id", None),
                     "wave_height": wave_height,
                     "threshold": max_heigth,
-                }
+                },
             )
-            can_fish = False
+            self.will_fish = False
+            return
 
-        done_enough = revenue_last_period >= weekly_needs
-        needs_money = not done_enough or self.capital < 0
+        days_in_weekly_window = min(len(self.memory), config.MEMORY_WEEKLY_WINDOW)
+        recent_days = self.memory[-days_in_weekly_window:]
+        fishing_days = sum(1 for t in recent_days if t.get("went_fishing", False))
+        avg_daily_revenue = sum(t.get("revenue", 0.0) for t in recent_days) / max(days_in_weekly_window, 1)
+        daily_cost = self.cost_existence + self.cost_activity
+        needs_fishing = fishing_days < 4 or avg_daily_revenue < daily_cost or self.capital < 0
         can_fish = not self.model.bad_weather
 
-
-        logger.debug(
-            "Satisficing evaluation",
-            extra={
-                "agent_id": getattr(self, "unique_id", None),
-                "done_enough": done_enough,
-                "needs_money": needs_money,
-                "can_fish": can_fish,
-            },
-        )
-
-
-        if fish_is_scarce and self.capital >= 0:
-
-            # logger.warning(
-            #     "Entering lay-low due to perceived scarcity",
-            #     extra={
-            #         "agent_id": getattr(self, "unique_id", None),
-            #         "capital": self.capital,
-            #     },
-            # )
-
+        if fish_is_scarce and self.capital >= self.cost_existence * 30:
             self.lay_low = True
             self.lay_low_counter = config.NEGATIVE_CAPITAL_LAYLOW_DAYS
             return
 
-        self.will_fish = needs_money and can_fish
-
-        if self.will_fish:
-            self.region_preference = "A"
-        
-
-        logger.info(
-            "Archipelago decision",
-            extra={
-                "agent_id": getattr(self, "unique_id", None),
-                "will_fish": self.will_fish,
-                "reason": "needs_money" if needs_money else "enough_resources",
-                "weather_ok": can_fish,
-            },
-        )
-
+        self.will_fish = needs_fishing and can_fish
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
     def _handle_exploration_phase(self) -> None:
-        """Set fishing intent during the initial exploration phase."""
-        date, wave_height = get_wave_height(self.model)
-        max_heigth = get_fisher_config(fisher_type="archipelago")["wave_height_threshold"]
-        if wave_height > max_heigth:
-            logger.debug(
-                "Decision blocked by wave height",
-                extra={
-                    "agent_id": getattr(self, "unique_id", None),
-                    "wave_height": wave_height,
-                    "threshold": max_heigth,
-                }
-            )
-            can_fish = False
         can_fish = not self.model.bad_weather
         logger.debug(
             "Exploration phase decision",
@@ -172,19 +95,9 @@ class Archipelagos:
                 "can_fish": can_fish,
             },
         )
-
         self.will_fish = can_fish
-        if self.will_fish:
-            self.region_preference = "A"
 
     def _compute_recent_revenue(self) -> float:
-        """Sum revenues over the most recent observation window.
-
-        Returns:
-            Total revenue (€) across the last 5 remembered days
-            (or fewer if memory is shorter). Days without fishing
-            contribute 0.
-        """
         last_days_count = min(len(self.memory), 5)
         recent_days = self.memory[-last_days_count:]
 
@@ -202,15 +115,8 @@ class Archipelagos:
         return total
 
     def _compute_weekly_needs(self) -> float:
-        """Estimate the agent's weekly financial needs.
-
-        Returns:
-            Minimum weekly revenue required to cover existence costs,
-            travel costs, and activity costs.
-        """
         needs = (
             7 * self.cost_existence
-            + 5 * self.get_travel_cost("A")
             + 5 * self.cost_activity
         )
 
@@ -223,23 +129,13 @@ class Archipelagos:
         )
 
         return needs
-    
 
     def _assess_scarcity(self) -> bool:
-        """Determine whether fish are perceived as scarce.
-
-        Scarcity is detected when more than 75 % of recent fishing
-        trips recorded catches below the agent's catchability threshold.
-
-        Returns:
-            True if scarcity conditions are met, False otherwise.
-        """
         if len(self.memory) < config.SCARCITY_MIN_MEMORY:
             logger.debug(
                 "Scarcity skipped (not enough memory)",
                 extra={"agent_id": getattr(self, "unique_id", None)},
             )
-
             return False
 
         fishing_trips = [
@@ -259,7 +155,6 @@ class Archipelagos:
         return low_catch_count > 0.75 * self.max_good_spots
 
     def _tick_lay_low(self) -> None:
-        """Decrement the lay-low counter and clear the flag when expired."""
         self.lay_low_counter -= 1
 
         logger.debug(

@@ -1,29 +1,8 @@
 
-from typing import Tuple, List, Optional
-import random
+from typing import List
 import numpy as np
 
 from src.infrastructure.ecospace import ecospace_outputs
-
-def get_random_position_in_region(
-    self, region: str
-) -> Optional[Tuple[int, int]]:
-    """Returns a random patch position within a named region.
-
-    Args:
-        region: Region identifier (``"A"``, ``"B"``, ``"C"``,
-            or ``"D"``).
-
-    Returns:
-        A random ``(x, y)`` tuple from that region, or None if the
-        region contains no patches.
-    """
-    candidates = [
-        pos
-        for pos, patch in self.patches.items()
-        if patch["region"] == region
-    ]
-    return random.choice(candidates) if candidates else None
 
 def restricted_habitat(self, habitat: List[str]) -> np.ndarray:
     """Returns a boolean mask of restricted areas based on habitat.

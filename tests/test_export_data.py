@@ -35,7 +35,7 @@ def test_datacollector_basic():
     print(f"  Agent vars: {len(agent_df)} rows, {len(agent_df.columns)} columns")
     
     # Vérifier colonnes clés
-    required_model_cols = ['stock_A', 'stock_B', 'total_catch_cumulative', 
+    required_model_cols = ['total_stock', 'total_catch_cumulative', 
                            'avg_capital', 'gini_capital', 'num_fishing']
     for col in required_model_cols:
         assert col in model_df.columns, f"Colonne manquante: {col}"
@@ -49,7 +49,7 @@ def test_datacollector_basic():
     
     # Afficher échantillon
     print("\nÉchantillon données model (5 derniers jours):")
-    print(model_df[['current_step', 'stock_A', 'total_catch_cumulative', 
+    print(model_df[['current_step', 'total_stock', 'total_catch_cumulative', 
                     'avg_capital', 'num_fishing']].tail())
     
     print("✓ Test réussi\n")
@@ -135,7 +135,7 @@ def test_yearly_data_collection():
     print(f"  Success rate: {year1['avg_success_rate']:.1%}")
     
     # Vérifier clés requises
-    required_keys = ['year', 'stock_A', 'total_catch_all', 'gini_capital', 
+    required_keys = ['year', 'total_stock', 'total_catch_all', 'gini_capital', 
                      'avg_success_rate', 'num_agents']
     for key in required_keys:
         assert key in year1, f"Clé manquante: {key}"
@@ -270,15 +270,12 @@ def test_integrated_simulation():
     
     model_df = model.datacollector.get_model_vars_dataframe()
     
-    # Evolution stocks
-    print(f"\nÉvolution stocks par région:")
-    for region in ['A', 'B', 'C', 'D']:
-        start = model_df[f'stock_{region}'].iloc[0]
-        end = model_df[f'stock_{region}'].iloc[-1]
-        change = ((end - start) / start) * 100
-        msy = getattr(model, f'MSY_STOCK_{region}')
-        pct_msy = (end / msy) * 100
-        print(f"  Region {region}: {start:>8,.0f} → {end:>8,.0f} ({change:>+6.1f}%) [{pct_msy:>5.1f}% MSY]")
+    # Evolution stock
+    print(f"\nÉvolution du stock total:")
+    start = model_df['total_stock'].iloc[0]
+    end = model_df['total_stock'].iloc[-1]
+    change = ((end - start) / start) * 100
+    print(f"  Total: {start:>8,.0f} → {end:>8,.0f} ({change:>+6.1f}%)")
     
     # Distribution catches par type
     agent_df = model.datacollector.get_agent_vars_dataframe()

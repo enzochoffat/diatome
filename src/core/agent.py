@@ -122,7 +122,6 @@ class FisherAgent(Agent):
         # Spatial state.
         self.current_location: tuple[int, int] | None = None
         self.target_location: tuple[int, int] | None = None
-        self.current_region: str | None = None
         self.display_location: tuple[int, int] | None = None
 
         # Activity flags.
@@ -135,7 +134,6 @@ class FisherAgent(Agent):
 
         # Decision-making.
         self.will_fish = False
-        self.region_preference: str | None = None
         self.spot_selection_strategy = "knowledge"
         self.growth_perception = 0.0
 
@@ -188,9 +186,9 @@ class FisherAgent(Agent):
         if self.fisher_type == "archipelago":
             self.cost_existence = self.model.LOW_COST_EXISTENCE
             self.cost_activity = self.model.LOW_COST_ACTIVITY
-            self.accessible_regions = ["A", "B", "C", "D"]
             self.lifestyle_preference = "high"
-            self.max_good_spots = 5
+            self.max_good_spots = 10
+            self.good_spots_threshold = 0.05
             self.has_partner = True
             self.has_colleagues = False
             self.has_technologie = False
@@ -198,7 +196,6 @@ class FisherAgent(Agent):
         elif self.fisher_type == "coastal":
             self.cost_existence = self.model.MEDIUM_COST_EXISTENCE
             self.cost_activity = self.model.MEDIUM_COST_ACTIVITY
-            self.accessible_regions = ["A", "B", "C", "D"]
             self.lifestyle_preference = "medium"
             self.max_good_spots = 3
             self.wanna_be_home = False
@@ -215,7 +212,6 @@ class FisherAgent(Agent):
         elif self.fisher_type == "trawler":
             self.cost_existence = self.model.HIGH_COST_EXISTENCE
             self.cost_activity = self.model.HIGH_COST_ACTIVITY
-            self.accessible_regions = ["A", "B", "C", "D"]
             self.lifestyle_preference = "low"
             self.max_good_spots = 2
             self.has_partner = False
@@ -245,10 +241,7 @@ class FisherAgent(Agent):
                 location,
             )
             if self.current_location
-            else movement.get_travel_cost(
-                self,
-                self.accessible_regions[0],
-            )
+            else self.cost_activity
         )
 
         return (
@@ -319,7 +312,6 @@ class FisherAgent(Agent):
                 ),
                 "days": 1,
                 "tick": self.model.current_step,
-                "region": None,
                 "went_fishing": False,
             }
         )
@@ -369,7 +361,6 @@ class FisherAgent(Agent):
         self.at_sea = False
         self.gone_fishing = False
         self.at_home = True
-        self.current_region = None
         self.current_location = None
 
         if getattr(self, "pos", None) is not None:
@@ -436,7 +427,6 @@ class FisherAgent(Agent):
             extra={
                 "agent_id": self.unique_id,
                 "will_fish": self.will_fish,
-                "region": self.region_preference,
             },
         )
 
@@ -453,13 +443,8 @@ class FisherAgent(Agent):
         * memory updates.
         """
         if self.bankrupt:
-            # logger.warning(
-            #     "Bankrupt agent forced to fish",
-            #     extra={"agent_id": self.unique_id},
-            # )
             self.lay_low = False
             self.will_fish = True
-            return
 
         if self.lay_low:
             logger.info(
@@ -495,12 +480,7 @@ class FisherAgent(Agent):
             self.stay_home(pay_existence_cost=True)
             return
 
-        target_region = (
-            self.region_preference
-            or self.accessible_regions[0]
-        )
-
-        target_spot = self.decide_fishSpot(target_region)
+        target_spot = self.decide_fishSpot()
 
         if target_spot is None:
             logger.debug(
@@ -512,7 +492,7 @@ class FisherAgent(Agent):
 
         estimated_cost = self.estimate_trip_cost(target_spot)
 
-        if not self.can_afford_trip(estimated_cost):
+        if not self.bankrupt and not self.can_afford_trip(estimated_cost):
             logger.debug(
                 "Agent cannot afford trip",
                 extra={
@@ -528,14 +508,12 @@ class FisherAgent(Agent):
             "Agent going fishing",
             extra={
                 "agent_id": self.unique_id,
-                "region": target_region,
                 "target_spot": target_spot,
             },
         )
 
         self.at_home = False
         self.gone_fishing = True
-        self.current_region = target_region
 
         movement.move_to(
             self,
@@ -568,200 +546,60 @@ class FisherAgent(Agent):
                 "profit": trip_result["profit"],
                 "days": 1,
                 "tick": self.model.current_step,
-                "region": target_region,
                 "went_fishing": True,
             }
         )
 
 
-    def _calculate_region_preference(self) -> str:
-        """Select the preferred fishing region.
-
-        Compares expected revenue across accessible regions.
-
-        Returns:
-            Preferred region identifier.
-        """
-        expected_revenues = {
-            region: self._estimate_value(region)
-            for region in self.accessible_regions
-        }
-
-        rev_b = expected_revenues.get("B", self.expected_revenue)
-        rev_c = expected_revenues.get("C", self.expected_revenue)
-        rev_d = expected_revenues.get("D", self.expected_revenue)
-
-        if rev_b >= rev_c:
-            return (
-                "B"
-                if rev_c >= rev_d or rev_b >= rev_d
-                else "D"
-            )
-
-        return "C" if rev_c >= rev_d else "D"
-
-
-    def _estimate_value(self, region: str) -> float:
-        """Estimate expected revenue in a region from memory.
-
-        Args:
-            region: Region identifier.
-
-        Returns:
-            Average revenue over the last ten trips in the region.
-            Returns ``expected_revenue`` when no memory is available.
-        """
-        region_memory = [
-            trip
-            for trip in self.memory
-            if trip.get("region") == region
-        ]
-
-        if region_memory:
-            return statistics.mean(
-                trip.get("revenue", 0.0)
-                for trip in region_memory[-10:]
-            )
-
-        return self.expected_revenue
-
-
-    def select_fishing_spot(
-        self,
-        region: str | None = None,
-    ) -> tuple[int, int] | None:
-        """Select a fishing spot using spatial memory.
-
-        Args:
-            region: Target fishing region.
-
-        Returns:
-            Selected fishing location or None if no valid location exists.
-        """
-        if region is None:
-            region = (
-                self.accessible_regions[0]
-                if self.accessible_regions
-                else None
-            )
-
-        if region is None:
-            return None
-
-        good_spots = memory.get_good_spots(
-            region=region,
-            min_visits=1,
-        )
-
+    def select_fishing_spot(self) -> Optional[Tuple[int, int]]:
+        good_spots = memory.get_good_spots(self, min_visits=1)
         if good_spots:
             spot, _ = random.choice(good_spots)
             return spot
+        return self.explore_random_spot()
 
-        return self.explore_random_spot(region)
 
+    def explore_random_spot(self) -> Optional[Tuple[int, int]]:
+        from src import config as cfg
 
-    def explore_random_spot(
-        self,
-        region: str,
-    ) -> tuple[int, int] | None:
-        """Explore a random fishing location in a region.
+        water_cells = cfg.WATER_CELLS
+        if water_cells:
+            for _ in range(50):
+                cell = random.choice(water_cells)
+                if (
+                    not movement.is_restricted(self, cell[0], cell[1])
+                    and not restricted_areas.is_restricted_area(
+                        cell[0], cell[1], self.model.current_date
+                    )
+                ):
+                    return (cell[0], cell[1])
 
-        Args:
-            region: Region to explore.
+        hotspots = self.model.HOTSPOTS
+        if hotspots:
+            for _ in range(10):
+                base_spot = random.choice(hotspots)
+                dx = random.randint(-5, 5)
+                dy = random.randint(-5, 5)
+                candidate = (base_spot[0] + dx, base_spot[1] + dy)
+                if (
+                    not movement.is_restricted(self, candidate[0], candidate[1])
+                    and not restricted_areas.is_restricted_area(
+                        candidate[0], candidate[1], self.model.current_date
+                    )
+                ):
+                    return candidate
 
-        Returns:
-            Valid location within the region, or None if no hotspot exists.
-        """
-        hotspot_map = {
-            "A": self.model.HOTSPOTS_A,
-            "B": self.model.HOTSPOTS_B,
-            "C": self.model.HOTSPOTS_C,
-            "D": self.model.HOTSPOTS_D,
-        }
+        return None
 
-        hotspots = hotspot_map.get(region)
-
-        if not hotspots:
-            return None
-
-        base_spot = random.choice(hotspots)
-        exploration_radius = 3
-
-        for _ in range(10):
-            dx = random.randint(
-                -exploration_radius,
-                exploration_radius,
-            )
-            dy = random.randint(
-                -exploration_radius,
-                exploration_radius,
-            )
-
-            candidate = (
-                base_spot[0] + dx,
-                base_spot[1] + dy,
-            )
-
-            patch = self.model.get_patch_info(
-                candidate[0],
-                candidate[1],
-            )
-
-            if (
-                patch
-                and patch["region"] == region
-                and not movement.is_restricted(
-                    self,
-                    candidate[0],
-                    candidate[1],
-                )
-                and not restricted_areas.is_restricted_area(
-                    candidate[0],
-                    candidate[1],
-                    self.model.current_date
-                )
-            ):
-                return candidate
-
-        return tuple(base_spot)
-
-    def decide_fishSpot(
-        self, region: str
-    ) -> Optional[Tuple[int, int]]:
-        """Selects a fishing spot using NetLogo-aligned spot-selection logic.
-
-        For trawlers already at sea with technology, an uphill-climb
-        scan is performed first. Social influence (expertise or
-        descriptive norm) is then applied when the agent has colleagues.
-        A second uphill pass follows movement for trawlers.
-
-        Args:
-            region: Target region identifier.
-
-        Returns:
-            ``(x, y)`` position selected for the next fishing step,
-            or None if no region is provided.
-        """
-        if not region:
-            return None
-
+    def decide_fishSpot(self) -> Optional[Tuple[int, int]]:
         stay_put = False
         fishing_spot = None
 
         if self.fisher_type == "trawler" and self.gone_fishing:
             if self.has_technologie and self.current_location:
-                uphill_spot = self.get_fishSpot_uphill_climbing(region)
+                uphill_spot = self.get_fishSpot_uphill_climbing()
                 if uphill_spot:
-                    uphill_patch = self.model.get_patch_info(*uphill_spot)
-                    current_patch = self.model.get_patch_info(
-                        *self.current_location
-                    )
-                    if (
-                        uphill_patch
-                        and current_patch
-                        and uphill_patch["region"] == current_patch["region"]
-                    ):
-                        self.current_location = uphill_spot
+                    self.current_location = uphill_spot
 
             patch_here = (
                 self.model.get_patch_info(*self.current_location)
@@ -792,144 +630,73 @@ class FisherAgent(Agent):
 
             if follow_social:
                 if social_strategy == "descriptiveNorm":
-                    fishing_spot = self.get_fishSpot_descriptive_norm(region)
+                    fishing_spot = self.get_fishSpot_descriptive_norm()
                 else:
-                    fishing_spot = self.get_fishSpot_expertise(region)
+                    fishing_spot = self.get_fishSpot_expertise()
                 if fishing_spot is None:
-                    fishing_spot = self.get_fishSpot_knowledge(region)
+                    fishing_spot = self.get_fishSpot_knowledge()
             else:
-                fishing_spot = self.get_fishSpot_knowledge(region)
+                fishing_spot = self.get_fishSpot_knowledge()
 
             if fishing_spot is None:
-                return self.explore_random_spot(region)
-
+                return self.explore_random_spot()
 
             if self.fisher_type == "trawler" and self.has_technologie:
-                uphill_spot = self.get_fishSpot_uphill_climbing(region)
+                uphill_spot = self.get_fishSpot_uphill_climbing()
                 if uphill_spot:
-                    uphill_patch = self.model.get_patch_info(*uphill_spot)
-                    current_patch = self.model.get_patch_info(
-                        *self.current_location
-                    )
-                    if (
-                        uphill_patch
-                        and current_patch
-                        and uphill_patch["region"] == current_patch["region"]
-                    ):
-                        self.current_location = uphill_spot
+                    self.current_location = uphill_spot
 
             if movement.is_restricted(self, *fishing_spot):
-                return self.explore_random_spot(region)
+                return self.explore_random_spot()
         
             if restricted_areas.is_restricted_area(fishing_spot[0], fishing_spot[1], self.model.current_date):
-                return self.explore_random_spot(region)
+                return self.explore_random_spot()
             self.current_location = fishing_spot
         self.at_sea = True
         return self.current_location
 
-    def get_fishSpot_knowledge(
-        self, region: str
-    ) -> Optional[Tuple[int, int]]:
-        """Selects a fishing spot from spatial memory (knowledge-based).
-
-        Args:
-            region: Target region.
-
-        Returns:
-            A remembered good spot in ``region``, or a random
-            exploration spot if memory is empty.
-        """
-        good_spots = memory.get_good_spots(self, region)
+    def get_fishSpot_knowledge(self) -> Optional[Tuple[int, int]]:
+        good_spots = memory.get_good_spots(self)
         if good_spots:
             spot, _ = random.choice(list(good_spots))
             return spot
-        return self.explore_random_spot(region)
+        return self.explore_random_spot()
 
-    def get_fishSpot_expertise(
-        self, region: str
-    ) -> Optional[Tuple[int, int]]:
-        """Follows the most successful fishing agent in the region.
-
-        Args:
-            region: Target region.
-
-        Returns:
-            Position of the highest-catch agent currently in
-            ``region``, or falls back to knowledge-based selection.
-        """
+    def get_fishSpot_expertise(self) -> Optional[Tuple[int, int]]:
         fishing_agents = [
             a
             for a in self.model.agents
             if a is not self
             and getattr(a, "gone_fishing", False)
-            and getattr(a, "current_region", None) == region
+            and getattr(a, "pos", None)
         ]
         if fishing_agents:
             expert = max(fishing_agents, key=lambda a: a.total_catch)
             if getattr(expert, "pos", None):
                 return expert.pos
-        return self.get_fishSpot_knowledge(region)
+        return self.get_fishSpot_knowledge()
 
-    def get_fishSpot_descriptive_norm(
-        self, region: str
-    ) -> Optional[Tuple[int, int]]:
-        """Goes where the most other fishers are (descriptive norm).
+    def get_fishSpot_descriptive_norm(self) -> Optional[Tuple[int, int]]:
+        spot = self.fishspot_with_most_fishers()
+        return spot if spot else self.get_fishSpot_knowledge()
 
-        Args:
-            region: Target region.
-
-        Returns:
-            The position with the highest local fisher density in
-            ``region``, or falls back to knowledge-based selection.
-        """
-        spot = self.fishspot_with_most_fishers(region)
-        return spot if spot else self.get_fishSpot_knowledge(region)
-
-    def fishspot_with_most_fishers(
-        self, region: str
-    ) -> Optional[Tuple[int, int]]:
-        """Finds the patch with the most fishers in a region.
-
-        Args:
-            region: Target region.
-
-        Returns:
-            ``(x, y)`` position with the highest local density of
-            fishing agents, or None if no agents are present.
-        """
+    def fishspot_with_most_fishers(self) -> Optional[Tuple[int, int]]:
         agent_counts: Dict[Tuple[int, int], int] = {}
         for agent in self.model.agents:
             if (
                 agent is not self
                 and getattr(agent, "gone_fishing", False)
-                and getattr(agent, "current_region", None) == region
                 and getattr(agent, "pos", None)
             ):
                 pos = agent.current_location
                 nearby = self.get_agents_in_radius(pos, radius=1)
-                nearby_in_region = sum(
-                    1
-                    for a in nearby
-                    if getattr(a, "current_region", None) == region
-                )
                 agent_counts[pos] = (
-                    agent_counts.get(pos, 0) + 1 + nearby_in_region
+                    agent_counts.get(pos, 0) + 1 + len(nearby)
                 )
 
         return max(agent_counts, key=agent_counts.get) if agent_counts else None
 
-    def get_fishSpot_uphill_climbing(
-        self, region: str
-    ) -> Optional[Tuple[int, int]]:
-        """Moves to the neighbouring patch with the highest perceived value.
-
-        Args:
-            region: Must match the neighbour's region to be eligible.
-
-        Returns:
-            ``(x, y)`` of the best-valued eligible neighbour, or the
-            result of knowledge-based selection as a fallback.
-        """
+    def get_fishSpot_uphill_climbing(self) -> Optional[Tuple[int, int]]:
         if self.current_location:
             neighbors = self.get_neighbor_positions_in_radius(
                 self.current_location, radius=1
@@ -937,15 +704,12 @@ class FisherAgent(Agent):
             valid_neighbors = [
                 (pos, self.model.get_cell_value(pos[0], pos[1], self.fisher_type))
                 for pos in neighbors
-                if (
-                    patch := self.model.get_patch_info(pos[0], pos[1])
-                ) and patch["region"] == region
             ]
             if valid_neighbors:
                 best_pos, _ = max(valid_neighbors, key=lambda item: item[1])
                 return best_pos
 
-        return self.get_fishSpot_knowledge(region)
+        return self.get_fishSpot_knowledge()
 
     # ------------------------------------------------------------------
     # Spatial helpers
@@ -1031,18 +795,6 @@ class FisherAgent(Agent):
         to_pos: Optional[Tuple[int, int]],
     ) -> float:
         return movement.calculate_travel_cost(self, from_pos, to_pos)
-
-    def get_travel_cost(self, region: str) -> float:
-        return movement.get_travel_cost(self, region)
-
-    def get_travel_cost_between_regions(
-        self,
-        from_region: str,
-        to_region: str,
-    ) -> float:
-        return Trawler.get_travel_cost_between_regions(
-            self, from_region, to_region
-        )
 
     def update_memory_good_spots(
         self,
@@ -1200,9 +952,7 @@ class FisherAgent(Agent):
             "gone_fishing": self.gone_fishing,
             "fished_today": self.fished_today,
             "lay_low": self.lay_low,
-            "current_region": self.current_region,
             "will_fish": self.will_fish,
-            "region_preference": self.region_preference,
             "growth_perception": self.growth_perception,
             "memory_size": len(self.memory),
             "good_spots_count": len(self.good_spots_memory),
@@ -1225,7 +975,6 @@ class FisherAgent(Agent):
         print(f"    Capital: {self.capital:.2f}")
         print(f"    Total catch: {self.total_catch:.0f}")
         print(f"    At home: {self.at_home}")
-        print(f"    Region: {self.current_region}")
         if self.memory:
             recent = self.memory[-1]
             print(

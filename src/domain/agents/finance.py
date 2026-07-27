@@ -64,15 +64,13 @@ def update_finances(
 
 
 def check_bankruptcy(agent) -> None:
-    """Update the bankruptcy status of an agent.
-
-    Args:
-        agent: Fisher agent instance.
-    """
     bankruptcy_threshold = -(agent.cost_existence * 7)
+    recovery_threshold = agent.cost_existence * 30
 
     if agent.capital < bankruptcy_threshold:
         agent.bankrupt = True
+    elif agent.bankrupt and agent.capital >= recovery_threshold:
+        agent.bankrupt = False
 
 
 def get_financial_summary(

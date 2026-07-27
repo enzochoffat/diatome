@@ -130,7 +130,6 @@ def test_navigation_state():
     agent.at_sea = True
     agent.gone_fishing = True
     agent.at_home = False
-    agent.current_region = "A"
     agent.accumulated_catch = 100
     agent.trip_cost = 50
     
@@ -198,7 +197,6 @@ def test_satisfaction_update():
                 'profit': 70,
                 'days': 1,
                 'tick': i,
-                'region': "A",
                 'went_fishing': True
             }
         else:
@@ -210,7 +208,6 @@ def test_satisfaction_update():
                 'profit': -5,
                 'days': 1,
                 'tick': i,
-                'region': None,
                 'went_fishing': False
             }
         agent.update_memory(trip_info)
@@ -234,7 +231,6 @@ def test_satisfaction_update():
             'profit': 20,
             'days': 1,
             'tick': i,
-            'region': "A",
             'went_fishing': True
         }
         agent.update_memory(trip_info)
@@ -271,7 +267,6 @@ def test_perception_scarcity():
             'profit': 50,
             'days': 1,
             'tick': i,
-            'region': "A",
             'went_fishing': True
         }
         agent.update_memory(trip_info)
@@ -291,7 +286,6 @@ def test_perception_scarcity():
             'profit': -10,
             'days': 1,
             'tick': i,
-            'region': "A",
             'went_fishing': True
         }
         agent.update_memory(trip_info)
@@ -364,7 +358,6 @@ def test_memory_statistics():
             'profit': profit,
             'days': 1,
             'tick': i,
-            'region': "A",
             'went_fishing': True
         }
         agent.update_memory(trip_info)

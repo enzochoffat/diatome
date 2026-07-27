@@ -107,7 +107,6 @@ def test_data_collection():
     print(f"Colonnes agent data: {list(agent_data.columns.get_level_values(0).unique())}")
     
     print(f"\nDernières valeurs:")
-    print(f"  Stock A: {model_data['stock_A'].iloc[-1]:,.0f}")
     print(f"  Stock total: {model_data['total_stock'].iloc[-1]:,.0f}")
     print(f"  Agents pêchant: {model_data['num_fishing'].iloc[-1]}")
     print(f"  Agents à la maison: {model_data['num_at_home'].iloc[-1]}")
@@ -116,7 +115,6 @@ def test_data_collection():
     # Vérifications
     assert len(model_data) == 10, "Devrait avoir 10 lignes de données"
     assert not model_data['total_stock'].isna().any(), "Le stock ne devrait pas être NaN"
-    assert (model_data['stock_A'] >= 0).all(), "Les stocks ne devraient pas être négatifs"
     
     print("✓ Test réussi\n")
 
@@ -140,14 +138,14 @@ def test_annual_regeneration():
     
     for year in range(3):
         # Stock début d'année
-        start_stock = model.get_region_stock("A")
+        start_stock = model.get_total_stock()
         
         # Simuler 1 an
         for day in range(365):
             model.step()
         
         # Stock fin d'année (après régénération)
-        end_stock = model.get_region_stock("A")
+        end_stock = model.get_total_stock()
         
         total_catch = sum(a.total_catch for a in model.agents)
         
@@ -191,34 +189,18 @@ def test_full_year_simulation():
     print(f"  Trawler: {model.num_trawler}")
     print(f"  Total agents: {len(list(model.agents))}")
     
-    initial_stocks = {
-        'A': model.get_region_stock("A"),
-        'B': model.get_region_stock("B"),
-        'C': model.get_region_stock("C"),
-        'D': model.get_region_stock("D"),
-        'total': model.get_total_stock()
-    }
+    initial_stock = model.get_total_stock()
     
-    print(f"\nStocks initiaux:")
-    for region, stock in initial_stocks.items():
-        print(f"  {region}: {stock:,.0f}")
+    print(f"\nStock initial: {initial_stock:,.0f}")
     
     # Simuler 1 an
     print("\nSimulation en cours...")
     model.run_model(steps=365)
     
-    final_stocks = {
-        'A': model.get_region_stock("A"),
-        'B': model.get_region_stock("B"),
-        'C': model.get_region_stock("C"),
-        'D': model.get_region_stock("D"),
-        'total': model.get_total_stock()
-    }
+    final_stock = model.get_total_stock()
+    change = final_stock - initial_stock
     
-    print(f"\nStocks finaux:")
-    for region, stock in final_stocks.items():
-        change = stock - initial_stocks[region]
-        print(f"  {region}: {stock:,.0f} ({change:+,.0f})")
+    print(f"\nStock final: {final_stock:,.0f} ({change:+,.0f})")
     
     # Statistiques agents
     print(f"\nStatistiques agents:")
@@ -241,8 +223,7 @@ def test_full_year_simulation():
     
     # Vérifications
     assert model.current_step == 365, "Devrait avoir simulé 365 jours"
-    assert final_stocks['total'] > 0, "Le stock total ne devrait pas être épuisé"
-    assert all(final_stocks[r] >= 0 for r in ['A', 'B', 'C', 'D']), "Aucun stock ne devrait être négatif"
+    assert final_stock > 0, "Le stock total ne devrait pas être épuisé"
     
     print("✓ Test réussi\n")
 

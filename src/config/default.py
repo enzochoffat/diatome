@@ -8,7 +8,7 @@ and social attributes.
 All values are immutable and must not be modified at runtime.
 """
 
-from typing import Final, List
+from typing import Final
 
 # =============================================================================
 # TIME CONSTANTS
@@ -45,7 +45,6 @@ SAFETY_BUFFER_DAYS: Final[int] = 7
 ARCHIPELAGO_COST_EXISTENCE: Final[float] = 0.5
 ARCHIPELAGO_COST_ACTIVITY: Final[float] = 0.5
 ARCHIPELAGO_CATCHABILITY: Final[int] = 5
-ARCHIPELAGO_ACCESSIBLE_REGIONS: Final[List[str]] = ["A", "B", "C", "D"]
 ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
 
 # =============================================================================
@@ -55,7 +54,6 @@ ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
 COASTAL_COST_EXISTENCE: Final[float] = 1.0
 COASTAL_COST_ACTIVITY: Final[float] = 1.0
 COASTAL_CATCHABILITY: Final[int] = 10
-COASTAL_ACCESSIBLE_REGIONS: Final[List[str]] = ["A", "B", "C", "D"]
 COASTAL_MAX_GOOD_SPOTS: Final[int] = 3
 
 # =============================================================================
@@ -65,7 +63,6 @@ COASTAL_MAX_GOOD_SPOTS: Final[int] = 3
 TRAWLER_COST_EXISTENCE: Final[float] = 5.0
 TRAWLER_COST_ACTIVITY: Final[float] = 5.0
 TRAWLER_CATCHABILITY: Final[int] = 50
-TRAWLER_ACCESSIBLE_REGIONS: Final[List[str]] = ["A", "B", "C", "D"]
 TRAWLER_MAX_GOOD_SPOTS: Final[int] = 2
 TRAWLER_STORAGE_CAPACITY: Final[int] = 50
 

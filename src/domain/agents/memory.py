@@ -43,25 +43,18 @@ def update_memory_good_spots(
 
 def get_good_spots(
     agent,
-    region: Optional[str] = None,
     min_visits: int = 1,
 ) -> List[Tuple[Tuple[int, int], Dict[str, Any]]]:
     good_spots = []
 
-    for location, memory in agent.good_spots_memory.items():
-        if memory["visits"] < min_visits:
+    for location, spot_memory in agent.good_spots_memory.items():
+        if spot_memory["visits"] < min_visits:
             continue
 
-        if not memory.get("is_good", False):
+        if not spot_memory.get("is_good", False):
             continue
 
-        if region is not None:
-            patch = agent.model.get_patch_info(location[0], location[1])
-
-            if patch and patch["region"] != region:
-                continue
-
-        good_spots.append((location, memory))
+        good_spots.append((location, spot_memory))
 
     good_spots.sort(key=lambda item: item[1]["avg_value"], reverse=True)
 
