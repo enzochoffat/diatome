@@ -209,7 +209,8 @@ class FisheryModel(Model):
         # Species matrices
         self.catchability_matrix = catchability_matrix
         self.price_matrix = price_matrix
-        self.species_names = species_names
+        self.species_names = species_names or []
+        self.species_to_idx = {name: i for i, name in enumerate(self.species_names)}
         self.flotilla_indices = {
             "archipelago": 1,
             "coastal": 2,

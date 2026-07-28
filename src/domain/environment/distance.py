@@ -97,5 +97,4 @@ def is_on_grid(x: int, y: int, grid_width: int, grid_height: int) -> bool:
 def get_distance(x: int, y: int) -> list[list[float]]:
     map = _distance_map
     price = map[y][x]
-    print(map[y][x])
     return price

@@ -63,6 +63,8 @@ class FisherAgent(Agent):
         habitat: list[str] | None = None,
         restricted_status: str | None = None,
         distance_map: Optional[Dict[str, Any]] = None,
+        effort_quotas: int | None = None,
+        landing_quotas: int | np.ndarray | None = None
     ) -> None:
         """Initialize a fisher agent.
 
@@ -85,6 +87,10 @@ class FisherAgent(Agent):
         self.port = port
         self.restricted_mask = habitat
         self.restricted_status = restricted_status
+        self.distance_map = distance_map
+        self.effort_quotas = effort_quotas
+        self.landings_quotas = landing_quotas
+        self.yearly_catch_by_species: Dict[str, float] = {name: 0.0 for name in self.model.species_names}
 
         # Financial state.
         self.capital: float = (
@@ -106,6 +112,7 @@ class FisherAgent(Agent):
         self.total_revenue = 0.0
         self.yearly_catch = 0.0
         self.yearly_profit = 0.0
+        self.yearly_effort = 0
 
         # Economic status.
         self.bankrupt = False
@@ -143,6 +150,7 @@ class FisherAgent(Agent):
         # Temporal memory.
         self.memory_size = config.DEFAULT_MEMORY_SIZE
         self.memory: list[dict[str, Any]] = []
+        self.catch_by_species = {name: 0.0 for name in self.model.species_names}
 
         # Spatial memory.
         self.good_spots_memory: dict[
@@ -393,6 +401,8 @@ class FisherAgent(Agent):
         """Reset yearly performance counters."""
         self.yearly_catch = 0.0
         self.yearly_profit = 0.0
+        self.yearly_effort = 0
+        self.yearly_catch_by_species = {name: 0.0 for name in self.model.species_names}
 
 
     def make_decision(self) -> None:
@@ -412,6 +422,11 @@ class FisherAgent(Agent):
                 "capital": self.capital,
             },
         )
+        if self.check_effort_quota():
+            return "Too much days at sea this year"
+
+        if self.check_landing_quota():
+            return "Too much catch this year"
 
         if self.fisher_type == "archipelago":
             Archipelagos.satisfice_lifestyle(self)
@@ -513,7 +528,8 @@ class FisherAgent(Agent):
         )
 
         self.at_home = False
-        self.gone_fishing = True
+        self.gone_fishing = True 
+        self.yearly_effort += 1
 
         movement.move_to(
             self,
@@ -982,6 +998,19 @@ class FisherAgent(Agent):
                 f" catch={recent['catch']:.0f},"
                 f" profit={recent['profit']:.2f}"
             )
+
+    def check_effort_quota(self) -> bool:
+        return self.yearly_effort >= self.effort_quotas
+
+    def check_landing_quota(self) -> bool:
+        if self.landings_quotas is None:
+            return False
+        if isinstance(self.landings_quotas, np.ndarray):
+            for name, quota in zip(self.model.species_names, self.landings_quotas):
+                if quota > 0 and self.yearly_catch_by_species.get(name, 0) >= quota:
+                    return True
+            return False
+        return self.yearly_catch >= self.landings_quotas
     
     # ------------------------------------------------------------------
     # Mesa step

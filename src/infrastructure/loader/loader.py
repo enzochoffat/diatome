@@ -337,7 +337,7 @@ class ConfigLoader:
         }
     
     def _load_species_flotilla_matrix(
-        self, csv_path: str, species_names: List[str]
+        self, csv_path: str, species_names: List[str], sep: str = ","
     ) -> np.ndarray:
         """Loads a species × flotilla CSV into a (F, N) numpy array.
 
@@ -348,11 +348,11 @@ class ConfigLoader:
 
         The returned array is indexed as ``array[flotilla_index, species_index]``.
         """
-        df = pd.read_csv(csv_path, index_col=0)
-        # Convert species_names (string IDs) to int to match CSV numeric index
-        species_ids = [int(s) for s in species_names]
+        df = pd.read_csv(csv_path, sep=sep, index_col=0)
+        species_ids = [
+            s for s in species_names if s in df.index
+        ] or species_names
         df = df.reindex(index=species_ids, fill_value=0.0)
-        # Transpose from (N, F) to (F, N) so that [flotilla_idx] gives a species vector
         return df.to_numpy(dtype=np.float64).T
 
     def get_species_params(self) -> Dict[str, Any]:
@@ -448,6 +448,48 @@ class ConfigLoader:
             prob = weather_params["bad_weather_probability"]
             default_config.BAD_WEATHER_PROBABILITY = prob
             model.bad_weather_probability = prob
+
+    def apply_effort_quotas(self):
+        if not self.loaded_config or "quotas" not in self.loaded_config:
+            return None
+
+        params = self.loaded_config["quotas"]
+        effort = params.get("effort")
+        if not effort:
+            return None
+
+        if isinstance(effort, str):
+            df = pd.read_csv(effort, sep=";", index_col=0)
+            return df.to_numpy(dtype=np.float64)
+
+        if isinstance(effort, dict):
+            return effort
+
+        return None
+
+    def apply_landings_quotas(self) -> Dict:
+        if not self.loaded_config or "quotas" not in self.loaded_config:
+            return {}
+
+        params = self.loaded_config["quotas"]
+        landings = params.get("landings")
+        if not landings:
+            return {}
+
+        if isinstance(landings, str):
+            species_maps = self.loaded_config.get("maps", {}).get("species_map", {})
+            species_names = list(species_maps.keys())
+            matrix = self._load_species_flotilla_matrix(landings, species_names, sep=";")
+            return {
+                "archipelagos": matrix[0],
+                "coastal": matrix[1],
+                "trawler": matrix[2],
+            }
+
+        if isinstance(landings, dict):
+            return landings
+
+        return {}
 
     def apply_map_configuration(self) -> None:
         """Applies map sources from the loaded configuration.

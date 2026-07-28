@@ -22,7 +22,7 @@ def determine_weather(model) -> bool:
 
 # Faut que chaque agent puisse lire la carte des profondeur et espèces
 
-# Ajouter dans la config des cartes de zones interdites, et un chemin vers le vecteur d'ouverture de ces zones
+# Ajouter dans la config des cartes de zones interdites, et un chemin vers le vecteur d'ouverture de ces zones (prendre les cartes de Lise)
 
 # A voir plus tard l'ouverture des parcs éolien (fermés, navigation, pêches)
 
@@ -30,11 +30,13 @@ def determine_weather(model) -> bool:
 
 # Faire une carte de distance à la côte.
 
-# Regarder comment avoir les agents aux alentours du patch
+# A faire Regarder comment avoir les agents aux alentours du patch
 
 # Calculer la distance du port à la zone de pêche, A* (pour éviter les zones interdites)
 
 # faire une liste de comment ajouter une nouvelle flottille
+
+#
 
 
 def read_wave_height_vector(wave_height_vector_path: str) -> Dict[datetime, float]:

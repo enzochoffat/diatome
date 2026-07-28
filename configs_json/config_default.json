@@ -1,145 +1,149 @@
 {
-  "metadata": {
-    "name": "FIBE Default Configuration",
-    "description": "Standard 25-year simulation with balanced fisher composition",
-    "version": "1.0",
-    "created": "2026-01-25"
-    
+  "metadata":  {
+    "name":  "FIBE Default Configuration",
+    "description":  "Standard 25-year simulation with balanced fisher composition",
+    "version":  "1.0",
+    "created":  "2026-01-25"
   },
-  
-  "simulation": {
-    "start_date": "2009-12-01",
-    "duration_years": 25,
-    "verbose": true,
-    "random_seed": null,
-    "coupling": false
+
+  "simulation":  {
+    "verbose":  true,
+    "random_seed":  null,
+    "step":  1,
+    "coupling":  false,
+    "duration_years":  5,
+    "start_date":  "2006-01-01"
   },
-  
-  "agents": {
-    "num_archipelago": 10,
-    "num_coastal": 10,
-    "num_trawler": 5,
-    "names": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y"],
-    "archipelago_ports": [1, 1, 1, 1, 1, 1, 1, 1, 2, 0],
-    "coastal_ports": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-    "trawler_ports": [0, 0, 0, 0, 0],
-    "archipelago_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
-    "coastal_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
-    "trawler_habitats": ["Fine_sand", "Sandy_mud", "Muddy_sand", "Clay", "Mud", "Sand", "Gravel_and_Pebbles", "KS_BdS_stock", "KS_Dieppe_stock", "KS_Vergoyer_stock"],
-    "archipelagos_wave_height": 2,
-    "coastal_wave_height": 2,
-    "trawler_wave_height": 2
+
+  "agents":  {
+    "num_archipelago":  10,
+    "num_coastal":  10,
+    "num_trawler":  5,
+    "names":  ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y"],
+    "archipelago_ports":  [1,1,1,1,1,1,1,1,2,0],
+    "coastal_ports":  [2,2,2,2,2,2,2,2,2,2],
+    "trawler_ports":  [0,0,0,0,0],
+    "archipelago_habitats":  ["Fine_sand","Sandy_mud","Muddy_sand","Clay","Mud","Sand","Gravel_and_Pebbles","KS_BdS_stock","KS_Dieppe_stock","KS_Vergoyer_stock"],
+    "coastal_habitats":  ["Fine_sand","Sandy_mud","Muddy_sand","Clay","Mud","Sand","Gravel_and_Pebbles","KS_BdS_stock","KS_Dieppe_stock","KS_Vergoyer_stock"],
+    "trawler_habitats":  ["Fine_sand","Sandy_mud","Muddy_sand","Clay","Mud","Sand","Gravel_and_Pebbles","KS_BdS_stock","KS_Dieppe_stock","KS_Vergoyer_stock"],
+    "archipelagos_wave_height":  2,
+    "coastal_wave_height":  2,
+    "trawler_wave_height":  2
   },
-  
-  "output": {
-    "export_data": true,
-    "filename_prefix": "test",
-    "export_interval_years": 1
+
+  "output":  {
+    "export_data":  true,
+    "filename_prefix":  "test",
+    "export_interval_years":  1
   },
-  
-  "parameters": {
-    "fish_dynamics": {
-      "growth_rate": 0.1,
-      "initial_stock_ratio": 0.5,
-      "initial_stock_size": "halfCarryingCap"
+
+  "parameters":  {
+    "fish_dynamics":  {
+      "growth_rate":  0.1,
+      "initial_stock_ratio":  0.5,
+      "initial_stock_size":  "halfCarryingCap"
     },
-    "economics": {
-      "fish_price": 1.0,
-      "initial_capital": 1000.0
+    "economics":  {
+      "fish_price":  1.0,
+      "initial_capital":  1000.0
     },
-    "weather": {
-      "bad_weather_probability": 0.1
+    "weather":  {
+      "bad_weather_probability":  0.1
     }
   },
-  "maps": {
-    "restricted_area_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
-    "restricted_area_vector": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
-    "ocean_current_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\OceanCurrents.csv",
-    "wave_height_vector": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
-    "spatial_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Depth\\DepthMap.csv",
-    "ports_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Ports\\PortsMap.csv",
-    "wind_farm_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
-    "species_map": 
-      {
-          "11":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_11.csv",
-          "41":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_41.csv",
-          "45":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_45.csv",
-          "42":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_42.csv",
-          "3":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_3.csv",
-          "20":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_20.csv",
-          "12":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_12.csv",
-          "31":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_31.csv",
-          "17":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_17.csv",
-          "51":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_51.csv",
-          "44":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_44.csv",
-          "8":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_8.csv",
-          "13":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_13.csv",
-          "27":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_27.csv",
-          "30":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_30.csv",
-          "10":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_10.csv",
-          "18":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_18.csv",
-          "36":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_36.csv",
-          "29":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_29.csv",
-          "56":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_56.csv",
-          "5":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_5.csv",
-          "19":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_19.csv",
-          "1":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_1.csv",
-          "47":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_47.csv",
-          "53":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_53.csv",
-          "49":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_49.csv",
-          "54":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_54.csv",
-          "52":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_52.csv",
-          "23":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_23.csv",
-          "40":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_40.csv",
-          "58":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_58.csv",
-          "59":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_59.csv",
-          "26":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_26.csv",
-          "39":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_39.csv",
-          "14":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_14.csv",
-          "37":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_37.csv",
-          "22":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_22.csv",
-          "28":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_28.csv",
-          "4":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_4.csv",
-          "25":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_25.csv",
-          "9":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_9.csv",
-          "33":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_33.csv",
-          "15":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_15.csv",
-          "34":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_34.csv",
-          "21":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_21.csv",
-          "57":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_57.csv",
-          "24":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_24.csv",
-          "46":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_46.csv",
-          "16":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_16.csv",
-          "35":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_35.csv",
-          "32":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_32.csv",
-          "7":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_7.csv",
-          "0":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_0.csv",
-          "43":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_43.csv",
-          "48":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_48.csv",
-          "2":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_2.csv",
-          "38":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_38.csv",
-          "55":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_55.csv",
-          "50":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_50.csv",
-          "6":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_6.csv"
-      },
-      "habitat_map":  {
-          "Fine_sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_3_Fine_sand.csv",
-          "KS_Vergoyer_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_10_KS_Vergoyer_stock.csv",
-          "Sandy_mud":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_4_Sandy_mud.csv",
-          "Clay":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_7_Clay.csv",
-          "Muddy_sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_5_Muddy_sand.csv",
-          "KS_Dieppe_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_9_KS_Dieppe_stock.csv",
-          "KS_Greenwich_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_11_KS_Greenwich_stock.csv",
-          "Gravel_and_Pebbles":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_1_Gravel_and_Pebbles.csv",
-          "KS_BdS_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_8_KS_BdS_stock.csv",
-          "Mud":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_6_Mud.csv",
-          "Sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_2_Sand.csv"
-      },
-      "species_tables": {
-        "catchability": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Landings.csv",
-        "price": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\OffVesselPrice\\EcospaceOffVesselPrice.csv"
-      }
 
+  "maps":  {
+    "restricted_area_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
+    "restricted_area_vector":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
+    "ocean_current_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\OceanCurrents.csv",
+    "wave_height_vector":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
+    "wind_farm_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
+    "species_tables":  {
+      "price":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\OffVesselPrice\\EcospaceOffVesselPrice.csv",
+      "catchability":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Landings\\EcospaceLandings.csv"
+    },
+    "species_map":  {
+      "benthic_inv_deposit_feeders_subsurface":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_benthic_inv_deposit_feeders_subsurface.csv",
+      "plunge_pelagic_piscivorous_seabirds":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_plunge_pelagic_piscivorous_seabirds.csv",
+      "cephalopods_benthic":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_cephalopods_benthic.csv",
+      "delphinidae":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_delphinidae.csv",
+      "phalacrocoracidae":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_phalacrocoracidae.csv",
+      "lobster_crabs":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_lobster_crabs.csv",
+      "fish_herring":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_herring.csv",
+      "microzooplankton":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_microzooplankton.csv",
+      "fish_tunas_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_tunas_ni.csv",
+      "fish_whiting":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_whiting.csv",
+      "surface_opportunistic_omnivorous_seabirds":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_surface_opportunistic_omnivorous_seabirds.csv",
+      "fish_pelagic_planctonivorous":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_pelagic_planctonivorous.csv",
+      "0":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_0.csv",
+      "piconanophytoplankton":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_piconanophytoplankton.csv",
+      "fish_flatfish_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_flatfish_ni.csv",
+      "benthic_inv_deposit_feeders_surface":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_benthic_inv_deposit_feeders_surface.csv",
+      "cephalopods_pelagic_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_cephalopods_pelagic_ni.csv",
+      "benthic_feeders_seabirds":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_benthic_feeders_seabirds.csv",
+      "fish_sprat":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_sprat.csv",
+      "harbour_porpoises":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_harbour_porpoises.csv",
+      "benthic_inv_pecten_maximus":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_benthic_inv_pecten_maximus.csv",
+      "fish_horse_mackerel":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_horse_mackerel.csv",
+      "microphytoplankton":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_microphytoplankton.csv",
+      "cephalopods_pelagic":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_cephalopods_pelagic.csv",
+      "fish_demersal_sharks_rays":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_demersal_sharks_rays.csv",
+      "benthic_inv_suspension_feeders":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_benthic_inv_suspension_feeders.csv",
+      "suprabenthos":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_suprabenthos.csv",
+      "mesozooplankton":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_mesozooplankton.csv",
+      "fish_demersal_piscivorous":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_demersal_piscivorous.csv",
+      "fish_seabass":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_seabass.csv",
+      "meiofauna":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_meiofauna.csv",
+      "fish_sole":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_sole.csv",
+      "fish_pelagic_planctonivorous_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_pelagic_planctonivorous_ni.csv",
+      "macro_algea_bio":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_macro_algea_bio.csv",
+      "benthic_inv_predators":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_benthic_inv_predators.csv",
+      "cephalopods_benthic_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_cephalopods_benthic_ni.csv",
+      "harbor_seals":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_harbor_seals.csv",
+      "bacteria":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_bacteria.csv",
+      "grey_seals":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_grey_seals.csv",
+      "discards":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_discards.csv",
+      "surface_piscivorous_seabirds":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_surface_piscivorous_seabirds.csv",
+      "fish_demersal_sharks_rays_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_demersal_sharks_rays_ni.csv",
+      "detritus":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_detritus.csv",
+      "fish_demersal_planct_det":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_demersal_planct_det.csv",
+      "fish_dab":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_dab.csv",
+      "fish_demersal_piscivorous_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_demersal_piscivorous_ni.csv",
+      "benthic_inv_suspension_feeders_bio":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_benthic_inv_suspension_feeders_bio.csv",
+      "shrimps":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_shrimps.csv",
+      "fish_sandeel":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_sandeel.csv",
+      "fish_turbot_brill":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_turbot_brill.csv",
+      "fish_sharks_pelagic":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_sharks_pelagic.csv",
+      "fish_pout":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_pout.csv",
+      "fish_atlantic_mackerel":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_atlantic_mackerel.csv",
+      "fish_demersal_benthos_feeders":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_demersal_benthos_feeders.csv",
+      "fish_atlantic_cod":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_atlantic_cod.csv",
+      "fish_plaice":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_plaice.csv",
+      "fish_gurnards":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_gurnards.csv",
+      "migration_prey":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_migration_prey.csv",
+      "fish_flatfish":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_flatfish.csv",
+      "fish_demersal_benthos_feeders_ni":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Biomass\\biomass_map_fish_demersal_benthos_feeders_ni.csv"
+    },
+    "spatial_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Depth\\DepthMap.csv",
+    "ports_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Ports\\PortsMap.csv",
+    "habitat_map":  {
+      "Fine_sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_3_Fine_sand.csv",
+      "KS_Vergoyer_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_10_KS_Vergoyer_stock.csv",
+      "Sandy_mud":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_4_Sandy_mud.csv",
+      "Clay":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_7_Clay.csv",
+      "Muddy_sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_5_Muddy_sand.csv",
+      "KS_Dieppe_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_9_KS_Dieppe_stock.csv",
+      "KS_Greenwich_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_11_KS_Greenwich_stock.csv",
+      "Gravel_and_Pebbles":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_1_Gravel_and_Pebbles.csv",
+      "KS_BdS_stock":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_8_KS_BdS_stock.csv",
+      "Mud":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_6_Mud.csv",
+      "Sand":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Habitats\\Habitat_2_Sand.csv"
+      }
+  },
+
+  "quotas": {
+    "effort": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\effort_quota.csv",
+    "landings": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\landings_quota.csv"
   }
 }
 

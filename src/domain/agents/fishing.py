@@ -25,6 +25,12 @@ def go_fish(agent, location: Tuple[int, int]) -> Dict[str, Any]:
 
     actual_catch = total_catch
 
+    for name, val in zip(agent.model.species_names, catch_vec):
+        val_f = float(val)
+        agent.catch_by_species[name] += val_f
+        agent.yearly_catch_by_species[name] += val_f
+
+    agent.yearly_catch += total_catch
     travel_cost = 0.0
 
     total_cost = agent.cost_existence + agent.cost_activity + travel_cost

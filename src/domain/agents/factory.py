@@ -1,5 +1,8 @@
+import numpy as np
+
 from src import config
 from src.core.agent import FisherAgent
+from src.infrastructure.loader import ConfigLoader 
 from src.infrastructure.ports.ports_loader import (
     get_port_coordinates,
 )
@@ -8,7 +11,8 @@ from src.domain.environment.distance import create_distance_map, save_distance_m
 
 def create_agents(self) -> None:
     agent_id = 0
-
+    effort_quotas = self.config_loader.apply_effort_quotas()
+    landings_quotas = self.config_loader.apply_landings_quotas()
     ports_dict = (
         self.config_loader.get_port_assignments()
         if self.config_loader
@@ -23,6 +27,18 @@ def create_agents(self) -> None:
 
     port_coordinates = get_port_coordinates()
 
+    _flotilla_key = ["archipelagos", "coastal", "trawler"]
+
+    if isinstance(effort_quotas, np.ndarray):
+        def _effort(port, col):
+            return int(effort_quotas[port, col]) if port < effort_quotas.shape[0] else 0
+    elif isinstance(effort_quotas, dict):
+        def _effort(port, col):
+            return effort_quotas.get(_flotilla_key[col], 0)
+    else:
+        def _effort(port, col):
+            return 0
+
     for i in range(self.num_archipelago):
         name = (
             self.archipelago_names[agent_id]
@@ -32,7 +48,8 @@ def create_agents(self) -> None:
 
         ports = ports_dict.get("archipelago_ports", [0])
         port_index = ports[i]
-
+        effort_quota = _effort(port_index, 0)
+        landings_quota = landings_quotas.get("archipelagos", [0])
         habitat = self.restricted_habitat(
             habitat_dict.get(
                 "archipelago_habitats",
@@ -59,6 +76,8 @@ def create_agents(self) -> None:
             port=port_coordinates[port_index],
             habitat=habitat,
             distance_map=distance_map,
+            effort_quotas=effort_quota,
+            landing_quotas=landings_quota
         )
 
         start_pos = (0, 0)
@@ -79,7 +98,8 @@ def create_agents(self) -> None:
 
         ports = ports_dict.get("coastal_ports", [0])
         port_index = ports[i]
-
+        effort_quota = _effort(port_index, 1)
+        landings_quota = landings_quotas.get("coastal", [0])
         habitat = self.restricted_habitat(
             habitat_dict.get(
                 "coastal_habitats",
@@ -99,6 +119,8 @@ def create_agents(self) -> None:
                 self,
                 port_location=port_coordinates[port_index],
             ),
+            effort_quotas=effort_quota,
+            landing_quotas=landings_quota
         )
 
         water_cells = config.WATER_CELLS
@@ -125,6 +147,8 @@ def create_agents(self) -> None:
 
         ports = ports_dict.get("trawler_ports", [0])
         port_index = ports[i]
+        effort_quota = _effort(port_index, 2)
+        landings_quota = landings_quotas.get("trawler", [0])
 
         habitat = self.restricted_habitat(
             habitat_dict.get(
@@ -145,6 +169,8 @@ def create_agents(self) -> None:
                 self,
                 port_location=port_coordinates[port_index],
             ),
+            effort_quotas=effort_quota,
+            landing_quotas=landings_quota            
         )
 
         water_cells = config.WATER_CELLS
