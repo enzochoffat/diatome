@@ -231,6 +231,14 @@ class ConfigLoader:
         maps = self.loaded_config.get("maps", {})
         species_map = maps.get("species_map") or {}
         habitat_map = maps.get("habitat_map") or {}
+        restricted_area_map = maps.get("restricted_area_map")
+        if isinstance(restricted_area_map, dict):
+            restricted_area_map = {
+                zone_name: self._resolve_config_path(zone_path)
+                for zone_name, zone_path in restricted_area_map.items()
+            }
+        else:
+            restricted_area_map = self._resolve_config_path(restricted_area_map)
 
         return {
             "topology_map": self._resolve_config_path(
@@ -256,9 +264,8 @@ class ConfigLoader:
             "restricted_area_vector": self._resolve_config_path(
                 maps.get("restricted_area_vector")
             ),
-            "restricted_area_map": self._resolve_config_path(
-                maps.get("restricted_area_map")
-            ),
+            "restricted_area_map": restricted_area_map,
+            "spatial_extent": maps.get("spatial_extent"),
         }
 
     def get_model_params(self) -> Dict[str, Any]:
@@ -533,7 +540,8 @@ class ConfigLoader:
             file_path=map_params.get("ocean_current_map")
         )
         load_restricted_area_map(
-            restricted_area_map_path=map_params.get("restricted_area_map")
+            restricted_area_map_path=map_params.get("restricted_area_map"),
+            spatial_extent=map_params.get("spatial_extent"),
         )
         load_restricted_area_vector(
             restricted_area_vector_path=map_params.get("restricted_area_vector")

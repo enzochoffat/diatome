@@ -56,6 +56,11 @@ def run_from_config(config_path: str, run_id: int = 0) -> FisheryModel:
 
         logger.info("Simulation completed successfully")
 
+        output_params = config_loader.get_output_params()
+        if output_params.get("export_data", False):
+            prefix = output_params.get("filename_prefix", "fibe_output")
+            model.export_data(filename_prefix=prefix)
+
         return model
 
     except Exception:

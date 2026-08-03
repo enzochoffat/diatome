@@ -174,6 +174,7 @@ class FisheryModel(Model):
 
         # Spatial data
         self.LAND = config.LAND
+        self.topology = config.TOPOLOGY
 
         # Density labels
         self.LOW = config.LOW
@@ -341,8 +342,13 @@ class FisheryModel(Model):
     def restricted_habitat(self, habitat):
         return restricted_habitat_helper(self, habitat)
 
-    def restricted_area_status(self, date: datetime) -> str:
-        return restricted_area_status_helper(date)
+    def restricted_area_status(self, flottille: str, date: datetime, zone_index: int) -> str:
+        return restricted_area_status_helper(flottille, date, zone_index)
+
+    def get_depth(self, x: int, y: int) -> int:
+        if 0 <= y < len(self.topology) and 0 <= x < len(self.topology[y]):
+            return self.topology[y][x]
+        return 0
 
     def get_patch_info(self, x: int, y: int):
         return get_patch_info_helper(self, x, y)
@@ -602,3 +608,57 @@ class FisheryModel(Model):
 
     def print_final_summary(self) -> None:
         print_final_summary_helper(self)
+
+    # ------------------------------------------------------------------
+    # Export
+    # ------------------------------------------------------------------
+
+    def get_output_map(self) -> np.ndarray:
+        stock_map = np.zeros(
+            (self.grid.height, self.grid.width), dtype=int
+        )
+        for (x_coord, y_coord), patch in self.patches.items():
+            stock_map[x_coord, y_coord] = int(patch["fish_stock"])
+        return stock_map
+
+    def save_output_map(self, directory: str, filename: str) -> None:
+        stock_map = self.get_output_map()
+        os.makedirs(directory, exist_ok=True)
+        np.savetxt(
+            os.path.join(directory, filename),
+            stock_map, fmt="%d", delimiter=",",
+        )
+
+    def export_data(
+        self,
+        filename_prefix: str = "fibe_output",
+        directory: str = "./results/",
+    ) -> None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        export_dir = os.path.join(directory, timestamp)
+        os.makedirs(export_dir, exist_ok=True)
+
+        model_df = self.datacollector.get_model_vars_dataframe()
+        model_path = os.path.join(
+            export_dir, f"{filename_prefix}_model_{timestamp}.csv"
+        )
+        model_df.to_csv(model_path, index=False)
+
+        agent_df = self.datacollector.get_agent_vars_dataframe()
+        agent_path = os.path.join(
+            export_dir, f"{filename_prefix}_agent_{timestamp}.csv"
+        )
+        agent_df.to_csv(agent_path, index=False)
+
+        if self.yearly_data:
+            yearly_df = pd.DataFrame(self.yearly_data)
+            yearly_path = os.path.join(
+                export_dir, f"{filename_prefix}_yearly_{timestamp}.csv"
+            )
+            yearly_df.to_csv(yearly_path, index=False)
+            self.save_output_map(
+                export_dir, f"{filename_prefix}_stock_{timestamp}.csv"
+            )
+
+        if self.verbose:
+            print(f"\nAll data exported with timestamp: {timestamp}")

@@ -53,8 +53,17 @@
   },
 
   "maps":  {
-    "restricted_area_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
-    "restricted_area_vector":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
+    "spatial_extent":  {
+      "west": -2.053,
+      "north": 53.526,
+      "cell_size_deg": 0.0202
+      },
+    "restricted_area_map":  {
+      "zone_1": "C:\\Users\\enzo.choffat\\Downloads\\GOL_fermetures_chalut\\Bande_0-3 miles\\Pol3mn.shp",
+      "zone_2": "C:\\Users\\enzo.choffat\\Downloads\\GOL_fermetures_chalut\\CGPM-FRA_Golfe_du_lion\\Box_CGPM.shp",
+      "zone_3": "C:\\Users\\enzo.choffat\\Downloads\\GOL_fermetures_chalut\\WESTMED-Natura2000\\Natura2000.shp"
+      },
+    "restricted_area_vector":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\restricted_area\\archipelago.csv",
     "ocean_current_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\OceanCurrents.csv",
     "wave_height_vector":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
     "wind_farm_map":  "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",

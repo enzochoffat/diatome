@@ -20,13 +20,14 @@ def determine_weather(model) -> bool:
 
 # v Créer un fichier pour les courants marins, load d'une carte jounalière.
 
-# Faut que chaque agent puisse lire la carte des profondeur et espèces
+# Les agents peuvent lire la carte des profondeurs via self.model.get_depth(x, y) et self.model.topology
+# Les agents peuvent lire les cartes d'espèces via self.model.species_biomass, self.model.get_cell_value(x, y, type)
 
 # Ajouter dans la config des cartes de zones interdites, et un chemin vers le vecteur d'ouverture de ces zones (prendre les cartes de Lise)
 
 # A voir plus tard l'ouverture des parcs éolien (fermés, navigation, pêches)
 
-# Récupérer dans ecopath le tableau "off vessel price" 
+# Récupérer dans ecopath le tableau "off vessel price"
 
 # Faire une carte de distance à la côte.
 
