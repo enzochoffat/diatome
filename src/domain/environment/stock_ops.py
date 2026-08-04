@@ -25,10 +25,10 @@ def reduce_stock_by_species(
     if pos in self._land_set:
         return np.zeros_like(catch_vector)
 
-    available = self.species_biomass[x, y, :]
+    available = self.species_biomass[y, x, :]
     actual_catch = np.minimum(catch_vector, available)
-    self.species_biomass[x, y, :] -= actual_catch
-    self.patches[pos]["fish_stock"] = float(np.sum(self.species_biomass[x, y, :]))
+    self.species_biomass[y, x, :] -= actual_catch
+    self.patches[pos]["fish_stock"] = float(np.sum(self.species_biomass[y, x, :]))
     return actual_catch
 
 
@@ -51,4 +51,4 @@ def update_patches_species(
 
     for (x, y), patch in self.patches.items():
         if (x, y) not in self._land_set:
-            patch["fish_stock"] = float(np.sum(self.species_biomass[x, y, :]))
+            patch["fish_stock"] = float(np.sum(self.species_biomass[y, x, :]))

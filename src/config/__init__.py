@@ -1,8 +1,12 @@
 """Compatibility package for configuration imports.
 
-This package re-exports the central configuration constants from
-src.core.config so legacy imports like ``from src import config`` keep
-working.
+This package is an alias for src.core.config so legacy imports like
+``from src import config`` keep working while always seeing the live
+values (e.g. WATER_CELLS populated by reload_spatial_configuration).
 """
 
-from src.core.config import *  # noqa: F401,F403
+import sys
+
+from src.core import config as _core_config
+
+sys.modules[__name__] = _core_config

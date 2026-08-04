@@ -119,12 +119,12 @@ class FisheryModel(Model):
             verbose: If True, prints progress information.
             growth_rate: Annual logistic growth rate override. Uses
                 ``config.GROWTH_RATE`` if None.
-            fish_price: Fish market price override (SEK). Uses
+            fish_price: Fish market price override (€). Uses
                 ``config.FISH_PRICE`` if None.
             bad_weather_probability: Daily bad-weather probability
                 override. Uses ``config.BAD_WEATHER_PROBABILITY`` if
                 None.
-            initial_capital: Starting capital override (SEK). Uses
+            initial_capital: Starting capital override (€). Uses
                 ``config.INITIAL_CAPITAL`` if None.
             archipelago_names: Optional list of names for archipelago
                 agents.
@@ -454,7 +454,7 @@ class FisheryModel(Model):
                         sum(a.accumulated_catch for a in active)
                         / len(active)
                     )
-                    print(f"Average capital: {avg_capital:.0f} SEK")
+                    print(f"Average capital: {avg_capital:.0f} €")
                     print(f"Average catch: {avg_catch:.0f} fish")
                     for ftype in ("archipelago", "coastal", "trawler"):
                         type_agents = [
@@ -468,7 +468,7 @@ class FisheryModel(Model):
                             print(
                                 f"  {ftype.capitalize()}:"
                                 f" {len(type_agents)} agents,"
-                                f" avg capital = {avg_cap:.0f} SEK"
+                                f" avg capital = {avg_cap:.0f} €"
                             )
                 print(f"{'=' * 60}\n")
 
@@ -618,7 +618,7 @@ class FisheryModel(Model):
             (self.grid.height, self.grid.width), dtype=int
         )
         for (x_coord, y_coord), patch in self.patches.items():
-            stock_map[x_coord, y_coord] = int(patch["fish_stock"])
+            stock_map[y_coord, x_coord] = int(patch["fish_stock"])
         return stock_map
 
     def save_output_map(self, directory: str, filename: str) -> None:

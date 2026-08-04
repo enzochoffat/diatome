@@ -162,6 +162,28 @@ def get_ecospace_data() -> Optional[Tuple[np.ndarray, List[str]]]:
     return _ecospace_data_cache
 
 
+def _detect_skip_header(file_path: str) -> int:
+    """Detects the number of header lines in an Ecospace CSV grid file.
+
+    Standard Ecospace exports start directly with the header row. Some
+    exports prepend a bare index row (e.g. ``0`` or ``1``) before the
+    header; in that case two lines must be skipped.
+    """
+    with open(file_path, "r", encoding="utf-8") as f:
+        first_line = f.readline()
+    if first_line and "," not in first_line:
+        return 2
+    return 1
+
+
+def _read_ecospace_grid(file_path: str) -> np.ndarray:
+    """Reads an Ecospace grid CSV, dropping the index column."""
+    skip = _detect_skip_header(file_path)
+    return np.genfromtxt(
+        file_path, delimiter=",", skip_header=skip
+    )[:, 1:]
+
+
 def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
     """Loads per-species population maps from CSV files.
 
@@ -202,9 +224,7 @@ def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
         # Itération sur un dictionnaire
         for species_name, file_path in file_paths.items():
             species_names.append(species_name)
-            grid = np.genfromtxt(
-                file_path, delimiter=",", skip_header=1
-            )[:, 1:]
+            grid = _read_ecospace_grid(file_path)
             species_data.append(grid)
     else:
         # Itération sur une liste
@@ -212,9 +232,7 @@ def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
             # On utilise le nom du fichier (sans extension) comme nom d'espèce
             species_name = Path(file_path).stem
             species_names.append(species_name)
-            grid = np.genfromtxt(
-                file_path, delimiter=",", skip_header=1
-            )[:, 1:]
+            grid = _read_ecospace_grid(file_path)
             species_data.append(grid)
 
     if not species_data:

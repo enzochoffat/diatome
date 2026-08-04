@@ -8,8 +8,8 @@ def _grow_species_at_patch(
         return 0.0
 
     total_cc = model.patches[(x, y)]["carrying_capacity"]
-    ratio = model.species_ratio[x, y, :]
-    biomass = model.species_biomass[x, y, :]
+    ratio = model.species_ratio[y, x, :]
+    biomass = model.species_biomass[y, x, :]
 
     total_growth = 0.0
     for s in range(model.species_biomass.shape[2]):
@@ -18,14 +18,14 @@ def _grow_species_at_patch(
             continue
         if biomass[s] <= 0:
             growth = 0.01 * cc_s * effective_rate * 365
-            model.species_biomass[x, y, s] = max(0.0, growth)
+            model.species_biomass[y, x, s] = max(0.0, growth)
             total_growth += growth
             continue
         growth = biomass[s] * effective_rate * (1.0 - biomass[s] / cc_s)
-        model.species_biomass[x, y, s] = max(0.0, biomass[s] + growth)
+        model.species_biomass[y, x, s] = max(0.0, biomass[s] + growth)
         total_growth += growth
 
-    model._sync_patch_fish_stock(y, x)
+    model._sync_patch_fish_stock(x, y)
     return total_growth
 
 

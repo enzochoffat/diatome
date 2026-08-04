@@ -120,7 +120,7 @@ def update_biomass(self, species_maps: Dict[str, str]) -> Dict[Tuple[int, int], 
                 for y, cell_value in enumerate(row):
                     # Option A: Sum biomass of all species per cell
                     current_value = new_fish_stocks.get((x, y), 0.0)
-                    new_fish_stocks[(x, y)] = current_value + cell_value
+                    new_fish_stocks[(x, y)] = current_value + cell_value * 1000.0
 
                     # Option B (commented): Keep data separated by species
                     # if (x, y) not in new_fish_stocks:
@@ -157,6 +157,7 @@ def update_biomass_species(
         grid = np.genfromtxt(path, delimiter=",", skip_header=1)[:, 1:]
         # Replace NaN with 0
         grid = np.nan_to_num(grid, nan=0.0)
+        grid = grid * 1000.0
         species_data.append(grid)
 
     if not species_data:

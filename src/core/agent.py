@@ -45,7 +45,7 @@ class FisherAgent(Agent):
         unique_id: Unique identifier within the model.
         name: Optional display name.
         port: Home port coordinates.
-        capital: Current financial capital in SEK.
+        capital: Current financial capital in €.
         wealth: Reported wealth value.
         bankrupt: Whether the fisher is bankrupt.
         memory: Recent trip history.
@@ -72,7 +72,7 @@ class FisherAgent(Agent):
             unique_id: Unique agent identifier.
             model: Parent FisheryModel instance.
             fisher_type: Fishing strategy.
-            initial_capital: Initial capital in SEK. Uses
+            initial_capital: Initial capital in €. Uses
                 config.INITIAL_CAPITAL when None.
             name: Optional display name.
             port: Home port coordinates.
@@ -237,7 +237,7 @@ class FisherAgent(Agent):
                 costs are considered.
 
         Returns:
-            Estimated trip cost in SEK.
+            Estimated trip cost in €.
         """
         if location is None:
             return self.cost_activity + self.cost_existence
@@ -265,7 +265,7 @@ class FisherAgent(Agent):
         Other fisher types must maintain a safety buffer.
 
         Args:
-            cost: Estimated trip cost in SEK.
+            cost: Estimated trip cost in €.
 
         Returns:
             True if the trip is affordable, otherwise False.
@@ -578,16 +578,20 @@ class FisherAgent(Agent):
     def explore_random_spot(self) -> Optional[Tuple[int, int]]:
         from src import config as cfg
 
+        def _valid(x: int, y: int) -> bool:
+            return (
+                self.is_in_grid_bounds(x, y)
+                and not movement.is_restricted(self, x, y)
+                and not restricted_areas.is_restricted_area(
+                    x, y, self.model.current_date
+                )
+            )
+
         water_cells = cfg.WATER_CELLS
         if water_cells:
             for _ in range(50):
                 cell = random.choice(water_cells)
-                if (
-                    not movement.is_restricted(self, cell[0], cell[1])
-                    and not restricted_areas.is_restricted_area(
-                        cell[0], cell[1], self.model.current_date
-                    )
-                ):
+                if _valid(cell[0], cell[1]):
                     return (cell[0], cell[1])
 
         hotspots = self.model.HOTSPOTS
@@ -597,12 +601,7 @@ class FisherAgent(Agent):
                 dx = random.randint(-5, 5)
                 dy = random.randint(-5, 5)
                 candidate = (base_spot[0] + dx, base_spot[1] + dy)
-                if (
-                    not movement.is_restricted(self, candidate[0], candidate[1])
-                    and not restricted_areas.is_restricted_area(
-                        candidate[0], candidate[1], self.model.current_date
-                    )
-                ):
+                if _valid(candidate[0], candidate[1]):
                     return candidate
 
         return None
@@ -730,6 +729,12 @@ class FisherAgent(Agent):
     # ------------------------------------------------------------------
     # Spatial helpers
     # ------------------------------------------------------------------
+
+    def is_in_grid_bounds(self, x: int, y: int) -> bool:
+        return (
+            0 <= x < self.model.grid.width
+            and 0 <= y < self.model.grid.height
+        )
 
     def calculate_distance(
         self,

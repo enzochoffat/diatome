@@ -10,6 +10,12 @@ def is_restricted(self, x: int, y: int) -> bool:
 
 
 def move_to(self, x: int, y: int) -> None:
+        if not (
+            0 <= x < self.model.grid.width
+            and 0 <= y < self.model.grid.height
+        ):
+            return
+
         if is_restricted(self, x, y):
             return
 

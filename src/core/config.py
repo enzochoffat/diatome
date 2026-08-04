@@ -72,6 +72,13 @@ INIT_STOCK_SIZE: Final[str] = "halfCarryingCap"
 
 
 # =============================================================================
+# UNITS
+# =============================================================================
+
+KG_PER_TONNE: Final[float] = 1000.0
+
+
+# =============================================================================
 # ECONOMIC PARAMETERS
 # =============================================================================
 
@@ -94,8 +101,8 @@ SAFETY_BUFFER_DAYS: Final[int] = 7
 
 ARCHIPELAGO_COST_EXISTENCE: Final[float] = 0.05
 ARCHIPELAGO_COST_ACTIVITY: Final[float] = 0.05
-ARCHIPELAGO_CATCHABILITY: Final[int] = 5
-ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
+ARCHIPELAGO_CATCHABILITY: Final[int] = 10
+ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 0.5
 
 
 # =============================================================================
@@ -104,7 +111,7 @@ ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
 
 COASTAL_COST_EXISTENCE: Final[float] = 1.0
 COASTAL_COST_ACTIVITY: Final[float] = 1.0
-COASTAL_CATCHABILITY: Final[int] = 10
+COASTAL_CATCHABILITY: Final[int] = 100
 COASTAL_MAX_GOOD_SPOTS: Final[int] = 3
 
 
@@ -114,7 +121,7 @@ COASTAL_MAX_GOOD_SPOTS: Final[int] = 3
 
 TRAWLER_COST_EXISTENCE: Final[float] = 5.0
 TRAWLER_COST_ACTIVITY: Final[float] = 2.0
-TRAWLER_CATCHABILITY: Final[int] = 50
+TRAWLER_CATCHABILITY: Final[int] = 200
 TRAWLER_MAX_GOOD_SPOTS: Final[int] = 2
 TRAWLER_STORAGE_CAPACITY: Final[int] = 50
 
@@ -241,7 +248,7 @@ def get_bankruptcy_threshold(cost_existence: float) -> float:
     """Calculates the negative-capital threshold that triggers bankruptcy.
 
     Args:
-        cost_existence: Daily existence cost for the fisher (SEK).
+        cost_existence: Daily existence cost for the fisher (€).
 
     Returns:
         The (negative) capital level below which the fisher is bankrupt.
@@ -253,10 +260,10 @@ def get_safety_buffer(cost_existence: float) -> float:
     """Calculates the capital safety buffer for trip-affordability checks.
 
     Args:
-        cost_existence: Daily existence cost for the fisher (SEK).
+        cost_existence: Daily existence cost for the fisher (€).
 
     Returns:
-        Safety buffer amount in SEK.
+        Safety buffer amount in €.
     """
     return cost_existence * SAFETY_BUFFER_DAYS
 
@@ -327,8 +334,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"\nGrid: {GRID_WIDTH} × {GRID_HEIGHT}")
     print(f"Growth rate: {GROWTH_RATE * 100}% per year")
-    print(f"Fish price: {FISH_PRICE} SEK")
-    print(f"Initial capital: {INITIAL_CAPITAL} SEK")
+    print(f"Fish price: {FISH_PRICE} €")
+    print(f"Initial capital: {INITIAL_CAPITAL} €")
 
     print("\nFisher types:")
     for ftype in ["archipelago", "coastal", "trawler"]:
@@ -336,7 +343,7 @@ if __name__ == "__main__":
         print(
             f"  {ftype.capitalize():12} -"
             f" Catchability: {cfg['catchability']:3},"
-            f" Existence: {cfg['cost_existence']:.1f} SEK"
+            f" Existence: {cfg['cost_existence']:.1f} €"
         )
 
     print("\nDecision-making parameters:")

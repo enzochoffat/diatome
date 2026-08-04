@@ -64,7 +64,8 @@ def update_finances(
 
 
 def check_bankruptcy(agent) -> None:
-    bankruptcy_threshold = -(agent.cost_existence * 7)
+    from src.core import config
+    bankruptcy_threshold = config.get_bankruptcy_threshold(agent.cost_existence)
     recovery_threshold = agent.cost_existence * 30
 
     if agent.capital < bankruptcy_threshold:

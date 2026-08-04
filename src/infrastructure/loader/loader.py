@@ -344,7 +344,11 @@ class ConfigLoader:
         }
     
     def _load_species_flotilla_matrix(
-        self, csv_path: str, species_names: List[str], sep: str = ","
+        self,
+        csv_path: str,
+        species_names: List[str],
+        sep: str = ",",
+        normalize_price_per_ton: bool = False,
     ) -> np.ndarray:
         """Loads a species × flotilla CSV into a (F, N) numpy array.
 
@@ -354,13 +358,32 @@ class ConfigLoader:
           - Values: catchability or price.
 
         The returned array is indexed as ``array[flotilla_index, species_index]``.
+
+        Args:
+            normalize_price_per_ton: If True and any value exceeds 1000,
+                the matrix is assumed to hold prices in €/tonne and is
+                divided by 1000 to convert it to €/kg.
         """
         df = pd.read_csv(csv_path, sep=sep, index_col=0)
         species_ids = [
             s for s in species_names if s in df.index
         ] or species_names
+
+        num_index = pd.to_numeric(df.index.copy())
+        if num_index.notna().all():
+            try:
+                species_ids = [int(s) for s in species_names]
+            except ValueError:
+                species_ids = [
+                    s for s in species_names if s in df.index
+                ] or list(species_names)
         df = df.reindex(index=species_ids, fill_value=0.0)
-        return df.to_numpy(dtype=np.float64).T
+        matrix = df.to_numpy(dtype=np.float64).T
+
+        if normalize_price_per_ton and matrix.max() > 1000.0:
+            matrix = matrix / 1000.0
+
+        return matrix 
 
     def get_species_params(self) -> Dict[str, Any]:
         """Loads and returns species-related parameters.
@@ -384,17 +407,36 @@ class ConfigLoader:
             species_tables.get("price")
         )
 
+        catchability_matrix = (
+            self._load_species_flotilla_matrix(catchability_path, species_names)
+            if catchability_path
+            else np.zeros((3, len(species_names)), dtype=np.float64)
+        )
+        price_matrix = (
+            self._load_species_flotilla_matrix(
+                price_path, species_names, normalize_price_per_ton=True
+            )
+            if price_path
+            else np.ones((3, len(species_names)), dtype=np.float64)
+        )
+
+        for f_name, f_idx in [
+            ("archipelago", 1),
+            ("coastal", 2),
+            ("trawler", 3),
+        ]:
+            print(
+                f"[debug] flottille '{f_name}' (idx {f_idx}) "
+                f"price (€/kg)  : {np.round(price_matrix[f_idx], 4)}"
+            )
+            print(
+                f"[debug] flottille '{f_name}' (idx {f_idx}) "
+                f"catchability  : {np.round(catchability_matrix[f_idx], 6)}"
+            )
+
         return {
-            "catchability_matrix": (
-                self._load_species_flotilla_matrix(catchability_path, species_names)
-                if catchability_path
-                else np.zeros((3, len(species_names)), dtype=np.float64)
-            ),
-            "price_matrix": (
-                self._load_species_flotilla_matrix(price_path, species_names)
-                if price_path
-                else np.ones((3, len(species_names)), dtype=np.float64)
-            ),
+            "catchability_matrix": catchability_matrix,
+            "price_matrix": price_matrix,
             "species_names": species_names,
         }
 
