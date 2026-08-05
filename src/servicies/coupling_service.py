@@ -154,7 +154,7 @@ def update_biomass_species(
                 np.zeros((self.grid.height, self.grid.width), dtype=np.float64)
             )
             continue
-        grid = np.genfromtxt(path, delimiter=",", skip_header=1)[:, 1:]
+        grid = np.genfromtxt(path, delimiter=",", skip_header=2)[:, 1:]
         # Replace NaN with 0
         grid = np.nan_to_num(grid, nan=0.0)
         grid = grid * 1000.0

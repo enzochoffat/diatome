@@ -225,7 +225,7 @@ def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
         for species_name, file_path in file_paths.items():
             species_names.append(species_name)
             grid = _read_ecospace_grid(file_path)
-            species_data.append(grid)
+            species_data.append(grid*1000)
     else:
         # Itération sur une liste
         for file_path in file_paths:
@@ -233,7 +233,7 @@ def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:
             species_name = Path(file_path).stem
             species_names.append(species_name)
             grid = _read_ecospace_grid(file_path)
-            species_data.append(grid)
+            species_data.append(grid*1000)
 
     if not species_data:
         return None
