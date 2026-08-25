@@ -62,7 +62,7 @@ class FisherAgent(Agent):
         port: tuple[int, int] | None = None,
         habitat: list[str] | None = None,
         restricted_status: str | None = None,
-        distance_map: Optional[Dict[str, Any]] = None,
+        distance_map: Optional[List[List[float]]] = None,
         effort_quotas: int | None = None,
         landing_quotas: int | np.ndarray | None = None
     ) -> None:

@@ -14,16 +14,18 @@ def _grow_species_at_patch(
     total_growth = 0.0
     for s in range(model.species_biomass.shape[2]):
         cc_s = total_cc * ratio[s]
-        if cc_s <= 0:
+        if not np.isfinite(cc_s) or cc_s <= 0:
             continue
-        if biomass[s] <= 0:
-            growth = 0.01 * cc_s * effective_rate * 365
-            model.species_biomass[y, x, s] = max(0.0, growth)
-            total_growth += growth
-            continue
-        growth = biomass[s] * effective_rate * (1.0 - biomass[s] / cc_s)
-        model.species_biomass[y, x, s] = max(0.0, biomass[s] + growth)
-        total_growth += growth
+        old_biomass = max(0.0, float(biomass[s]))
+        if old_biomass <= 0:
+            new_biomass = 0.01 * cc_s * effective_rate * 365
+        else:
+            new_biomass = old_biomass + old_biomass * effective_rate * (
+                1.0 - old_biomass / cc_s
+            )
+        new_biomass = max(0.0, new_biomass)
+        model.species_biomass[y, x, s] = new_biomass
+        total_growth += new_biomass - old_biomass
 
     model._sync_patch_fish_stock(x, y)
     return total_growth

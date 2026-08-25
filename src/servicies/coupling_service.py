@@ -1,6 +1,7 @@
-from typing import Any, Tuple, Dict, List
+from typing import Any, Optional, Tuple, Dict, List
 import json
 import os
+import time
 from time import sleep
 import csv
 
@@ -10,6 +11,7 @@ def wait_for_coupling_update(
         self,
         json_path: str = "configs_json/config.json",
         poll_interval: float = 0.5,
+        timeout: Optional[float] = 60.0,
     ) -> Tuple[Any, Any]:
         """Blocks until the coupling config file is updated.
 
@@ -19,38 +21,59 @@ def wait_for_coupling_update(
         Args:
             json_path: Path to the JSON config monitored for changes.
             poll_interval: Polling interval in seconds.
+            timeout: Maximum time to wait in seconds. ``None`` waits
+                indefinitely. A ``TimeoutError`` is raised when the
+                deadline expires without any file update.
 
         Returns:
             A tuple ``(species_maps, current_step_val)`` from the
             updated Ecospace CSV.
+
+        Raises:
+            TimeoutError: If the file is not updated within ``timeout``
+                seconds.
         """
-        species_maps, last_step = read_csv_biomass(self)
-        current_step_val = last_step
-
-        last_modified_time = 0.0
-        current_modified_time = 0.0
-
         if os.path.exists(json_path):
+            species_maps, current_step_val = read_csv_biomass(self, json_path)
             last_modified_time = os.path.getmtime(json_path)
             current_modified_time = last_modified_time
+        else:
+            species_maps, current_step_val = {}, -1
+            last_modified_time = 0.0
+            current_modified_time = 0.0
+            if self.verbose:
+                print(
+                    f"File {json_path} not found."
+                    " Waiting for the file to be created..."
+                )
 
-        while (
-            current_modified_time <= last_modified_time
-            and self.current_step != 28
-        ):
+        deadline = None if timeout is None else time.monotonic() + timeout
+        warned_missing = False
+
+        while current_modified_time <= last_modified_time:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Coupling config '{json_path}' was not updated within"
+                    f" {timeout} s (model step {self.current_step})."
+                    " Is the Ecospace side running?"
+                )
+
             sleep(poll_interval)
+
             if os.path.exists(json_path):
+                warned_missing = False
                 current_modified_time = os.path.getmtime(json_path)
                 if current_modified_time > last_modified_time:
-                    species_maps, current_step_val = (
-                        read_csv_biomass(self)
+                    species_maps, current_step_val = read_csv_biomass(
+                        self, json_path
                     )
                     if self.verbose:
                         print(
                             f"File {json_path} updated. Proceeding with"
                             f" biomass update for step {current_step_val}."
                         )
-            elif self.verbose:
+            elif self.verbose and not warned_missing:
+                warned_missing = True
                 print(
                     f"File {json_path} not found."
                     " Waiting for the file to be created..."
@@ -58,19 +81,23 @@ def wait_for_coupling_update(
 
         return species_maps, current_step_val
 
-def read_csv_biomass(self) -> Tuple[Dict[str, str], int]:
+def read_csv_biomass(
+    self,
+    json_path: str = "configs_json/config.json",
+) -> Tuple[Dict[str, str], int]:
     """Reads the JSON configuration to retrieve species map file paths.
 
     This method loads the configuration file to extract species maps
     and the simulation time step, without running the simulation.
+
+    Args:
+        json_path: Path to the coupling JSON configuration file.
 
     Returns:
         A tuple containing:
             - A dictionary mapping species IDs to their CSV file paths.
             - The simulation time step.
     """
-    json_path = "configs_json/config.json"
-    
     with open(json_path, 'r', encoding='utf-8') as file:
         config = json.load(file)
         species_maps = config["maps"]["species_map"]

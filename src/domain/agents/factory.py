@@ -1,12 +1,16 @@
 import numpy as np
 
+from pathlib import Path
+
 from src import config
 from src.core.agent import FisherAgent
-from src.infrastructure.loader import ConfigLoader 
+from src.infrastructure.loader import ConfigLoader
 from src.infrastructure.ports.ports_loader import (
     get_port_coordinates,
 )
 from src.domain.environment.distance import create_distance_map, save_distance_map
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def create_agents(self) -> None:
@@ -64,7 +68,10 @@ def create_agents(self) -> None:
         if i == 0:
             save_distance_map(
                 distance_map,
-                file_path="C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\Distance.csv",
+                file_path=(
+                    _PROJECT_ROOT / "Ecospace_outputs" / "topology"
+                    / "Distance.csv"
+                ),
             )
 
         agent = FisherAgent(

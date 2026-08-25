@@ -1,5 +1,7 @@
 import math
 import heapq
+from pathlib import Path
+from typing import Union
 
 from src.domain.environment.spatial_utils import read_depth_map
 from src.domain.environment.restricted_areas import is_restricted_area
@@ -9,7 +11,6 @@ def create_distance_map(
         port_location: tuple[int, int],
         ) -> list[list[float]]:
     """Creates a distance map from a port location."""
-    global _distance_map
     base_map = read_depth_map()
     grid_height = len(base_map)
     grid_width = len(base_map[0]) if grid_height > 0 else 0
@@ -70,12 +71,18 @@ def create_distance_map(
             if distance_map[y][x] == float('inf'):
                 distance_map[y][x] = -1
 
-    _distance_map = distance_map
+    return distance_map
 
-    return _distance_map
+def save_distance_map(
+    distance_map: list[list[float]],
+    file_path: Union[str, Path],
+) -> None:
+    """Saves the distance map to a CSV file.
 
-def save_distance_map(distance_map: list[list[float]], file_path: str) -> None:
-    """Saves the distance map to a CSV file."""
+    Parent directories are created if missing.
+    """
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as file:
         for row in distance_map:
             row_str = ';'.join(str(value) for value in row)
@@ -94,7 +101,17 @@ def is_on_grid(x: int, y: int, grid_width: int, grid_height: int) -> bool:
     """Checks if the given coordinates are within the grid boundaries."""
     return 0 <= x < grid_width and 0 <= y < grid_height
 
-def get_distance(x: int, y: int) -> list[list[float]]:
-    map = _distance_map
-    price = map[y][x]
-    return price
+def get_distance(distance_map: list[list[float]], x: int, y: int) -> float:
+    """Returns the travel distance to ``(x, y)`` from a port.
+
+    Args:
+        distance_map: Distance grid produced by ``create_distance_map``
+            for a given port.
+        x: X-coordinate of the target cell.
+        y: Y-coordinate of the target cell.
+
+    Returns:
+        Travel distance from the port to ``(x, y)``. Cells that are
+        land, restricted, or unreachable hold ``-1``.
+    """
+    return float(distance_map[y][x])

@@ -57,6 +57,7 @@ from src.servicies.metrics import (
     collect_yearly_data as collect_yearly_data_helper,
     calculate_gini as calculate_gini_helper,
     export_monthly_agent_buffer as export_monthly_agent_buffer_helper,
+    export_monthly_fishing_mortality as export_monthly_fishing_mortality_helper,
     get_total_catch_all_agents as get_total_catch_all_agents_helper,
     safe_mean as safe_mean_helper,
     safe_median as safe_median_helper,
@@ -260,6 +261,13 @@ class FisheryModel(Model):
         self._initialize_stock_cache()
         self._create_agents()
 
+        n_rows, n_cols, n_species = self.species_biomass.shape
+        n_flotillas = max(self.flotilla_indices.values())
+        self.monthly_catch_by_flotilla = np.zeros(
+            (n_flotillas + 1, n_rows, n_cols, n_species)
+        )
+        self.month_start_biomass = self.species_biomass.copy()
+
         self.num_fishing_midday = sum(
             1 for a in self.agents if a.gone_fishing
         )
@@ -371,8 +379,18 @@ class FisheryModel(Model):
     def update_patches_species(self, species_biomass, species_names):
         return update_patches_species_helper(self, species_biomass, species_names)
 
-    def _wait_for_coupling_update(self, json_path: str = "config/config.json", poll_interval: float = 0.5):
-        return wait_for_coupling_update_helper(self, json_path=json_path, poll_interval=poll_interval)
+    def _wait_for_coupling_update(
+        self,
+        json_path: str = "config/config.json",
+        poll_interval: float = 0.5,
+        timeout: Optional[float] = 60.0,
+    ):
+        return wait_for_coupling_update_helper(
+            self,
+            json_path=json_path,
+            poll_interval=poll_interval,
+            timeout=timeout,
+        )
 
     def _read_csv_biomass(self):
         return read_csv_biomass_helper(self)
@@ -394,6 +412,13 @@ class FisheryModel(Model):
 
     def _export_monthly_agent_buffer(self) -> None:
         export_monthly_agent_buffer_helper(self)
+
+    def _accumulate_monthly_catch(self, f_idx: int, y: int, x: int, catch_vec) -> None:
+        if self.monthly_catch_by_flotilla is not None:
+            self.monthly_catch_by_flotilla[f_idx, y, x, :] += catch_vec
+
+    def _export_monthly_fishing_mortality(self) -> None:
+        export_monthly_fishing_mortality_helper(self)
 
     def collect_yearly_data(self):
         return collect_yearly_data_helper(self)
@@ -547,6 +572,7 @@ class FisheryModel(Model):
                 new_species_biomass = self._update_biomass_species(species_maps)
                 self.update_patches_species(new_species_biomass, self.species_names)
                 self._export_monthly_agent_buffer()
+                self._export_monthly_fishing_mortality()
 
     # ------------------------------------------------------------------
     # Run helpers

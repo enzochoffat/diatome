@@ -266,6 +266,52 @@ def export_monthly_agent_buffer(self) -> None:
 
         self._monthly_agent_rows.clear()
 
+def export_monthly_fishing_mortality(self) -> None:
+        monthly_catch = getattr(self, "monthly_catch_by_flotilla", None)
+        if monthly_catch is None:
+            return
+
+        month_start_biomass = getattr(self, "month_start_biomass", None)
+        if month_start_biomass is None:
+            month_start_biomass = self.species_biomass
+
+        os.makedirs("./results/biomass", exist_ok=True)
+        output_path = os.path.join(
+            "./results/biomass", f"F_{self.current_step}.csv"
+        )
+
+        rows: List[str] = ["ligne;colonne;flottille;espèce;F"]
+        for f_idx in sorted(set(self.flotilla_indices.values())):
+            for y in range(monthly_catch.shape[1]):
+                for x in range(monthly_catch.shape[2]):
+                    biomass_vec = month_start_biomass[y, x, :]
+                    catch_vec = monthly_catch[f_idx, y, x, :]
+                    for s_idx, catch in enumerate(catch_vec):
+                        if catch <= 0.0:
+                            continue
+                        biomass = biomass_vec[s_idx]
+                        if biomass <= 0.0:
+                            continue
+                        f_value = catch / biomass
+                        rows.append(
+                            f"{y + 1};{x + 1};{f_idx};"
+                            f"{self.species_names[s_idx]};{float(f_value):.10g}"
+                        )
+
+        tmp_path = output_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(rows) + "\n")
+        os.replace(tmp_path, output_path)
+
+        if self.verbose:
+            print(
+                f"Exported: F_{self.current_step}.csv"
+                f" ({len(rows) - 1} rows)"
+            )
+
+        self.month_start_biomass = self.species_biomass.copy()
+        monthly_catch.fill(0.0)
+
 def collect_yearly_data(self) -> Dict[str, Any]:
         year = self.current_step // self.YEAR
 

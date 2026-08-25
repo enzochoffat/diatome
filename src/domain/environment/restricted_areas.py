@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Dict, Optional, Union
 
 import numpy as np
@@ -8,6 +9,8 @@ from src.core import config
 from src.infrastructure.ecospace import ecospace_outputs
 
 logger = logging.getLogger(__name__)
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 STATUS_ENCODING = {
     "fermé": 0,
@@ -120,8 +123,13 @@ def load_restricted_area_map(
         )
     else:
         _restricted_area_map = np.genfromtxt(restricted_area_map_path, delimiter=",", skip_header=1)
-    save_restricted_area_map(file_path="C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\RestrictedAreasMap.csv",
-                             restricted_area_map=_restricted_area_map)
+    save_restricted_area_map(
+        file_path=(
+            _PROJECT_ROOT / "Ecospace_outputs" / "topology"
+            / "RestrictedAreasMap.csv"
+        ),
+        restricted_area_map=_restricted_area_map,
+    )
     return _restricted_area_map
 
 def load_restricted_area_vector(restricted_area_vector_path: Optional[str]) -> dict[str, np.ndarray]:
@@ -209,14 +217,20 @@ def is_restricted_area(x: int, y: int, date: datetime) -> bool:
         return True
     return False
 
-def save_restricted_area_map(restricted_area_map: np.ndarray, file_path: str) -> None:
+def save_restricted_area_map(
+    restricted_area_map: np.ndarray,
+    file_path: Union[str, Path],
+) -> None:
     """Saves the restricted area map to a CSV file.
 
     Args:
         restricted_area_map: The 2D boolean numpy array representing the
             restricted area map.
-        file_path: The path to save the CSV file.
+        file_path: The path to save the CSV file. Parent directories
+            are created if missing.
     """
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as file:
         for row in restricted_area_map:
             row_str = ';'.join(str(value) for value in row)

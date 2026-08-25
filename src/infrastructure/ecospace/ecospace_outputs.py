@@ -22,7 +22,8 @@ from tkinter import filedialog
 _ecospace_data_cache: Optional[Tuple[np.ndarray, List[str]]] = None
 _cached_habitat_data: Optional[Tuple[np.ndarray, List[str]]] = None
 
-_PROJECT_ROOT = Path(__file__).parent.parent
+# <repo root>: src/infrastructure/ecospace/ecospace_outputs.py -> 3 levels up
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 TOPOLOGY_MAP_PATH: str = str(
     _PROJECT_ROOT / "Ecospace_outputs/topology/EEC_NS_Mmermaid-Depth.csv"
@@ -179,9 +180,10 @@ def _detect_skip_header(file_path: str) -> int:
 def _read_ecospace_grid(file_path: str) -> np.ndarray:
     """Reads an Ecospace grid CSV, dropping the index column."""
     skip = _detect_skip_header(file_path)
-    return np.genfromtxt(
+    grid = np.genfromtxt(
         file_path, delimiter=",", skip_header=skip
     )[:, 1:]
+    return np.nan_to_num(grid, nan=0.0)
 
 
 def pop_evol_over_time() -> Optional[Tuple[np.ndarray, List[str]]]:

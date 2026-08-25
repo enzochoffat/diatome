@@ -96,6 +96,9 @@ def _simple_catch(agent, location) -> Tuple[np.ndarray, float, float]:
     catch_vec = np.minimum(catchability_vec, available)
     agent.model.species_biomass[location[1], location[0], :] -= catch_vec
     agent.model._sync_patch_fish_stock(location[0], location[1])
+    agent.model._accumulate_monthly_catch(
+        f_idx, location[1], location[0], catch_vec
+    )
 
     total_catch = float(np.sum(catch_vec))
     total_revenue = float(np.sum(catch_vec * price_vec))
@@ -128,6 +131,12 @@ def _coastal_catch(agent, location) -> Tuple[np.ndarray, float, float]:
 
         agent.model._sync_patch_fish_stock(location[0], location[1])
         agent.model._sync_patch_fish_stock(other_pos[0], other_pos[1])
+        agent.model._accumulate_monthly_catch(
+            f_idx, location[1], location[0], actual_here
+        )
+        agent.model._accumulate_monthly_catch(
+            f_idx, other_pos[1], other_pos[0], actual_other
+        )
 
         catch_vec = actual_here + actual_other
     else:
@@ -136,6 +145,9 @@ def _coastal_catch(agent, location) -> Tuple[np.ndarray, float, float]:
         catch_vec = np.minimum(catchability_vec, available_here)
         agent.model.species_biomass[location[1], location[0], :] -= catch_vec
         agent.model._sync_patch_fish_stock(location[0], location[1])
+        agent.model._accumulate_monthly_catch(
+            f_idx, location[1], location[0], catch_vec
+        )
 
     total_catch = float(np.sum(catch_vec))
     total_revenue = float(np.sum(catch_vec * price_vec))

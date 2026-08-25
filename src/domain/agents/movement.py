@@ -33,5 +33,7 @@ def calculate_travel_cost(
     ) -> float:
         if from_pos is None or to_pos is None:
             return 0.0
-        price = distance.get_distance(to_pos[0], to_pos[1])
-        return price
+        distance_map = getattr(self, "distance_map", None)
+        if not distance_map:
+            return 0.0
+        return distance.get_distance(distance_map, to_pos[0], to_pos[1])
