@@ -24,7 +24,15 @@ def _read_config_snapshot(
             config = json.load(file)
             species_maps = config["maps"]["species_map"]
             step = int(config["simulation"]["step"])
-    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+    except (
+        FileNotFoundError,
+        PermissionError,
+        OSError,
+        json.JSONDecodeError, 
+        KeyError, 
+        TypeError, 
+        ValueError
+        ) as e:
         return None
     return species_maps, step
 
