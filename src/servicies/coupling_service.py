@@ -28,7 +28,7 @@ def _read_config_snapshot(
         return None
     return species_maps, step
 
-def wait_for_coupling_updates(
+def wait_for_coupling_update(
     self,
     json_path: str = "configs_json/config.json",
     poll_interval: float = 0.5,
