@@ -53,35 +53,43 @@ def wait_for_coupling_update(
         Raises:
             TimeoutError: If no new sequence appears within ``timeout``.
         """
+    last_mtime = None
     deadline = None if timeout is None else time.monotonic() + timeout
     warned_missing = False
     warned_stale = False
 
     while True:
-        snapshot = _read_config_snapshot(json_path)
+        try:
+            mtime = os.path.getmtime(json_path)
+        except OSError:
+            mtime = None
 
-        if snapshot is not None:
-            species_maps, step = snapshot
-            last_consumed = getattr(
-                self, "_coupling_step_consumed", None
-            )
+        if mtime is not None and mtime != last_mtime:
+            last_mtime = mtime
+            snapshot = _read_config_snapshot(json_path)
 
-            if last_consumed is None or step > last_consumed:
-                self._coupling_step_consumed = step
-                if self.verbose:
-                    print(
-                        f"Coupling config accepted:"
-                        f" simulation.step={step}"
-                        f" (previously consumed={last_consumed})"
-                    )
-                return species_maps, step
-
-            if self.verbose and not warned_stale:
-                warned_stale = True
-                print(
-                    f"Coupling step {step} already consumed"
-                    f" (last: {last_consumed}). Waiting for new step..."
+            if snapshot is not None:
+                species_maps, step = snapshot
+                last_consumed = getattr(
+                    self, "_coupling_step_consumed", None
                 )
+
+                if last_consumed is None or step > last_consumed:
+                    self._coupling_step_consumed = step
+                    if self.verbose:
+                        print(
+                            f"Coupling config accepted:"
+                            f" simulation.step={step}"
+                            f" (previously consumed={last_consumed})"
+                        )
+                    return species_maps, step
+
+                if self.verbose and not warned_stale:
+                    warned_stale = True
+                    print(
+                        f"Coupling step {step} already consumed"
+                        f" (last: {last_consumed}). Waiting for new step..."
+                    )
         else:
             if self.verbose and not warned_missing:
                 warned_missing = True
