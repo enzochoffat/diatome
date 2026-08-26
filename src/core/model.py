@@ -256,6 +256,9 @@ class FisheryModel(Model):
         self.yearly_data: List[Dict[str, Any]] = []
         self.last_year_catches: Dict[int, float] = {}
 
+        # Last coupling step consumed
+        self._coupling_step_consumed: Optional[int] = None
+
         # Patch and agent initialisation
         self.init_patches()
         self._initialize_stock_cache()

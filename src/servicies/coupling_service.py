@@ -7,79 +7,101 @@ import csv
 
 import numpy as np
 
-def wait_for_coupling_update(
-        self,
-        json_path: str = "configs_json/config.json",
-        poll_interval: float = 0.5,
-        timeout: Optional[float] = 60.0,
-    ) -> Tuple[Any, Any]:
-        """Blocks until the coupling config file is updated.
+def _read_config_snapshot(
+        json_path: str,
+) -> Optional[Tuple[Dict[str, str], int]]:
+    """Reads config.json
+    
+    Args:
+        json_path: Path to the coupling JSON configuration file.
 
-        Polls ``json_path`` for modification-time changes and returns
-        the updated biomass maps once a change is detected.
+    Returns:
+        ''(species_maps, step)'' if successful, else None.
+        Any exceptions, decide to wait
+    """
+    try:
+        with open(json_path, 'r', encoding='utf-8') as file:
+            config = json.load(file)
+            species_maps = config["maps"]["species_map"]
+            step = int(config["simulation"]["step"])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        return None
+    return species_maps, step
+
+def wait_for_coupling_updates(
+    self,
+    json_path: str = "configs_json/config.json",
+    poll_interval: float = 0.5,
+    timeout: Optional[float] = 60.0,
+) -> Tuple[Any, Any]:
+    """Blocks until a NEW coupling sequence is available.
+
+        Synchronizes by the step number in the JSON config. The first call (bootstrap) consumes the existing file immediately, even if it was written before our start.
+        This prevents deadlock when Ecospace writes steps 1 and 2 before FIBE has armed its listening loop. 
+        Subsequent calls only accept the file if ``simulation.step > last consumed step``.:
 
         Args:
-            json_path: Path to the JSON config monitored for changes.
+            json_path: Path to the JSON config monitored.
             poll_interval: Polling interval in seconds.
             timeout: Maximum time to wait in seconds. ``None`` waits
                 indefinitely. A ``TimeoutError`` is raised when the
-                deadline expires without any file update.
+                deadline expires without any new sequence.
 
         Returns:
-            A tuple ``(species_maps, current_step_val)`` from the
-            updated Ecospace CSV.
+            A tuple ``(species_maps, coupling_step)`` from the config.
 
         Raises:
-            TimeoutError: If the file is not updated within ``timeout``
-                seconds.
+            TimeoutError: If no new sequence appears within ``timeout``.
         """
-        if os.path.exists(json_path):
-            species_maps, current_step_val = read_csv_biomass(self, json_path)
-            last_modified_time = os.path.getmtime(json_path)
-            current_modified_time = last_modified_time
-        else:
-            species_maps, current_step_val = {}, -1
-            last_modified_time = 0.0
-            current_modified_time = 0.0
-            if self.verbose:
-                print(
-                    f"File {json_path} not found."
-                    " Waiting for the file to be created..."
-                )
+    deadline = None if timeout is None else time.monotonic() + timeout
+    warned_missing = False
+    warned_stale = False
 
-        deadline = None if timeout is None else time.monotonic() + timeout
-        warned_missing = False
+    while True:
+        snapshot = _read_config_snapshot(json_path)
 
-        while current_modified_time <= last_modified_time:
-            if deadline is not None and time.monotonic() >= deadline:
-                raise TimeoutError(
-                    f"Coupling config '{json_path}' was not updated within"
-                    f" {timeout} s (model step {self.current_step})."
-                    " Is the Ecospace side running?"
-                )
+        if snapshot is not None:
+            species_maps, step = snapshot
+            last_consumed = getattr(
+                self, "_coupling_step_consumed", None
+            )
 
-            sleep(poll_interval)
-
-            if os.path.exists(json_path):
-                warned_missing = False
-                current_modified_time = os.path.getmtime(json_path)
-                if current_modified_time > last_modified_time:
-                    species_maps, current_step_val = read_csv_biomass(
-                        self, json_path
+            if last_consumed is None or step > last_consumed:
+                self._coupling_step_consumed = step
+                if self.verbose:
+                    print(
+                        f"Coupling config accepted:"
+                        f" simulation.step={step}"
+                        f" (previously consumed={last_consumed})"
                     )
-                    if self.verbose:
-                        print(
-                            f"File {json_path} updated. Proceeding with"
-                            f" biomass update for step {current_step_val}."
-                        )
-            elif self.verbose and not warned_missing:
+                return species_maps, step
+
+            if self.verbose and not warned_stale:
+                warned_stale = True
+                print(
+                    f"Coupling step {step} already consumed"
+                    f" (last: {last_consumed}). Waiting for new step..."
+                )
+        else:
+            if self.verbose and not warned_missing:
                 warned_missing = True
                 print(
-                    f"File {json_path} not found."
-                    " Waiting for the file to be created..."
+                    f"Coupling config missing or invalid at {json_path}. "
+                    f"Waiting for valid config..."
                 )
 
-        return species_maps, current_step_val
+        if deadline is not None and time.monotonic() > deadline:
+            expected = (
+                f"> {last_consumed}"
+                if last_consumed is not None
+                else "any valid config (bootstrap)"
+            )    
+            raise TimeoutError(
+                f"Coupling config '{json_path}' was not updated"
+                f" within {timeout} seconds (model step"
+                f" {self.current_step}, expecting coupling step"
+                f" {expected}). Is the Ecospace side running?"
+            )
 
 def read_csv_biomass(
     self,
