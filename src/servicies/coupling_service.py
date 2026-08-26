@@ -40,7 +40,7 @@ def wait_for_coupling_update(
     self,
     json_path: str = "configs_json/config.json",
     poll_interval: float = 0.5,
-    timeout: Optional[float] = 60.0,
+    timeout: Optional[float] = 350.0,
 ) -> Tuple[Any, Any]:
     """Blocks until a NEW coupling sequence is available.
 
@@ -118,6 +118,7 @@ def wait_for_coupling_update(
                 f" {self.current_step}, expecting coupling step"
                 f" {expected}). Is the Ecospace side running?"
             )
+        sleep(poll_interval)
 
 def read_csv_biomass(
     self,
