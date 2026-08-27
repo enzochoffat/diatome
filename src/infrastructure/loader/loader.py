@@ -584,6 +584,8 @@ class ConfigLoader:
         load_restricted_area_map(
             restricted_area_map_path=map_params.get("restricted_area_map"),
             spatial_extent=map_params.get("spatial_extent"),
+            grid_height=default_config.GRID_HEIGHT,
+            grid_width=default_config.GRID_WIDTH,
         )
         load_restricted_area_vector(
             restricted_area_vector_path=map_params.get("restricted_area_vector")
