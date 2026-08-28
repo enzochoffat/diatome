@@ -89,7 +89,7 @@ def _rasterize_restricted_areas_from_shapes(
             gdf = gdf.set_crs(epsg=4326)
         elif gdf.crs.to_epsg() != 4326:
             gdf = gdf.to_crs(epsg=4326)
-        geometry = gdf.geometry.union_all
+        geometry = gdf.geometry.union_all()
         if not geometry.intersects(grid_box):
             logger.warning(
                 "Restricted zone %r (%s) does not intersect the grid "
