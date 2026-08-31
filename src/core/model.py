@@ -511,14 +511,15 @@ class FisheryModel(Model):
             )
             self.last_year_catches = current_catches
 
-        for agent in self.agents:
-            agent.reset_daily_flags()
+        self.agents.shuffle_do("reset_daily_flags")
 
         self.num_fishing_midday = 0
         self.num_at_home_midday = 0
         self.num_fished_today = 0
 
-        for agent in self.agents:
+        shuffled = list(self.agents)
+        self.random.shuffle(shuffled)
+        for agent in shuffled:
             agent.step()
             if agent.gone_fishing:
                 self.num_fishing_midday += 1
@@ -532,8 +533,7 @@ class FisheryModel(Model):
 
         self._append_daily_agent_rows_for_monthly_export()
 
-        for agent in self.agents:
-            agent.finalize_day()
+        self.agents.shuffle_do("finalize_day")
 
         if is_new_year and yearly_summary is not None and self.verbose:
             year = self.current_step // self.YEAR
