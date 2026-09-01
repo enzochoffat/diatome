@@ -43,12 +43,13 @@ from src.domain.environment.fish_dynamics import (
     update_fish_stock as update_fish_stock_helper,
     update_fish_stock_yearly as update_fish_stock_yearly_helper,
 )
-from src.domain.agents.factory import create_agents as create_agents_helper
+from src.domain.agents.factory import create_agents as create_agents_helper, create_single_agent as create_single_agent_helper
 from src.servicies.coupling_service import (
     wait_for_coupling_update as wait_for_coupling_update_helper,
     read_csv_biomass as read_csv_biomass_helper,
     update_biomass as update_biomass_helper,
     update_biomass_species as update_biomass_species_helper,
+    read_desired_num_agents as read_desired_num_agents_helper,
 )
 from src.servicies.metrics import (
     append_daily_agent_rows_for_monthly_export as append_daily_agent_rows_for_monthly_export_helper,
@@ -264,6 +265,25 @@ class FisheryModel(Model):
         self._initialize_stock_cache()
         self._create_agents()
 
+        # Dynamic fleet: monotone ID and retired archive (IDs never reused)
+        self._retired_agents: List[Any] = []
+        self._retired_ids: set[int] = set()
+        if len(self.agents) > 0:
+            try:
+                max_id = max(a.unique_id for a in self.agents)
+                self._next_agent_id = int(max_id) + 1
+            except Exception:
+                self._next_agent_id = len(self.agents)
+        else:
+            self._next_agent_id = 0
+        # Keep Mesa counter in sync to avoid collisions if Mesa creates agents
+        try:
+            if hasattr(self, "agent_id_counter"):
+                if self._next_agent_id > self.agent_id_counter:
+                    self.agent_id_counter = self._next_agent_id
+        except Exception:
+            pass
+
         n_rows, n_cols, n_species = self.species_biomass.shape
         n_flotillas = max(self.flotilla_indices.values())
         self.monthly_catch_by_flotilla = np.zeros(
@@ -349,6 +369,127 @@ class FisheryModel(Model):
 
     def _create_agents(self) -> None:
         create_agents_helper(self)
+
+    def _create_single_agent(self, fisher_type: str, agent_id: int) -> Any:
+        return create_single_agent_helper(self, fisher_type, agent_id)
+
+    # ------------------------------------------------------------------
+    # Dynamic fleet management (IDs unique, retirement definitive)
+    # ------------------------------------------------------------------
+
+    def _retire_agents(self, fisher_type: str, n: int) -> int:
+        """Retires n random active agents of a given flotilla.
+
+        Retirement is definitive: agents are marked retired, removed from
+        grid and deregistered, archived in ``_retired_agents`` and their
+        IDs are never reused (requirement).
+
+        Args:
+            fisher_type: Flotilla type.
+            n: Number to retire.
+
+        Returns:
+            Number actually retired.
+        """
+        if n <= 0:
+            return 0
+        candidates = [a for a in self.agents if a.fisher_type == fisher_type and not getattr(a, "retired", False)]
+        if not candidates:
+            return 0
+        n = min(n, len(candidates))
+        # Random equitable
+        to_remove = self.random.sample(candidates, n) if len(candidates) > n else candidates
+        retired = 0
+        for agent in to_remove:
+            agent.retired = True
+            agent.retired_at_step = self.current_step
+            # Immediate removal without landing (requirement 2)
+            try:
+                if getattr(agent, "pos", None) is not None:
+                    self.grid.remove_agent(agent)
+            except Exception:
+                pass
+            # Clear spatial state
+            agent.current_location = None
+            agent.at_sea = False
+            agent.gone_fishing = False
+            agent.at_home = False
+            self._retired_agents.append(agent)
+            self._retired_ids.add(agent.unique_id)
+            try:
+                agent.remove()  # Mesa deregister
+            except Exception:
+                # Fallback
+                try:
+                    self.deregister_agent(agent)
+                except Exception:
+                    pass
+            retired += 1
+            if self.verbose:
+                logger.info(f"Retired agent {agent.unique_id} ({fisher_type}) at step {self.current_step}")
+        # Update cached counts
+        if fisher_type == "archipelago":
+            self.num_archipelago = sum(1 for a in self.agents if a.fisher_type == "archipelago")
+        elif fisher_type == "coastal":
+            self.num_coastal = sum(1 for a in self.agents if a.fisher_type == "coastal")
+        elif fisher_type == "trawler":
+            self.num_trawler = sum(1 for a in self.agents if a.fisher_type == "trawler")
+        return retired
+
+    def _create_agents_batch(self, fisher_type: str, n: int) -> int:
+        """Creates n new agents of a given flotilla with new IDs."""
+        if n <= 0:
+            return 0
+        created = 0
+        for _ in range(n):
+            agent_id = self._next_agent_id
+            self._next_agent_id += 1
+            # Keep Mesa counter synced
+            try:
+                if agent_id >= self.agent_id_counter:
+                    self.agent_id_counter = agent_id + 1
+            except Exception:
+                pass
+            self._create_single_agent(fisher_type, agent_id)
+            created += 1
+            if self.verbose:
+                logger.info(f"Created agent {agent_id} ({fisher_type}) at step {self.current_step}")
+        if fisher_type == "archipelago":
+            self.num_archipelago = sum(1 for a in self.agents if a.fisher_type == "archipelago")
+        elif fisher_type == "coastal":
+            self.num_coastal = sum(1 for a in self.agents if a.fisher_type == "coastal")
+        elif fisher_type == "trawler":
+            self.num_trawler = sum(1 for a in self.agents if a.fisher_type == "trawler")
+        return created
+
+    def _apply_fleet_resize(self, desired: Optional[Dict[str, int]]) -> None:
+        """Applies desired fleet sizes per flotilla (random retire / random port create)."""
+        if not desired:
+            return
+        # Normalize keys
+        desired_norm = {
+            "archipelago": int(desired.get("num_archipelago", self.num_archipelago)),
+            "coastal": int(desired.get("num_coastal", self.num_coastal)),
+            "trawler": int(desired.get("num_trawler", self.num_trawler)),
+        }
+        for ftype in ("archipelago", "coastal", "trawler"):
+            current = sum(1 for a in self.agents if a.fisher_type == ftype)
+            target = desired_norm[ftype]
+            if target < 0:
+                target = 0
+            delta = target - current
+            if delta < 0:
+                self._retire_agents(ftype, -delta)
+            elif delta > 0:
+                self._create_agents_batch(ftype, delta)
+        # After resize, rebuild daily cache so datacollector sees new counts next step
+        try:
+            self._build_daily_agent_metrics_cache()
+        except Exception:
+            pass
+
+    def _read_desired_counts(self, json_path: str = "configs_json/config.json") -> Optional[Dict[str, int]]:
+        return read_desired_num_agents_helper(json_path)
 
     def restricted_habitat(self, habitat):
         return restricted_habitat_helper(self, habitat)
@@ -501,9 +642,13 @@ class FisheryModel(Model):
                 print(f"{'=' * 60}\n")
 
             yearly_summary = self.collect_yearly_data()
+            # Include retired agents so yearly catch accounts for fleet reductions
             current_catches = {
                 a.unique_id: a.total_catch for a in self.agents
             }
+            # Add retired (frozen) catches to keep total monotone
+            for a in getattr(self, "_retired_agents", []):
+                current_catches[a.unique_id] = a.total_catch
             yearly_catch = sum(
                 current_catches[aid]
                 - self.last_year_catches.get(aid, 0)
@@ -567,15 +712,27 @@ class FisheryModel(Model):
                 self.current_step,
             )
 
+            desired = None
             if self.coupling:
-                species_maps, _ = self._wait_for_coupling_update(
+                species_maps, _, desired = self._wait_for_coupling_update(
                     json_path="configs_json/config.json",
                     poll_interval=0.5,
                 )
                 new_species_biomass = self._update_biomass_species(species_maps)
                 self.update_patches_species(new_species_biomass, self.species_names)
+                if desired is not None:
+                    self._apply_fleet_resize(desired)
                 self._export_monthly_agent_buffer()
                 self._export_monthly_fishing_mortality()
+            else:
+                # Non-coupling mode: still allow dynamic fleet via config polling (for tests)
+                desired = self._read_desired_counts(json_path="configs_json/config.json")
+                if desired is not None:
+                    self._apply_fleet_resize(desired)
+                # Keep monthly exports consistent even without coupling
+                if self.current_step > 0:
+                    self._export_monthly_agent_buffer()
+                    self._export_monthly_fishing_mortality()
 
     # ------------------------------------------------------------------
     # Run helpers
@@ -616,17 +773,23 @@ class FisheryModel(Model):
     def get_model_summary(self) -> Dict[str, Any]:
         agents_list = list(self.agents)
         num_agents = len(agents_list)
+        retired_agents = getattr(self, "_retired_agents", [])
 
         return {
             "current_step": self.current_step,
             "current_year": self.current_step // self.YEAR,
             "current_day": self.current_step % self.YEAR,
             "num_agents": num_agents,
+            "num_retired": len(retired_agents),
+            "num_archipelago": sum(1 for a in agents_list if a.fisher_type == "archipelago"),
+            "num_coastal": sum(1 for a in agents_list if a.fisher_type == "coastal"),
+            "num_trawler": sum(1 for a in agents_list if a.fisher_type == "trawler"),
             "num_fishing": self.num_fishing_midday,
             "num_at_home": self.num_at_home_midday,
             "num_fished_today": self.num_fished_today,
             "total_stock": self.get_total_stock(),
             "total_catch": sum(a.total_catch for a in agents_list),
+            "total_catch_including_retired": sum(a.total_catch for a in agents_list) + sum(a.total_catch for a in retired_agents),
             "avg_capital": (
                 sum(a.capital for a in agents_list) / num_agents
                 if num_agents > 0

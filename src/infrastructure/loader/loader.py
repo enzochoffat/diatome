@@ -31,7 +31,7 @@ class ConfigLoader:
     """
 
     _REQUIRED_SECTIONS = ["metadata", "simulation", "agents", "output"]
-    _REQUIRED_AGENT_KEYS = ["num_archipelago", "num_coastal", "num_trawler"]
+    _REQUIRED_AGENT_KEYS = ["num_agents"]
     _VALID_STOCK_SIZES = {
         "random",
         "carryingCap",
@@ -133,7 +133,12 @@ class ConfigLoader:
         for agent_key in self._REQUIRED_AGENT_KEYS:
             if agent_key not in agents:
                 raise ValueError(f"Missing agent count: {agent_key}")
-            if agents[agent_key] < 0:
+            val = agents[agent_key]
+            if isinstance(val, dict):
+                for sub_k, sub_v in val.items():
+                    if sub_v < 0:
+                        raise ValueError(f"{agent_key}.{sub_k} must be non-negative")
+            elif val < 0:
                 raise ValueError(f"{agent_key} must be non-negative")
 
     def _merge_with_defaults(
@@ -281,8 +286,9 @@ class ConfigLoader:
 
         config = self.loaded_config
         agent_names: List[str] = config["agents"]["names"]
-        num_archipelago: int = config["agents"]["num_archipelago"]
-        num_coastal: int = config["agents"]["num_coastal"]
+        num_archipelago: int = config["agents"]["num_agents"]["num_archipelago"]
+        num_coastal: int = config["agents"]["num_agents"]["num_coastal"]
+        num_trawler: int = config["agents"]["num_agents"]["num_trawler"]
 
         species_params = self.get_species_params()
 
@@ -290,7 +296,7 @@ class ConfigLoader:
             "end_of_sim": config["simulation"]["duration_years"] * 365,
             "num_archipelago": num_archipelago,
             "num_coastal": num_coastal,
-            "num_trawler": config["agents"]["num_trawler"],
+            "num_trawler": num_trawler,
             "verbose": config["simulation"]["verbose"],
             "coupling": config["simulation"]["coupling"],
             "archipelago_names": agent_names[:num_archipelago],

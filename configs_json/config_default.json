@@ -14,9 +14,11 @@
                        "start_date":  "2006-01-01"
                    },
     "agents":  {
-                   "num_archipelago":  10,
-                   "num_coastal":  10,
-                   "num_trawler":  5,
+        "num_agents": {
+            "num_archipelago":  10,
+            "num_coastal":  10,
+            "num_trawler":  5
+        },
                    "names":  [
                                  "a",
                                  "b",

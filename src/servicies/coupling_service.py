@@ -9,21 +9,31 @@ import numpy as np
 
 def _read_config_snapshot(
         json_path: str,
-) -> Optional[Tuple[Dict[str, str], int]]:
+) -> Optional[Tuple[Dict[str, str], int, Optional[Dict[str, int]]]]:
     """Reads config.json
     
     Args:
         json_path: Path to the coupling JSON configuration file.
 
     Returns:
-        ''(species_maps, step)'' if successful, else None.
-        Any exceptions, decide to wait
+        ''(species_maps, step, num_agents)'' if successful, else None.
+        Any exceptions, decide to wait. ``num_agents`` may be None if not
+        present in the config (backward compatibility).
     """
     try:
         with open(json_path, 'r', encoding='utf-8') as file:
             config = json.load(file)
             species_maps = config["maps"]["species_map"]
             step = int(config["simulation"]["step"])
+            # New dynamic fleet counts: agents.num_agents
+            num_agents = config.get("agents", {}).get("num_agents", None)
+            if num_agents is not None:
+                # Validate and normalize to int
+                num_agents = {
+                    "num_archipelago": int(num_agents.get("num_archipelago", 0)),
+                    "num_coastal": int(num_agents.get("num_coastal", 0)),
+                    "num_trawler": int(num_agents.get("num_trawler", 0)),
+                }
     except (
         FileNotFoundError,
         PermissionError,
@@ -34,14 +44,14 @@ def _read_config_snapshot(
         ValueError
         ) as e:
         return None
-    return species_maps, step
+    return species_maps, step, num_agents
 
 def wait_for_coupling_update(
     self,
     json_path: str = "configs_json/config.json",
     poll_interval: float = 0.5,
     timeout: Optional[float] = 350.0,
-) -> Tuple[Any, Any]:
+) -> Tuple[Any, Any, Optional[Dict[str, int]]]:
     """Blocks until a NEW coupling sequence is available.
 
         Synchronizes by the step number in the JSON config. The first call (bootstrap) consumes the existing file immediately, even if it was written before our start.
@@ -56,7 +66,8 @@ def wait_for_coupling_update(
                 deadline expires without any new sequence.
 
         Returns:
-            A tuple ``(species_maps, coupling_step)`` from the config.
+            A tuple ``(species_maps, coupling_step, num_agents)`` from the config.
+            ``num_agents`` is ``None`` if not present.
 
         Raises:
             TimeoutError: If no new sequence appears within ``timeout``.
@@ -77,7 +88,7 @@ def wait_for_coupling_update(
             snapshot = _read_config_snapshot(json_path)
 
             if snapshot is not None:
-                species_maps, step = snapshot
+                species_maps, step, num_agents = snapshot
                 last_consumed = getattr(
                     self, "_coupling_step_consumed", None
                 )
@@ -89,8 +100,9 @@ def wait_for_coupling_update(
                             f"Coupling config accepted:"
                             f" simulation.step={step}"
                             f" (previously consumed={last_consumed})"
+                            f" num_agents={num_agents}"
                         )
-                    return species_maps, step
+                    return species_maps, step, num_agents
 
                 if self.verbose and not warned_stale:
                     warned_stale = True
@@ -230,3 +242,48 @@ def update_biomass_species(
         return np.zeros((self.grid.height, self.grid.width, 1), dtype=np.float64)
 
     return np.stack(species_data, axis=2)
+
+def update_num_agents(self, num_agents: Dict[str, int]) -> Dict[str, int]:
+    """Updates the number of agents based on the provided configuration.
+
+    Args:
+        num_agents: Dictionary containing the number of each agent type.
+
+    Returns:
+        A dictionary with updated agent counts.
+    """
+    updated_agents = {
+        "num_archipelago": int(num_agents.get("num_archipelago", 0)),
+        "num_coastal": int(num_agents.get("num_coastal", 0)),
+        "num_trawler": int(num_agents.get("num_trawler", 0))
+    }
+    return updated_agents
+
+
+def read_desired_num_agents(
+    json_path: str = "configs_json/config.json",
+) -> Optional[Dict[str, int]]:
+    """Non-blocking read of desired fleet sizes.
+
+    Used when ``coupling`` is False or for testing without Ecospace.
+
+    Args:
+        json_path: Path to the JSON config.
+
+    Returns:
+        Dict with ``num_archipelago``, ``num_coastal``, ``num_trawler`` or
+        None if file missing / invalid / key absent.
+    """
+    try:
+        with open(json_path, 'r', encoding='utf-8') as file:
+            config = json.load(file)
+            num_agents = config.get("agents", {}).get("num_agents", None)
+            if num_agents is None:
+                return None
+            return {
+                "num_archipelago": int(num_agents.get("num_archipelago", 0)),
+                "num_coastal": int(num_agents.get("num_coastal", 0)),
+                "num_trawler": int(num_agents.get("num_trawler", 0)),
+            }
+    except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return None

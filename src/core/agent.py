@@ -82,7 +82,13 @@ class FisherAgent(Agent):
         super().__init__(model)
 
         self.fisher_type = fisher_type
+        # Mesa 3.x assigns unique_id via model.agent_id_counter in super().__init__;
+        # we override with our monotone ID to guarantee global uniqueness.
+        # Keep Mesa counter in sync if needed by caller.
         self.unique_id = unique_id
+        # Retirement flag - definitive, never reused
+        self.retired: bool = False
+        self.retired_at_step: int | None = None
         self.name = name
         self.port = port
         self.restricted_mask = habitat
@@ -957,6 +963,8 @@ class FisherAgent(Agent):
         summary: Dict[str, Any] = {
             "id": self.unique_id,
             "type": self.fisher_type,
+            "retired": self.retired,
+            "retired_at": self.retired_at_step,
             "age": self.age,
             "capital": self.capital,
             "wealth": self.wealth,
@@ -1027,7 +1035,12 @@ class FisherAgent(Agent):
         In order: make decision → execute decision → update growth
         perception → update satisfaction → update scarcity perception →
         check bankruptcy.
+
+        Retired agents are no-ops (they have been deregistered, but guard
+        in case they remain in schedule).
         """
+        if self.retired:
+            return
         self.make_decision()
         self.execute_decision()
         self.update_growth_perception()

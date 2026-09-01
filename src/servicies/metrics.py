@@ -21,6 +21,18 @@ def build_datacollector(self) -> DataCollector:
                 "num_bankrupt": lambda m: m._daily_agent_metrics[
                     "num_bankrupt"
                 ],
+                "num_retired": lambda m: m._daily_agent_metrics.get(
+                    "num_retired", 0
+                ),
+                "num_retired_archipelago": lambda m: m._daily_agent_metrics.get(
+                    "num_retired_archipelago", 0
+                ),
+                "num_retired_coastal": lambda m: m._daily_agent_metrics.get(
+                    "num_retired_coastal", 0
+                ),
+                "num_retired_trawler": lambda m: m._daily_agent_metrics.get(
+                    "num_retired_trawler", 0
+                ),
                 "total_catch_daily": lambda m: m._daily_agent_metrics[
                     "total_catch_daily"
                 ],
@@ -88,6 +100,8 @@ def build_datacollector(self) -> DataCollector:
                 "total_revenue": "total_revenue",
                 "total_cost": "total_cost",
                 "bankrupt": "bankrupt",
+                "retired": "retired",
+                "retired_at": lambda a: getattr(a, "retired_at_step", None),
                 "total_catch": "total_catch",
                 "days_at_sea": "days_at_sea",
                 "profitable_trips": "profitable_trip",
@@ -112,6 +126,9 @@ def build_datacollector(self) -> DataCollector:
 
 def build_daily_agent_metrics_cache(self) -> None:
         agents = list(self.agents)
+        # For model-level reporters we count only active agents (retired excluded).
+        # Retired stats are kept separately in model._retired_agents.
+        num_retired = len(getattr(self, "_retired_agents", []))
 
         capitals: List[float] = []
         wealths: List[float] = []
@@ -186,6 +203,10 @@ def build_daily_agent_metrics_cache(self) -> None:
             "num_coastal": by_type_count["coastal"],
             "num_trawler": by_type_count["trawler"],
             "num_bankrupt": num_bankrupt,
+            "num_retired": num_retired,
+            "num_retired_archipelago": sum(1 for a in getattr(self, "_retired_agents", []) if a.fisher_type == "archipelago"),
+            "num_retired_coastal": sum(1 for a in getattr(self, "_retired_agents", []) if a.fisher_type == "coastal"),
+            "num_retired_trawler": sum(1 for a in getattr(self, "_retired_agents", []) if a.fisher_type == "trawler"),
             "total_catch_daily": total_catch_daily,
             "total_catch_cumulative": total_catch_cumulative,
             "total_capital": total_capital,
@@ -226,6 +247,8 @@ def append_daily_agent_rows_for_monthly_export(self) -> None:
                 "total_revenue": agent.total_revenue,
                 "total_cost": agent.total_cost,
                 "bankrupt": agent.bankrupt,
+                "retired": getattr(agent, "retired", False),
+                "retired_at": getattr(agent, "retired_at_step", None),
                 "total_catch": agent.total_catch,
                 "days_at_sea": agent.days_at_sea,
                 "profitable_trips": agent.profitable_trip,
@@ -374,15 +397,28 @@ def collect_yearly_data(self) -> Dict[str, Any]:
             if agent.bankrupt:
                 num_bankrupt += 1
 
+        # Retired archive (definitive, never reused) - keep for final stats
+        retired_agents = getattr(self, "_retired_agents", [])
+        num_retired = len(retired_agents)
+        retired_catch = sum(a.total_catch for a in retired_agents)
+        retired_capital = sum(a.capital for a in retired_agents)
+
         yearly_summary: Dict[str, Any] = {
             "year": year,
             "step": self.current_step,
             "total_stock": total_stock,
-            "num_agents": num_agents,
+            "num_agents": num_agents,  # active only
             "num_archipelago": by_type_count["archipelago"],
             "num_coastal": by_type_count["coastal"],
             "num_trawler": by_type_count["trawler"],
             "num_bankrupt": num_bankrupt,
+            "num_retired": num_retired,
+            "num_retired_archipelago": sum(1 for a in retired_agents if a.fisher_type == "archipelago"),
+            "num_retired_coastal": sum(1 for a in retired_agents if a.fisher_type == "coastal"),
+            "num_retired_trawler": sum(1 for a in retired_agents if a.fisher_type == "trawler"),
+            "total_catch_retired": retired_catch,
+            "total_catch_all_including_retired": sum(catches) + retired_catch,
+            "total_capital_retired": retired_capital,
             "total_catch_archipelago": by_type_total_catch["archipelago"],
             "total_catch_coastal": by_type_total_catch["coastal"],
             "total_catch_trawler": by_type_total_catch["trawler"],
@@ -434,12 +470,17 @@ def collect_yearly_data(self) -> Dict[str, Any]:
         return yearly_summary
 
 def get_total_catch_all_agents(self) -> float:
+        # Cumulative catch including retired (for total_catch metric)
+        # If last_year_catches is empty (first year), sum all.
         if not getattr(self, "last_year_catches", None):
-            return sum(a.total_catch for a in self.agents)
+            return sum(a.total_catch for a in self.agents) + sum(a.total_catch for a in getattr(self, "_retired_agents", []))
 
         current_catches = {
             a.unique_id: a.total_catch for a in self.agents
         }
+        # Include retired catches in yearly delta (they are frozen)
+        for a in getattr(self, "_retired_agents", []):
+            current_catches[a.unique_id] = a.total_catch
         return sum(
             current_catches[aid] - self.last_year_catches.get(aid, 0)
             for aid in current_catches
