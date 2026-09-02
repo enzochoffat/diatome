@@ -276,14 +276,29 @@ def export_monthly_agent_buffer(self) -> None:
 
         os.makedirs("./results/biomass", exist_ok=True)
         df = pd.DataFrame(self._monthly_agent_rows)
+        # Fix décalage step : Ecospace attend agent_{TimeStep*28-28}.csv (ex: 28,56...)
+        # FIBE current_step est en jours réels (31j janv), donc on calcule le vrai TimeStep calendaire
+        try:
+            start = getattr(self, '_start_date_obj', None)
+            if start is None:
+                from datetime import datetime as _dt
+                start = _dt.strptime(getattr(self, 'start_date', '2010-01-01'), "%Y-%m-%d").date()
+            cur = getattr(self, 'current_date', None)
+            if cur is not None and start is not None:
+                coupling_step = (cur.year - start.year) * 12 + (cur.month - start.month) + 1
+                count = max(0, (coupling_step - 1) * 28)
+            else:
+                count = self.current_step
+        except Exception:
+            count = self.current_step
         output_path = os.path.join(
-            "./results/biomass", f"agent_{self.current_step}.csv"
+            "./results/biomass", f"agent_{count}.csv"
         )
         df.to_csv(output_path, index=False)
 
         if self.verbose:
             print(
-                f"Exported: agent_{self.current_step}.csv"
+                f"Exported: agent_{count}.csv"
                 f" ({len(df)} rows)"
             )
 
@@ -299,8 +314,22 @@ def export_monthly_fishing_mortality(self) -> None:
             month_start_biomass = self.species_biomass
 
         os.makedirs("./results/biomass", exist_ok=True)
+        # Même fix que agent_*.csv : aligné sur TimeStep Ecospace, pas sur jours réels
+        try:
+            start = getattr(self, '_start_date_obj', None)
+            if start is None:
+                from datetime import datetime as _dt
+                start = _dt.strptime(getattr(self, 'start_date', '2010-01-01'), "%Y-%m-%d").date()
+            cur = getattr(self, 'current_date', None)
+            if cur is not None and start is not None:
+                coupling_step = (cur.year - start.year) * 12 + (cur.month - start.month) + 1
+                count = max(0, (coupling_step - 1) * 28)
+            else:
+                count = self.current_step
+        except Exception:
+            count = self.current_step
         output_path = os.path.join(
-            "./results/biomass", f"F_{self.current_step}.csv"
+            "./results/biomass", f"F_{count}.csv"
         )
 
         rows: List[str] = ["ligne;colonne;flottille;espèce;F"]
@@ -328,7 +357,7 @@ def export_monthly_fishing_mortality(self) -> None:
 
         if self.verbose:
             print(
-                f"Exported: F_{self.current_step}.csv"
+                f"Exported: F_{count}.csv"
                 f" ({len(rows) - 1} rows)"
             )
 

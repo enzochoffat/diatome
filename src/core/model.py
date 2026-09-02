@@ -147,6 +147,9 @@ class FisheryModel(Model):
         self.current_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         self.end_of_sim = end_of_sim
         self.start_date = start_date
+        # Pour aligner le couplage sur vraies dates Ecopath (01/MM/YYYY) et pas 28j fixes :
+        # on garde self.MONTH=28 pour la pêche, mais le couplage se fait le 1er de chaque mois.
+        self._start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
 
         self.num_archipelago = num_archipelago
         self.num_coastal = num_coastal
@@ -525,9 +528,13 @@ class FisheryModel(Model):
 
     def _wait_for_coupling_update(
         self,
-        json_path: str = "config/config.json",
+        # Étape 1 - Fix: chemin cohérent avec coupling_service.py et CreateJSON.ps1
+        # Ancien "config/config.json" n'existe jamais → timeout direct si oubli d'override.
+        json_path: str = "configs_json/config.json",
         poll_interval: float = 0.5,
-        timeout: Optional[float] = 60.0,
+        # Étape 1 - Fix: timeout aligné sur coupling_service.py (350s) et VB (WaitForExit 5min).
+        # 60s était trop court : FIBE mourrait pendant que Ecospace était encore dans post_save.ps1.
+        timeout: Optional[float] = 350.0,
     ):
         return wait_for_coupling_update_helper(
             self,
@@ -707,7 +714,11 @@ class FisheryModel(Model):
             if self.verbose:
                 self.print_final_summary()
 
-        if self.current_step % self.MONTH == 0:
+        # Aligné sur vraies dates Ecopath : 1er de chaque mois, pas tous les 28j.
+        # Ecopath TimeStep=1/12 → 01/01/2010, 01/02/2010... CreateJSON fait AddMonths(TimeStep-1).
+        # FIBE faisait current_step%28 → dérive 2.4j/mois (28 vs 30.4) → 144j sur 60 mois.
+        is_new_month = (self.current_date.day == 1 and self.current_date != self._start_date_obj)
+        if is_new_month:
             self.HOTSPOTS = get_hotspots_for_step(
                 self.current_step,
             )

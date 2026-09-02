@@ -76,6 +76,9 @@ def wait_for_coupling_update(
     deadline = None if timeout is None else time.monotonic() + timeout
     warned_missing = False
     warned_stale = False
+    # Étape 4 - Pour ne pas spammer "missing or invalid" à chaque poll (0.5s)
+    # on ne log qu'après 2s d'attente continue.
+    first_missing_time = None
 
     while True:
         try:
@@ -83,17 +86,35 @@ def wait_for_coupling_update(
         except OSError:
             mtime = None
 
+        # Étape 1 - Fix atomicité : on ne met à jour last_mtime qu'après avoir
+        # vérifié que le JSON est lisible. Sinon un Move-Item en cours donne
+        # PermissionError/JSONDecodeError → snapshot=None, mais on avait déjà
+        # marqué ce mtime comme "vu" → la prochaine écriture valide à la même
+        # seconde (NTFS 1s) est ignorée comme mtime==last_mtime → boucle
+        # "missing or invalid" + "already consumed" vue dans les logs.
         if mtime is not None and mtime != last_mtime:
-            last_mtime = mtime
             snapshot = _read_config_snapshot(json_path)
 
             if snapshot is not None:
+                # Maintenant seulement, on valide ce mtime
+                last_mtime = mtime
                 species_maps, step, num_agents = snapshot
                 last_consumed = getattr(
                     self, "_coupling_step_consumed", None
                 )
 
-                if last_consumed is None or step > last_consumed:
+                # Étape 1 - Fix bootstrap stale + restart : si Ecospace redémarre à 1
+                # alors qu'on attendait >60, on détecte step < last_consumed et on reset.
+                is_restart = (
+                    last_consumed is not None
+                    and step < last_consumed
+                    and (last_consumed - step) > 5
+                )
+                if last_consumed is None or step > last_consumed or is_restart:
+                    if is_restart and self.verbose:
+                        print(
+                            f"Coupling restart detected: last {last_consumed} -> new {step}, resetting"
+                        )
                     self._coupling_step_consumed = step
                     if self.verbose:
                         print(
@@ -111,12 +132,20 @@ def wait_for_coupling_update(
                         f" (last: {last_consumed}). Waiting for new step..."
                     )
         else:
-            if self.verbose and not warned_missing:
-                warned_missing = True
-                print(
-                    f"Coupling config missing or invalid at {json_path}. "
-                    f"Waiting for valid config..."
-                )
+            # Étape 4 - Log allégé : on attend 2s avant de spammer, et on ne log qu'une fois par cycle
+            if self.verbose:
+                if first_missing_time is None:
+                    first_missing_time = time.monotonic()
+                if not warned_missing and (time.monotonic() - first_missing_time) > 2.0:
+                    warned_missing = True
+                    print(
+                        f"Coupling config missing or invalid at {json_path}. "
+                        f"Waiting for valid config... (step {getattr(self, '_coupling_step_consumed', None)})"
+                    )
+        # Si on a un snapshot valide, on reset le timer missing
+        if 'snapshot' in locals() and snapshot is not None:
+            first_missing_time = None
+            warned_missing = False
 
         if deadline is not None and time.monotonic() > deadline:
             expected = (

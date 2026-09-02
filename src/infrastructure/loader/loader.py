@@ -426,19 +426,16 @@ class ConfigLoader:
             else np.ones((3, len(species_names)), dtype=np.float64)
         )
 
+        # Étape 4 - Logs allégés : n'affiche les matrices que si verbose, sinon spam à chaque mois
         for f_name, f_idx in [
             ("archipelago", 1),
             ("coastal", 2),
             ("trawler", 3),
         ]:
-            print(
-                f"[debug] flottille '{f_name}' (idx {f_idx}) "
-                f"price (€/kg)  : {np.round(price_matrix[f_idx], 4)}"
-            )
-            print(
-                f"[debug] flottille '{f_name}' (idx {f_idx}) "
-                f"catchability  : {np.round(catchability_matrix[f_idx], 6)}"
-            )
+            # On ne log plus systématiquement les grosses matrices (polluent les couplages)
+            # Pour debug, décommente :
+            # print(f"[debug] flottille '{f_name}' (idx {f_idx}) price: {np.round(price_matrix[f_idx], 4)}")
+            pass
 
         return {
             "catchability_matrix": catchability_matrix,
