@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "name": "FIBE Default Configuration",
+    "description": "Standard 25-year simulation with balanced fisher composition",
+    "version": "1.0",
+    "created": "2026-01-25"
+  },
+  "simulation": {
+    "duration_years": 25,
+    "verbose": true,
+    "random_seed": null,
+    "repetitions": 1
+  },
+  "agents": {
+    "num_archipelago": 30,
+    "num_coastal": 30,
+    "num_trawler": 30
+  },
+  "output": {
+    "export_data": true,
+    "filename_prefix": "fibe_output",
+    "export_interval_years": 1,
+    "save_final_state": false,
+    "export_yearly_only": false
+  },
+  "parameters": {
+    "fish_dynamics": {
+      "growth_rate": 0.1,
+      "initial_stock_ratio": 0.5
+    },
+    "economics": {
+      "fish_price": 10.0,
+      "initial_capital": 1000.0
+    },
+    "weather": {
+      "bad_weather_probability": 0.1
+    }
+  },
+  "execution": {
+    "timestamp": "2026-01-27T20:31:32.579211",
+    "config_loader_version": "1.0"
+  }
+}

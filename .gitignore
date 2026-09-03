@@ -41,5 +41,26 @@ desktop.ini
 # Temporary files
 *.tmp
 *.bak
-code/python/# Plan de Conversion NetLogo → Python.prompt.md
 
+# Results (keep structure, ignore data)
+results/temp/
+results/**/*.csv
+!results/examples/
+results/
+test_config_None.json
+
+# Notebooks
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Local config
+config/local.yaml
+.env
+test_config_None.json
+read_cProfile.py
+.gitignore
+resultat.prof
+test_config_None.json
+resultat.prof
+pyproject.toml
+.pylintrc
