@@ -52,18 +52,18 @@ def create_single_agent(
     """
     from src.infrastructure.ports.ports_loader import get_port_coordinates
 
-    port_coordinates = get_port_coordinates()
-    if not port_coordinates:
+    dict_coordinates = get_port_coordinates()
+    if not dict_coordinates:
         # Fallback: at least one dummy port at (0,0)
-        port_coordinates = [(0, 0)]
+        dict_coordinates = {0: (0, 0)}
 
     if port_index is None:
         # Requirement 3: port associé aléatoirement
-        port_index = self.random.choice(list(range(len(port_coordinates))))
+        port_index = self.random.choice(list(range(len(dict_coordinates))))
 
     # Clamp port_index to valid range
-    port_index = int(port_index) % len(port_coordinates)
-    port_coord = port_coordinates[port_index]
+    port_index = int(port_index) % len(dict_coordinates)
+    port_coord = dict_coordinates[port_index]
 
     # Habitat is fleet-specific, same for all agents of a flotilla
     habitat_dict = (
@@ -156,7 +156,7 @@ def create_agents(self) -> None:
         else {}
     )
 
-    port_coordinates = get_port_coordinates()
+    dict_coordinates = get_port_coordinates()
 
     _flotilla_key = ["archipelagos", "coastal", "trawler"]
 
@@ -190,7 +190,7 @@ def create_agents(self) -> None:
 
         distance_map = create_distance_map(
             self,
-            port_location=port_coordinates[port_index],
+            port_location=dict_coordinates[port_index],
         )
         if i == 0:
             save_distance_map(
@@ -207,7 +207,7 @@ def create_agents(self) -> None:
             "archipelago",
             initial_capital=self.initial_capital,
             name=name,
-            port=port_coordinates[port_index],
+            port=dict_coordinates[port_index],
             habitat=habitat,
             distance_map=distance_map,
             effort_quotas=effort_quota,
@@ -247,11 +247,11 @@ def create_agents(self) -> None:
             "coastal",
             initial_capital=self.initial_capital,
             name=name,
-            port=port_coordinates[port_index],
+            port=dict_coordinates[port_index],
             habitat=habitat,
             distance_map=create_distance_map(
                 self,
-                port_location=port_coordinates[port_index],
+                port_location=dict_coordinates[port_index],
             ),
             effort_quotas=effort_quota,
             landing_quotas=landings_quota
@@ -297,11 +297,11 @@ def create_agents(self) -> None:
             "trawler",
             initial_capital=self.initial_capital,
             name=name,
-            port=port_coordinates[port_index],
+            port=dict_coordinates[port_index],
             habitat=habitat,
             distance_map=create_distance_map(
                 self,
-                port_location=port_coordinates[port_index],
+                port_location=dict_coordinates[port_index],
             ),
             effort_quotas=effort_quota,
             landing_quotas=landings_quota            
