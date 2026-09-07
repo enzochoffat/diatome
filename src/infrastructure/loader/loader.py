@@ -188,6 +188,8 @@ class ConfigLoader:
 
         Tries the config file's directory, its parent, and the current
         working directory in order, returning the first match found.
+        Handles Windows absolute paths (C:\\...) when running on Linux/WSL
+        by translating to /mnt/c/... .
 
         Args:
             relative_path: A path string from the JSON config, which
@@ -201,8 +203,28 @@ class ConfigLoader:
         if relative_path is None:
             return None
 
+        # Handle Windows drive letter on Linux/WSL (C:\Users\...)
+        import re, sys
+        win_match = re.match(r"^([a-zA-Z]):[\\/](.*)", relative_path)
+        if win_match:
+            drive = win_match.group(1).lower()
+            rest = win_match.group(2).replace("\\", "/")
+            # Try WSL mount
+            wsl_path = Path(f"/mnt/{drive}/{rest}")
+            if wsl_path.exists():
+                return str(wsl_path.resolve())
+            # Also try original Windows path as-is if running on Windows
+            path = Path(relative_path)
+            if path.exists():
+                return str(path.resolve())
+            # Fall through to candidate search with translated path
+            relative_path = str(wsl_path)
+        
         path = Path(relative_path)
         if path.is_absolute():
+            if path.exists():
+                return str(path.resolve())
+            # Even if absolute but not exists, try to return it (caller will warn)
             return str(path)
 
         candidates: List[Path] = []
@@ -210,6 +232,8 @@ class ConfigLoader:
             candidates.append(self.config_path.parent / path)
             candidates.append(self.config_path.parent.parent / path)
         candidates.append(Path.cwd() / path)
+        # Also try WSL translation for candidates if path was Windows-like
+        # (already handled above)
 
         for candidate in candidates:
             if candidate.exists():
@@ -584,15 +608,26 @@ class ConfigLoader:
         load_ocean_current_map(
             file_path=map_params.get("ocean_current_map")
         )
-        load_restricted_area_map(
-            restricted_area_map_path=map_params.get("restricted_area_map"),
-            spatial_extent=map_params.get("spatial_extent"),
-            grid_height=default_config.GRID_HEIGHT,
-            grid_width=default_config.GRID_WIDTH,
-        )
-        load_restricted_area_vector(
-            restricted_area_vector_path=map_params.get("restricted_area_vector")
-        )
+        # Restricted areas: zone_id_map + vector (range format) + caches
+        # Wrap in try/except to allow missing shapefiles in tests/CI
+        try:
+            load_restricted_area_map(
+                restricted_area_map_path=map_params.get("restricted_area_map"),
+                spatial_extent=map_params.get("spatial_extent"),
+                grid_height=default_config.GRID_HEIGHT,
+                grid_width=default_config.GRID_WIDTH,
+            )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(f"Restricted area map not loaded: {e}")
+        try:
+            if map_params.get("restricted_area_vector"):
+                load_restricted_area_vector(
+                    restricted_area_vector_path=map_params.get("restricted_area_vector")
+                )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(f"Restricted area vector not loaded: {e}")
 
     def save_config(self, output_path: str) -> None:
         """Saves the current configuration to a JSON file.

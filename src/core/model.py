@@ -38,6 +38,8 @@ from src.domain.environment.utils import (
 from src.domain.environment.restricted_areas import (
     restricted_area_status as restricted_area_status_helper,
 )
+from src.domain.environment import restricted_areas as restricted_areas_module
+from src.domain.environment.distance import clear_distance_cache, get_cached_distance_map
 from src.domain.environment.weather import determine_weather as determine_weather_helper
 from src.domain.environment.fish_dynamics import (
     update_fish_stock as update_fish_stock_helper,
@@ -722,6 +724,18 @@ class FisheryModel(Model):
             self.HOTSPOTS = get_hotspots_for_step(
                 self.current_step,
             )
+            # Monthly restricted areas: clear mask caches (habitat/zone) and distance cache (port x fleet x month)
+            try:
+                restricted_areas_module.clear_cache()
+                clear_distance_cache()
+                for _a in self.agents:
+                    try:
+                        if getattr(_a, "port", None) is not None and getattr(_a, "fisher_type", None):
+                            _a.distance_map = get_cached_distance_map(self, _a.port, _a.fisher_type)
+                    except Exception:
+                        pass
+            except Exception as _e:
+                logger.warning(f"Failed monthly distance regen: {_e}")
 
             desired = None
             if self.coupling:

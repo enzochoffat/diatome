@@ -8,7 +8,8 @@ from src.infrastructure.loader import ConfigLoader
 from src.infrastructure.ports.ports_loader import (
     get_port_coordinates,
 )
-from src.domain.environment.distance import create_distance_map, save_distance_map
+from src.domain.environment.distance import get_cached_distance_map, save_distance_map
+from src.domain.environment import restricted_areas
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -38,34 +39,19 @@ def create_single_agent(
     port_index: int | None = None,
     name: str | None = None,
 ) -> "FisherAgent":
-    """Creates a single fisher agent for dynamic fleet resize.
-
-    Args:
-        fisher_type: One of ``archipelago``, ``coastal``, ``trawler``.
-        agent_id: Monotone unique_id (never reused).
-        port_index: Optional port index. If None, chosen randomly among
-            available ports (fallback 0 if no ports map).
-        name: Optional display name.
-
-    Returns:
-        The created ``FisherAgent`` already registered and placed on grid.
-    """
+    """Creates a single fisher agent for dynamic fleet resize."""
     from src.infrastructure.ports.ports_loader import get_port_coordinates
 
     dict_coordinates = get_port_coordinates()
     if not dict_coordinates:
-        # Fallback: at least one dummy port at (0,0)
         dict_coordinates = {0: (0, 0)}
 
     if port_index is None:
-        # Requirement 3: port associé aléatoirement
         port_index = self.random.choice(list(range(len(dict_coordinates))))
 
-    # Clamp port_index to valid range
     port_index = int(port_index) % len(dict_coordinates)
     port_coord = dict_coordinates[port_index]
 
-    # Habitat is fleet-specific, same for all agents of a flotilla
     habitat_dict = (
         self.config_loader.get_habitat_assignments()
         if getattr(self, "config_loader", None)
@@ -81,7 +67,6 @@ def create_single_agent(
     flotilla_col = {"archipelago": 0, "coastal": 1, "trawler": 2}[fisher_type]
     effort_quota = _effort(port_index, flotilla_col)
 
-    # Habitat key mapping
     habitat_key_map = {
         "archipelago": "archipelago_habitats",
         "coastal": "coastal_habitats",
@@ -92,12 +77,18 @@ def create_single_agent(
         "coastal": "coastal",
         "trawler": "trawler",
     }
+    # Habitat is fleet-specific, shared via restricted_areas cache
     habitat = self.restricted_habitat(
         habitat_dict.get(habitat_key_map[fisher_type], [0])
     )
+    # Register in global habitat masks (port x fleet x month uses it for can_fish)
+    try:
+        restricted_areas.set_habitat_mask(fisher_type, habitat)
+    except Exception:
+        pass
     landings_quota = landings_quotas.get(landings_key_map[fisher_type], [0])
 
-    distance_map = create_distance_map(self, port_location=port_coord)
+    distance_map = get_cached_distance_map(self, port_location=port_coord, fleet=fisher_type)
 
     agent = FisherAgent(
         agent_id,
@@ -124,12 +115,10 @@ def create_single_agent(
             self.grid.place_agent(agent, start_pos)
             agent.current_location = start_pos
         else:
-            # Fallback if no water cells loaded yet
             start_pos = (0, 0)
             self.grid.place_agent(agent, start_pos)
             agent.current_location = start_pos
 
-    # Keep Mesa counter in sync (since we override unique_id)
     if hasattr(self, "_next_agent_id"):
         if agent_id >= self._next_agent_id:
             self._next_agent_id = agent_id + 1
@@ -170,6 +159,16 @@ def create_agents(self) -> None:
         def _effort(port, col):
             return 0
 
+    # Precompute habitat masks per fleet (shared)
+    habitat_per_fleet = {}
+    for ftype, key in [("archipelago","archipelago_habitats"), ("coastal","coastal_habitats"), ("trawler","trawler_habitats")]:
+        hab = self.restricted_habitat(habitat_dict.get(key, [0]))
+        habitat_per_fleet[ftype] = hab
+        try:
+            restricted_areas.set_habitat_mask(ftype, hab)
+        except Exception:
+            pass
+
     for i in range(self.num_archipelago):
         name = (
             self.archipelago_names[agent_id]
@@ -181,16 +180,12 @@ def create_agents(self) -> None:
         port_index = ports[i]
         effort_quota = _effort(port_index, 0)
         landings_quota = landings_quotas.get("archipelagos", [0])
-        habitat = self.restricted_habitat(
-            habitat_dict.get(
-                "archipelago_habitats",
-                [0],
-            )
-        )
+        habitat = habitat_per_fleet["archipelago"]
 
-        distance_map = create_distance_map(
+        distance_map = get_cached_distance_map(
             self,
             port_location=dict_coordinates[port_index],
+            fleet="archipelago",
         )
         if i == 0:
             save_distance_map(
@@ -234,12 +229,7 @@ def create_agents(self) -> None:
         port_index = ports[i]
         effort_quota = _effort(port_index, 1)
         landings_quota = landings_quotas.get("coastal", [0])
-        habitat = self.restricted_habitat(
-            habitat_dict.get(
-                "coastal_habitats",
-                [0],
-            )
-        )
+        habitat = habitat_per_fleet["coastal"]
 
         agent = FisherAgent(
             agent_id,
@@ -249,9 +239,10 @@ def create_agents(self) -> None:
             name=name,
             port=dict_coordinates[port_index],
             habitat=habitat,
-            distance_map=create_distance_map(
+            distance_map=get_cached_distance_map(
                 self,
                 port_location=dict_coordinates[port_index],
+                fleet="coastal",
             ),
             effort_quotas=effort_quota,
             landing_quotas=landings_quota
@@ -284,12 +275,7 @@ def create_agents(self) -> None:
         effort_quota = _effort(port_index, 2)
         landings_quota = landings_quotas.get("trawler", [0])
 
-        habitat = self.restricted_habitat(
-            habitat_dict.get(
-                "trawler_habitats",
-                [0],
-            )
-        )
+        habitat = habitat_per_fleet["trawler"]
 
         agent = FisherAgent(
             agent_id,
@@ -299,9 +285,10 @@ def create_agents(self) -> None:
             name=name,
             port=dict_coordinates[port_index],
             habitat=habitat,
-            distance_map=create_distance_map(
+            distance_map=get_cached_distance_map(
                 self,
                 port_location=dict_coordinates[port_index],
+                fleet="trawler",
             ),
             effort_quotas=effort_quota,
             landing_quotas=landings_quota            

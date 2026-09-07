@@ -587,9 +587,8 @@ class FisherAgent(Agent):
         def _valid(x: int, y: int) -> bool:
             return (
                 self.is_in_grid_bounds(x, y)
-                and not movement.is_restricted(self, x, y)
-                and not restricted_areas.is_restricted_area(
-                    x, y, self.model.current_date
+                and restricted_areas.can_fish(
+                    self.fisher_type, x, y, self.model.current_date
                 )
             )
 
@@ -667,10 +666,9 @@ class FisherAgent(Agent):
                 if uphill_spot:
                     self.current_location = uphill_spot
 
-            if movement.is_restricted(self, *fishing_spot):
-                return self.explore_random_spot()
-        
-            if restricted_areas.is_restricted_area(fishing_spot[0], fishing_spot[1], self.model.current_date):
+            if not restricted_areas.can_fish(
+                self.fisher_type, fishing_spot[0], fishing_spot[1], self.model.current_date
+            ):
                 return self.explore_random_spot()
             self.current_location = fishing_spot
         self.at_sea = True
@@ -722,6 +720,13 @@ class FisherAgent(Agent):
             neighbors = self.get_neighbor_positions_in_radius(
                 self.current_location, radius=1
             )
+            # Filter to fishing-allowed cells (habitat/zone)
+            neighbors = [
+                pos for pos in neighbors
+                if restricted_areas.can_fish(
+                    self.fisher_type, pos[0], pos[1], self.model.current_date
+                )
+            ]
             valid_neighbors = [
                 (pos, self.model.get_cell_value(pos[0], pos[1], self.fisher_type))
                 for pos in neighbors
@@ -811,7 +816,15 @@ class FisherAgent(Agent):
         )
 
     def is_restricted(self, x: int, y: int) -> bool:
-        return movement.is_restricted(self, x, y)
+        # Fishing restriction (habitat + zone not open) - legacy name
+        return not restricted_areas.can_fish(
+            self.fisher_type, x, y, self.model.current_date
+        )
+
+    def is_navigation_restricted(self, x: int, y: int) -> bool:
+        return not restricted_areas.can_navigate(
+            self.fisher_type, x, y, self.model.current_date
+        )
 
     def move_to(self, x: int, y: int) -> None:
         movement.move_to(self, x, y)

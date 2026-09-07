@@ -282,32 +282,35 @@ def load_habitat_map(habitat_map_path: Optional[Dict[str, str]] = None) -> Tuple
     return _cached_habitat_data
 
 def load_restricted_area_map(restricted_area_map_path: Optional[str] = None) -> np.ndarray:
-    """Loads the restricted area map from a CSV file.
-
-    Args:
-        restricted_area_map_path: The path to the restricted area map CSV file.
-    Returns:
-        np.ndarray: A 2D boolean numpy array where True indicates a restricted area.
-    """
-    if restricted_area_map_path is None:
-        raise ValueError("No restricted area map path provided.")
-
-    grid = np.genfromtxt(restricted_area_map_path, delimiter=",", skip_header=1)[:, 1:]
-    return grid > 0
+    """Legacy wrapper — delegates to domain restricted_areas (deprecated)."""
+    import warnings
+    warnings.warn("ecospace_outputs.load_restricted_area_map is deprecated, use domain.environment.restricted_areas", DeprecationWarning, stacklevel=2)
+    from src.domain.environment import restricted_areas as _ra
+    # Try new loader; fallback to old CSV boolean
+    try:
+        if restricted_area_map_path is not None:
+            return _ra.load_restricted_area_map(restricted_area_map_path)
+        return _ra._zone_id_map
+    except Exception:
+        if restricted_area_map_path is None:
+            raise ValueError("No restricted area map path provided.")
+        grid = np.genfromtxt(restricted_area_map_path, delimiter=",", skip_header=1)[:, 1:]
+        return grid > 0
 
 def load_restricted_area_vector(restricted_area_vector_path: Optional[str] = None) -> np.ndarray:
-    """Loads the restricted area vector from a CSV file.
-
-    Args:
-        restricted_area_vector_path: The path to the restricted area vector CSV file.
-    Returns:
-        np.ndarray: A 1D boolean numpy array where 0 indicates a restricted area is closed, 1 indicates open to navigation, and 2 indicates open.
-    """
-    if restricted_area_vector_path is None:
-        raise ValueError("No restricted area vector path provided.")
-
-    vector = np.genfromtxt(restricted_area_vector_path, delimiter=",", skip_header=1)[:, 1:]
-    return vector.astype(int).flatten()
+    """Legacy wrapper — delegates to domain restricted_areas (deprecated)."""
+    import warnings
+    warnings.warn("ecospace_outputs.load_restricted_area_vector is deprecated, use domain.environment.restricted_areas", DeprecationWarning, stacklevel=2)
+    from src.domain.environment import restricted_areas as _ra
+    try:
+        if restricted_area_vector_path is not None:
+            return _ra.load_restricted_area_vector(restricted_area_vector_path)
+        return _ra._restricted_area_vector
+    except Exception:
+        if restricted_area_vector_path is None:
+            raise ValueError("No restricted area vector path provided.")
+        vector = np.genfromtxt(restricted_area_vector_path, delimiter=",", skip_header=1)[:, 1:]
+        return vector.astype(int).flatten()
 
 # ---------------------------------------------------------------------------
 # Mask utilities
