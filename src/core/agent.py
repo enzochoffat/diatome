@@ -614,6 +614,7 @@ class FisherAgent(Agent):
     def decide_fishSpot(self) -> Optional[Tuple[int, int]]:
         stay_put = False
         fishing_spot = None
+        fleet_map = self.get_fleet_map_snapshot()
 
         if self.fisher_type == "trawler" and self.gone_fishing:
             if self.has_technologie and self.current_location:
@@ -674,6 +675,28 @@ class FisherAgent(Agent):
         self.at_sea = True
         return self.current_location
 
+    def get_fleet_map_snapshot(self) -> Dict[Tuple[int, int], List["FisherAgent"]]:
+        """Return a snapshot of the fleet's spatial distribution.
+
+        Returns:
+            Dictionary mapping grid positions to lists of agents
+            currently at those positions.
+        """
+        fleet_map: Dict[Tuple[int, int], List["FisherAgent"]] = {}
+        for a in self.model.agents:
+            if a is self:
+                continue
+            if getattr(a, "retired", False):
+                continue
+            if not getattr(a, "gone_fishing", False):
+                continue
+            loc = getattr(a, "current_location", None)
+            if loc is None:
+                continue
+            fleet_map.setdefault((int(loc[0]), int(loc[1])), []).append(a)
+        return fleet_map
+
+
     def get_fishSpot_knowledge(self) -> Optional[Tuple[int, int]]:
         good_spots = memory.get_good_spots(self)
         if good_spots:
@@ -687,12 +710,12 @@ class FisherAgent(Agent):
             for a in self.model.agents
             if a is not self
             and getattr(a, "gone_fishing", False)
-            and getattr(a, "pos", None)
+            and getattr(a, "current_location", None)
         ]
         if fishing_agents:
             expert = max(fishing_agents, key=lambda a: a.total_catch)
-            if getattr(expert, "pos", None):
-                return expert.pos
+            if getattr(expert, "current_location", None):
+                return expert.current_location
         return self.get_fishSpot_knowledge()
 
     def get_fishSpot_descriptive_norm(self) -> Optional[Tuple[int, int]]:
@@ -705,7 +728,7 @@ class FisherAgent(Agent):
             if (
                 agent is not self
                 and getattr(agent, "gone_fishing", False)
-                and getattr(agent, "pos", None)
+                and getattr(agent, "current_location", None)
             ):
                 pos = agent.current_location
                 nearby = self.get_agents_in_radius(pos, radius=1)
