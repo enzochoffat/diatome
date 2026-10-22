@@ -8,9 +8,7 @@ coupling.
 import logging
 import os
 import random
-from collections import defaultdict
 from datetime import datetime, timedelta
-from time import sleep
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -46,14 +44,15 @@ from src.domain.environment.fish_dynamics import (
     update_fish_stock_yearly as update_fish_stock_yearly_helper,
 )
 from src.domain.agents.factory import create_agents as create_agents_helper, create_single_agent as create_single_agent_helper
-from src.servicies.coupling_service import (
+from src.services import DEFAULT_COUPLING_CONFIG, DEFAULT_RESULTS_DIR
+from src.services.coupling_service import (
     wait_for_coupling_update as wait_for_coupling_update_helper,
     read_csv_biomass as read_csv_biomass_helper,
     update_biomass as update_biomass_helper,
     update_biomass_species as update_biomass_species_helper,
     read_desired_num_agents as read_desired_num_agents_helper,
 )
-from src.servicies.metrics import (
+from src.services.metrics import (
     append_daily_agent_rows_for_monthly_export as append_daily_agent_rows_for_monthly_export_helper,
     build_datacollector as build_datacollector_helper,
     build_daily_agent_metrics_cache as build_daily_agent_metrics_cache_helper,
@@ -66,8 +65,6 @@ from src.servicies.metrics import (
     safe_median as safe_median_helper,
 )
 from src.interfaces.cli.report import print_final_summary as print_final_summary_helper
-from src.servicies.coupling_service import wait_for_coupling_update, read_csv_biomass, update_biomass
-from src.infrastructure.loader.loader import ConfigLoader
 from src.domain.environment.ocean_currents import read_currents_map
 
 
@@ -220,9 +217,9 @@ class FisheryModel(Model):
         self.species_names = species_names or []
         self.species_to_idx = {name: i for i, name in enumerate(self.species_names)}
         self.flotilla_indices = {
-            "archipelago": 1,
-            "coastal": 2,
-            "trawler": 3,
+            "archipelago": 0,
+            "coastal": 1,
+            "trawler": 2,
         }
 
         # Set from init_patches
@@ -493,7 +490,7 @@ class FisheryModel(Model):
         except Exception:
             pass
 
-    def _read_desired_counts(self, json_path: str = "configs_json/config.json") -> Optional[Dict[str, int]]:
+    def _read_desired_counts(self, json_path: str = DEFAULT_COUPLING_CONFIG) -> Optional[Dict[str, int]]:
         return read_desired_num_agents_helper(json_path)
 
     def restricted_habitat(self, habitat):
@@ -532,7 +529,7 @@ class FisheryModel(Model):
         self,
         # Étape 1 - Fix: chemin cohérent avec coupling_service.py et CreateJSON.ps1
         # Ancien "config/config.json" n'existe jamais → timeout direct si oubli d'override.
-        json_path: str = "configs_json/config.json",
+        json_path: str = DEFAULT_COUPLING_CONFIG,
         poll_interval: float = 0.5,
         # Étape 1 - Fix: timeout aligné sur coupling_service.py (350s) et VB (WaitForExit 5min).
         # 60s était trop court : FIBE mourrait pendant que Ecospace était encore dans post_save.ps1.
@@ -740,7 +737,7 @@ class FisheryModel(Model):
             desired = None
             if self.coupling:
                 species_maps, _, desired = self._wait_for_coupling_update(
-                    json_path="configs_json/config.json",
+                    json_path=DEFAULT_COUPLING_CONFIG,
                     poll_interval=0.5,
                 )
                 new_species_biomass = self._update_biomass_species(species_maps)
@@ -751,7 +748,7 @@ class FisheryModel(Model):
                 self._export_monthly_fishing_mortality()
             else:
                 # Non-coupling mode: still allow dynamic fleet via config polling (for tests)
-                desired = self._read_desired_counts(json_path="configs_json/config.json")
+                desired = self._read_desired_counts(json_path=DEFAULT_COUPLING_CONFIG)
                 if desired is not None:
                     self._apply_fleet_resize(desired)
                 # Keep monthly exports consistent even without coupling
@@ -849,7 +846,7 @@ class FisheryModel(Model):
     def export_data(
         self,
         filename_prefix: str = "fibe_output",
-        directory: str = "./results/",
+        directory: str = DEFAULT_RESULTS_DIR,
     ) -> None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         export_dir = os.path.join(directory, timestamp)

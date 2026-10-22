@@ -4,9 +4,9 @@ Tests pour Step 7: Utilités et helpers
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))), '..')))
 
-from model import FisheryModel
+from src.core.model import FisheryModel
 import random
 
 def test_financial_methods():

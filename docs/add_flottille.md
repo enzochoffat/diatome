@@ -11,7 +11,7 @@
 11. Dans `src/domain/agents/factory.py`, ajouter la boucle de création des agents
 12. Dans `src/infrastructure/loader/loader.py`, mettre à jour les clés requises et les assignments
 13. Dans `configs_json/config_default.json`, ajouter les champs de configuration
-14. Dans `src/servicies/metrics.py`, ajouter la flottille dans les métriques
+14. Dans `src/services/metrics.py`, ajouter la flottille dans les métriques
 15. Dans `src/interfaces/cli/report.py`, ajouter dans les rapports (pas utile)
 16. Dans `src/interfaces/gui/gui.py` (si utilisée), ajouter les contrôles UI (pas utile)
 17. Dans `src/domain/agents/fishing.py`, ajouter des branches si comportement de pêche spécifique

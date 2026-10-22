@@ -4,15 +4,9 @@ This module centralises all model parameters, making them easy to modify
 for experiments and sensitivity analysis.
 """
 
-import math
-import sys
+import numpy as np
 from pathlib import Path
 from typing import Dict, List, Final
-
-import numpy as np
-
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 # =============================================================================
 # TIME CONSTANTS
@@ -62,7 +56,7 @@ LOW_MEDIUM: Final[str] = "low_medium"
 # FISH STOCK PARAMETERS
 # =============================================================================
 
-GROWTH_RATE: Final[float] = 1.0
+GROWTH_RATE: Final[float] = 0.1
 
 LOW_CARRYING_CAPACITY: Final[int] = 4
 MEDIUM_CARRYING_CAPACITY: Final[int] = 3276
@@ -102,7 +96,7 @@ SAFETY_BUFFER_DAYS: Final[int] = 7
 ARCHIPELAGO_COST_EXISTENCE: Final[float] = 0.05
 ARCHIPELAGO_COST_ACTIVITY: Final[float] = 0.05
 ARCHIPELAGO_CATCHABILITY: Final[int] = 10
-ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 0.5
+ARCHIPELAGO_MAX_GOOD_SPOTS: Final[int] = 5
 
 
 # =============================================================================

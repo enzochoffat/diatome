@@ -19,6 +19,9 @@ def restricted_habitat(self, habitat: List[str]) -> np.ndarray:
     """
     habitat_array, habitat_names = ecospace_outputs.load_habitat_map()
 
+    if habitat_array.size == 0 or habitat_array.ndim < 2:
+        return np.zeros((self.grid.height, self.grid.width), dtype=bool)
+
     forbidden_index = [habitat_names.index(name) for name in habitat if name in habitat_names]
     forbidden_layers = habitat_array[:, :, forbidden_index] if forbidden_index else None
     if forbidden_layers is None or forbidden_layers.size == 0:

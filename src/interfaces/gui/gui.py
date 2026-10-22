@@ -3,9 +3,10 @@ import json
 import random
 from pathlib import Path
 
-# Add the project root to Python path so we can import from src
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+# Add the repo root to Python path so we can import from src
+project_root = Path(__file__).resolve().parents[3]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -14,11 +15,11 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 from PyQt6.QtCore import QTimer
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-from src.model import FisheryModel
-import src.config as config
+from src.core.model import FisheryModel
+from src.core import config
 
 
 # ---------------------------------------------------------------------------
@@ -599,7 +600,7 @@ class MainWindow(QMainWindow):
     def load_config(self):
         """Charger un fichier JSON et remplir les champs."""
         path, _ = QFileDialog.getOpenFileName(
-            self, "Ouvrir une configuration", "config/", "JSON Files (*.json)"
+            self, "Ouvrir une configuration", "configs_json/", "JSON Files (*.json)"
         )
         if not path:
             return
@@ -614,12 +615,14 @@ class MainWindow(QMainWindow):
 
             if "duration_years" in sim:
                 self.duration_spin.setValue(sim["duration_years"])
-            if "num_archipelago" in agents:
-                self.arch_spin.setValue(agents["num_archipelago"])
-            if "num_coastal" in agents:
-                self.coast_spin.setValue(agents["num_coastal"])
-            if "num_trawler" in agents:
-                self.trawl_spin.setValue(agents["num_trawler"])
+            # Nouveau schéma : agents.num_agents.{...} ; ancien plat supporté aussi
+            num_agents = agents.get("num_agents", agents)
+            if "num_archipelago" in num_agents:
+                self.arch_spin.setValue(int(num_agents["num_archipelago"]))
+            if "num_coastal" in num_agents:
+                self.coast_spin.setValue(int(num_agents["num_coastal"]))
+            if "num_trawler" in num_agents:
+                self.trawl_spin.setValue(int(num_agents["num_trawler"]))
 
             fish = params.get("fish_dynamics", {})
             if "growth_rate" in fish:
@@ -646,7 +649,9 @@ class MainWindow(QMainWindow):
     def load_ecospace_data(self):
         """Charger les données Ecospace depuis des CSV sélectionnés par l'utilisateur."""
         try:
-            ecospace_data = config.get_ecospace_data()
+            from src.infrastructure.ecospace.ecospace_outputs import get_ecospace_data
+
+            ecospace_data = get_ecospace_data()
             if ecospace_data is not None:
                 self.ecospace_status.setText("✓ Chargées")
                 self.ecospace_status.setStyleSheet("color: green; font-weight: bold;")
@@ -665,7 +670,16 @@ class MainWindow(QMainWindow):
     def add_wind_farm(self):
         """Ajouter le parc éolien à la topologie courante."""
         try:
-            config.add_windfarm_to_topology()
+            from src.domain.environment.spatial_utils import (
+                reload_spatial_configuration,
+            )
+            from src.infrastructure.ecospace import ecospace_outputs
+
+            reload_spatial_configuration(
+                topology_map_path=None,
+                windfarm_map_path=ecospace_outputs.WINDFARM_MAP_PATH,
+                apply_windfarm=True,
+            )
             self.wind_farm_status.setText("✓ Activé")
             self.wind_farm_status.setStyleSheet("color: green; font-weight: bold;")
             self.wind_farm_btn.setEnabled(False)

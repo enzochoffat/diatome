@@ -5,6 +5,8 @@ experiment configurations.
 """
 
 import json
+import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -204,7 +206,6 @@ class ConfigLoader:
             return None
 
         # Handle Windows drive letter on Linux/WSL (C:\Users\...)
-        import re, sys
         win_match = re.match(r"^([a-zA-Z]):[\\/](.*)", relative_path)
         if win_match:
             drive = win_match.group(1).lower()
@@ -250,7 +251,8 @@ class ConfigLoader:
 
         Returns:
             Dictionary with keys ``topology_map``, ``wind_farm_map``,
-            and ``species_map`` (a dict of species-name → path).
+            ``species_map`` (a dict of species-name → path),
+            ``ocean_current_map``, ``wave_height_vector``, etc.
 
         Raises:
             ValueError: If no configuration has been loaded.
@@ -289,6 +291,9 @@ class ConfigLoader:
             },
             "wave_height_vector": self._resolve_config_path(
                 maps.get("wave_height_vector")
+            ),
+            "ocean_current_map": self._resolve_config_path(
+                maps.get("ocean_current_map")
             ),
             "restricted_area_vector": self._resolve_config_path(
                 maps.get("restricted_area_vector")

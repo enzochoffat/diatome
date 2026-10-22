@@ -4,9 +4,9 @@ Tests pour Step 6: Modèles de décision
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))), '..')))
 
-from model import FisheryModel
+from src.core.model import FisheryModel
 import random
 
 def test_archipelago_satisficing():

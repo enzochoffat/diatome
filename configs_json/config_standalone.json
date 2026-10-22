@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "name": "FIBE Docker Standalone Configuration",
+    "description": "Minimal standalone simulation without external data dependencies",
+    "version": "0.1.0",
+    "created": "2026-01-25"
+  },
+  "simulation": {
+    "verbose": true,
+    "random_seed": null,
+    "step": 1,
+    "coupling": false,
+    "duration_years": 1,
+    "start_date": "2006-01-01"
+  },
+  "agents": {
+    "num_agents": {
+      "num_archipelago": 2,
+      "num_coastal": 2,
+      "num_trawler": 1
+    },
+    "names": [
+      "a", "b", "c", "d", "e"
+    ],
+    "archipelago_ports": [1, 1],
+    "coastal_ports": [2, 2],
+    "trawler_ports": [0],
+    "archipelago_habitats": [],
+    "coastal_habitats": [],
+    "trawler_habitats": [],
+    "archipelagos_wave_height": 2,
+    "coastal_wave_height": 2,
+    "trawler_wave_height": 2
+  },
+  "output": {
+    "export_data": true,
+    "filename_prefix": "fibe_standalone",
+    "export_interval_years": 1
+  },
+  "parameters": {
+    "fish_dynamics": {
+      "growth_rate": 0.1,
+      "initial_stock_ratio": 0.5,
+      "initial_stock_size": "halfCarryingCap"
+    },
+    "economics": {
+      "fish_price": 1.0,
+      "initial_capital": 1000.0
+    },
+    "weather": {
+      "bad_weather_probability": 0.1
+    }
+  },
+  "maps": {
+    "spatial_extent": {
+      "west": 3.0,
+      "north": 42.4,
+      "cell_size_deg": 0.0202
+    },
+    "restricted_area_map": {},
+    "restricted_area_vector": "/app/Ecospace_outputs/restricted_area/archipelago.csv",
+    "ocean_current_map": "/app/Ecospace_outputs/topology/OceanCurrents.csv",
+    "wave_height_vector": "/app/Ecospace_outputs/topology/WaveHeights.csv",
+    "wind_farm_map": "/app/Ecospace_outputs/topology/EEC_NS_Mmermaid-Windfarms.csv",
+    "species_tables": {
+      "price": null,
+      "catchability": null
+    },
+    "species_map": {},
+    "spatial_map": "/app/Ecospace_outputs/topology/EEC_NS_Mmermaid-Depth.csv",
+    "ports_map": "/app/Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Ports (All fleets).csv",
+    "habitat_map": {}
+  },
+  "quotas": {
+    "effort": "",
+    "landings": ""
+  }
+}

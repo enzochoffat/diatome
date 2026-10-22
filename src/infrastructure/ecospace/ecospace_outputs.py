@@ -36,7 +36,7 @@ SPECIES_MAP_PATHS: Optional[Dict[str, str]] = None
 SPECIES_MAP_NAMES: Optional[List[str]] = None
 PORTS_MAP_PATH: str = str(
     _PROJECT_ROOT
-    / "Ecospace_outputs/ports/PortsMap.csv"
+    / "Ecospace_outputs/topology/Ecoapth_Baie_de_Seine-Ports (All fleets).csv"
 )
 
 

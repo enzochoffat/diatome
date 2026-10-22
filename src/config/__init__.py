@@ -1,8 +1,13 @@
-"""Compatibility package for configuration imports.
+"""Configuration package alias.
 
-This package is an alias for src.core.config so legacy imports like
-``from src import config`` keep working while always seeing the live
-values (e.g. WATER_CELLS populated by reload_spatial_configuration).
+Canonical source is ``src.core.config``. This package re-exports it so
+``from src import config`` and ``import src.config`` keep working while
+always seeing live values (e.g. WATER_CELLS populated by
+reload_spatial_configuration).
+
+The former divergent ``src/config/default.py`` and empty
+``src/config/spatial.py`` were removed on 2026-09-11 to leave a single
+source of truth.
 """
 
 import sys

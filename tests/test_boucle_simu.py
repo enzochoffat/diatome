@@ -6,9 +6,9 @@ import sys
 import os
 import pandas as pd
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))), '..')))
 
-from model import FisheryModel
+from src.core.model import FisheryModel
 
 def test_weather_generation():
     """Test la génération de météo stochastique"""

@@ -5,10 +5,10 @@ Tests pour Step 4: Exécution de pêche (archipelago)
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))), '..')))
 
-from model import FisheryModel
-from agent import FisherAgent
+from src.core.model import FisheryModel
+from src.core.agent import FisherAgent
 
 def test_agent_creation():
     """Test la création d'un agent archipelago"""

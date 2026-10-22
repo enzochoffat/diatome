@@ -1,13 +1,16 @@
 import os
+from datetime import datetime
+
 import numpy as np
-import datetime
 import pandas as pd
+
+from src.services import DEFAULT_RESULTS_DIR
 
 
 def export_data(
     self,
     filename_prefix: str = "fibe_output",
-    directory: str = "./results/",
+    directory: str = DEFAULT_RESULTS_DIR,
 ) -> None:
     """Exports collected data to timestamped CSV files.
 
@@ -58,7 +61,7 @@ def get_output_map(self) -> np.ndarray:
         (self.grid.height, self.grid.width), dtype=int
     )
     for (x_coord, y_coord), patch in self.patches.items():
-        stock_map[x_coord, y_coord] = int(patch["fish_stock"])
+        stock_map[y_coord, x_coord] = int(patch["fish_stock"])
     return stock_map
 
 def save_output_map(self, directory: str, filename: str) -> None:

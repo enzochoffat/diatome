@@ -122,7 +122,7 @@ def test_retired_column_in_exports():
 
 
 def test_coupling_read_desired():
-    from src.servicies.coupling_service import read_desired_num_agents, _read_config_snapshot
+    from src.services.coupling_service import read_desired_num_agents, _read_config_snapshot
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / "config.json"
         cfg = {

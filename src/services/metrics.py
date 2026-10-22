@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import os
 
+from src.services import DEFAULT_BIOMASS_DIR
+
 
 def build_datacollector(self) -> DataCollector:
         return DataCollector(
@@ -274,7 +276,7 @@ def export_monthly_agent_buffer(self) -> None:
         if not self._monthly_agent_rows:
             return
 
-        os.makedirs("./results/biomass", exist_ok=True)
+        os.makedirs(DEFAULT_BIOMASS_DIR, exist_ok=True)
         df = pd.DataFrame(self._monthly_agent_rows)
         # Fix décalage step : Ecospace attend agent_{TimeStep*28-28}.csv (ex: 28,56...)
         # FIBE current_step est en jours réels (31j janv), donc on calcule le vrai TimeStep calendaire
@@ -292,7 +294,7 @@ def export_monthly_agent_buffer(self) -> None:
         except Exception:
             count = self.current_step
         output_path = os.path.join(
-            "./results/biomass", f"agent_{count}.csv"
+            DEFAULT_BIOMASS_DIR, f"agent_{count}.csv"
         )
         df.to_csv(output_path, index=False)
 
@@ -313,7 +315,7 @@ def export_monthly_fishing_mortality(self) -> None:
         if month_start_biomass is None:
             month_start_biomass = self.species_biomass
 
-        os.makedirs("./results/biomass", exist_ok=True)
+        os.makedirs(DEFAULT_BIOMASS_DIR, exist_ok=True)
         # Même fix que agent_*.csv : aligné sur TimeStep Ecospace, pas sur jours réels
         try:
             start = getattr(self, '_start_date_obj', None)
@@ -329,7 +331,7 @@ def export_monthly_fishing_mortality(self) -> None:
         except Exception:
             count = self.current_step
         output_path = os.path.join(
-            "./results/biomass", f"F_{count}.csv"
+            DEFAULT_BIOMASS_DIR, f"F_{count}.csv"
         )
 
         rows: List[str] = ["ligne;colonne;flottille;espèce;F"]

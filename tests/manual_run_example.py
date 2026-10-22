@@ -2,7 +2,7 @@
 Script to run the FIBE fishery simulation for 5 years and save results
 """
 
-from model import FisheryModel
+from src.core.model import FisheryModel
 import pandas as pd
 import json
 from datetime import datetime

@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
 develop-eggs/
@@ -45,9 +46,10 @@ desktop.ini
 # Results (keep structure, ignore data)
 results/temp/
 results/**/*.csv
-!results/examples/
-results/
-test_config_None.json
+!results/examples/.gitkeep
+results/biomass/
+resultat.prof
+*.prof
 
 # Notebooks
 .ipynb_checkpoints/
@@ -56,11 +58,10 @@ notebooks/.ipynb_checkpoints/
 # Local config
 config/local.yaml
 .env
-test_config_None.json
+
+# Debug / profiling artefacts (ne pas versionner)
 read_cProfile.py
-.gitignore
-resultat.prof
-test_config_None.json
-resultat.prof
-pyproject.toml
-.pylintrc
+
+# Configs générées locales (suffixe _None = config=None non substitué)
+*_None.json
+fibe_output_*.json

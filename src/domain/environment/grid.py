@@ -13,8 +13,14 @@ def init_patches(self) -> None:
     height = self.grid.height
     growth_rate = self.GROWTH_RATE
 
-    ecospace_data, _ = ecospace_outputs.get_ecospace_data()
-    self.species_biomass = ecospace_data.copy() * config.KG_PER_TONNE
+    ecospace_result = ecospace_outputs.get_ecospace_data()
+    if ecospace_result is not None and self.coupling:
+        ecospace_data, _ = ecospace_result
+        self.species_biomass = ecospace_data.copy() * config.KG_PER_TONNE
+    else:
+        n_species = max(len(self.species_names), 1)
+        self.species_biomass = np.zeros((height, width, n_species), dtype=np.float64)
+
     sum_data = np.sum(self.species_biomass, axis=2)
 
     total_biomass = np.sum(self.species_biomass, axis=2, keepdims=True) + 1e-10

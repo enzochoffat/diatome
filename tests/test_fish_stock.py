@@ -3,9 +3,9 @@ Script de test pour vérifier l'environnement spatial du modèle
 """
 
 import sys
-sys.path.append('.')
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from model import FisheryModel
+from src.core.model import FisheryModel
 
 def test_grid_creation():
     """Test la création de la grille"""

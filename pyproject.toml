@@ -5,21 +5,35 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "diatome"
 version = "0.1.0"
-description = "FIBE fishery behavior model - Python implementation"
-requires-python = ">=3.8"
+description = "FIBE fishery behavior model - Python implementation (Mesa port)"
+readme = "README.md"
+license = { text = "CC-BY-4.0" }
+requires-python = ">=3.12"
 dependencies = [
-    "mesa>=2.0.0",
-    "pandas>=1.5.0",
-    "numpy>=1.23.0",
+    "mesa>=3.4.0",
+    "pandas>=2.3.3",
+    "numpy>=2.4.0",
     "matplotlib>=3.6.0",
-    "solara>=1.0.0"
+    "PyQt6>=6.5.0",
+    "networkx>=3.6.1",
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "pyogrio>=0.8",
 ]
 
 [tool.setuptools]
-packages = ["src"]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
-src = ["**/*.json"]
+"*" = ["**/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
 
 [tool.ruff]
 target-version = "py312"

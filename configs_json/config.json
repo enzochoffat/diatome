@@ -1,8 +1,8 @@
 {
   "metadata": {
     "name": "FIBE Default Configuration",
-    "description": "Standard 25-year simulation with balanced fisher composition",
-    "version": "1.0",
+    "description": "Standard 10-year simulation with balanced fisher composition",
+    "version": "0.1.0",
     "created": "2026-01-25"
   },
   "simulation": {
@@ -114,10 +114,10 @@
       "zone_2": "C:\\Users\\enzo.choffat\\Downloads\\GOL_fermetures_chalut\\CGPM-FRA_Golfe_du_lion\\Box_CGPM.shp",
       "zone_3": "C:\\Users\\enzo.choffat\\Downloads\\GOL_fermetures_chalut\\WESTMED-Natura2000\\Natura2000.shp"
     },
-    "restricted_area_vector": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\restricted_area\\archipelago.csv",
-    "ocean_current_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\OceanCurrents.csv",
-    "wave_height_vector": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\WaveHeights.csv",
-    "wind_farm_map": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\EEC_NS_Mmermaid-Windfarms.csv",
+    "restricted_area_vector": "Ecospace_outputs/restricted_area/archipelago.csv",
+    "ocean_current_map": "Ecospace_outputs/topology/OceanCurrents.csv",
+    "wave_height_vector": "Ecospace_outputs/topology/WaveHeights.csv",
+    "wind_farm_map": "Ecospace_outputs/topology/EEC_NS_Mmermaid-Windfarms.csv",
     "species_tables": {
       "price": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\OffVesselPrice\\EcospaceOffVesselPrice.csv",
       "catchability": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\Eii.Ecopath-master\\Eii.Ecopath-master\\Couplage\\Data\\Landings\\EcospaceLandings.csv"
@@ -217,7 +217,7 @@
     }
   },
   "quotas": {
-    "effort": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\effort_quota.csv",
-    "landings": "C:\\Users\\enzo.choffat\\Documents\\Stage\\code\\diatome\\Ecospace_outputs\\topology\\landings_quota.csv"
+    "effort": "Ecospace_outputs/topology/effort_quota.csv",
+    "landings": "Ecospace_outputs/topology/landings_quota.csv"
   }
 }

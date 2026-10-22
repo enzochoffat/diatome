@@ -7,6 +7,8 @@ import csv
 
 import numpy as np
 
+from src.services import DEFAULT_COUPLING_CONFIG
+
 def _read_config_snapshot(
         json_path: str,
 ) -> Optional[Tuple[Dict[str, str], int, Optional[Dict[str, int]]]]:
@@ -48,7 +50,7 @@ def _read_config_snapshot(
 
 def wait_for_coupling_update(
     self,
-    json_path: str = "configs_json/config.json",
+    json_path: str = DEFAULT_COUPLING_CONFIG,
     poll_interval: float = 0.5,
     timeout: Optional[float] = 350.0,
 ) -> Tuple[Any, Any, Optional[Dict[str, int]]]:
@@ -163,7 +165,7 @@ def wait_for_coupling_update(
 
 def read_csv_biomass(
     self,
-    json_path: str = "configs_json/config.json",
+    json_path: str = DEFAULT_COUPLING_CONFIG,
 ) -> Tuple[Dict[str, str], int]:
     """Reads the JSON configuration to retrieve species map file paths.
 
@@ -290,7 +292,7 @@ def update_num_agents(self, num_agents: Dict[str, int]) -> Dict[str, int]:
 
 
 def read_desired_num_agents(
-    json_path: str = "configs_json/config.json",
+    json_path: str = DEFAULT_COUPLING_CONFIG,
 ) -> Optional[Dict[str, int]]:
     """Non-blocking read of desired fleet sizes.
 

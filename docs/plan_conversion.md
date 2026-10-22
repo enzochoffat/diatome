@@ -1,5 +1,9 @@
 # Plan de Conversion NetLogo → Python
 
+> **Note 2026-09-11 — document d'archive.** État `~8 % / Step1 / code/python/model.py / 50×56 / régions A/B/C/D Baltique` obsolète.
+> Architecture actuelle : `src/core/model.py + src/domain/...`, configs `configs_json/`, GUI `src/interfaces/gui/gui.py (PyQt6)`.
+> Voir `README.md` et `docs/add_flottille.md` pour l'état à jour.
+
 ## Contexte
 
 Conversion du modèle FIBE (Fishery and Individual-Based Ecological model) de NetLogo vers Python/Mesa. Le modèle simule la reproduction des poissons et les comportements de pêcheurs avec différents styles de pêche dans la mer Baltique suédoise.

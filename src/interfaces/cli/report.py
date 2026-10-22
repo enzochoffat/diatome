@@ -1,7 +1,14 @@
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
-def print_final_summary(self) -> None:
+def print_final_summary(model: Any) -> None:
+    """Prints the end-of-simulation summary for a FisheryModel.
+
+    Free function (not a method) taking the model explicitly so it can
+    be reused via ``from src.interfaces.cli.report import
+    print_final_summary as ..._helper``.
+    """
+    self = model
     total_stock = self._region_stock_cache.get("TOTAL", 0)
     agents_list = list(self.agents)
     retired_agents = getattr(self, "_retired_agents", [])

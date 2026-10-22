@@ -3,10 +3,10 @@ Script de test pour créer plusieurs agents et vérifier leur intégration avec 
 """
 
 import sys
-sys.path.append('.')
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from model import FisheryModel
-from agent import FisherAgent
+from src.core.model import FisheryModel
+from src.core.agent import FisherAgent
 
 def test_create_multiple_agents():
     """Test la création de plusieurs agents de chaque type"""

@@ -20,7 +20,7 @@ def load_ports_map(ports_map_path: Optional[str] = None) -> List[List[int]]:
     ports_map = np.array(masks(topology=False, windfarm=False, ports=True)["masks"][0])
     return ports_map.tolist()
 
-def count_ports(ports_map: List[List[int]]) -> Dict[int, (int,int)]:
+def count_ports(ports_map: List[List[int]]) -> Dict[int, Tuple[int, int]]:
     """Counts the number of ports in the ports map.
 
     Args:

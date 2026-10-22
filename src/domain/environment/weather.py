@@ -71,14 +71,16 @@ def read_wave_height_vector(wave_height_vector_path: str) -> Dict[datetime, floa
 
     return VECTOR_WAVE_HEIGHT
 
-def get_wave_height(model) -> float:
+def get_wave_height(model) -> tuple:
     """Retrieve the current wave height from the model.
 
     Args:
         model: The model containing the current wave height information.
     
     Returns:
-        float: The current wave height value.
+        tuple: ``(date, wave_height)`` where ``date`` is the current
+            model date and ``wave_height`` the value from the vector
+            (0.0 if the date is missing).
     """
     step = model.current_step
     date = model.current_date

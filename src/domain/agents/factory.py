@@ -4,11 +4,11 @@ from pathlib import Path
 
 from src import config
 from src.core.agent import FisherAgent
-from src.infrastructure.loader import ConfigLoader
 from src.infrastructure.ports.ports_loader import (
     get_port_coordinates,
 )
 from src.domain.environment.distance import get_cached_distance_map, save_distance_map
+import os
 from src.domain.environment import restricted_areas
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -190,10 +190,7 @@ def create_agents(self) -> None:
         if i == 0:
             save_distance_map(
                 distance_map,
-                file_path=(
-                    _PROJECT_ROOT / "Ecospace_outputs" / "topology"
-                    / "Distance.csv"
-                ),
+                file_path=os.path.join(os.getcwd(), "Distance.csv"),
             )
 
         agent = FisherAgent(

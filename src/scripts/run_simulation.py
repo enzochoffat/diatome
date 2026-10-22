@@ -12,8 +12,8 @@ import traceback
 from pathlib import Path
 
 
-# Add parent directory to path to import source modules
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add repo root to path to import source modules
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 from src.infrastructure.loader import load_config  # noqa: E402
