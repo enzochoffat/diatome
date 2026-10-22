@@ -1,7 +1,7 @@
 {
   "@id": "https://doi.org/10.25937/xzxh-7667",
   "url": "https://doi.org/10.25937/xzxh-7667",
-  "name": "FIBE - FIsher BEhaviour model",
+  "name": "FIBE - FIsher BEhaviour model (Python/Mesa port, diatome)",
   "@type": "SoftwareSourceCode",
   "author": [
     {
@@ -23,7 +23,7 @@
       "@type": "Person",
       "email": "maja.schlueter@su.se",
       "givenName": "Maja",
-      "familyName": "Schl\u00fcter",
+      "familyName": "Schlüter",
       "affiliation": {
         "@id": "https://ror.org/0145rpw38",
         "url": "http://www.stockholmresilience.org",
@@ -91,6 +91,16 @@
       "@id": "_:author_5",
       "@type": "Role",
       "roleName": "contributor"
+    },
+    {
+      "@type": "Person",
+      "givenName": "Enzo",
+      "familyName": "Choffat"
+    },
+    {
+      "@type": "Person",
+      "givenName": "Agathe",
+      "familyName": "Nguyen"
     }
   ],
   "license": {
@@ -98,15 +108,16 @@
     "name": "CC-BY-4.0",
     "@type": "CreativeWork"
   },
-  "version": "1.0.0",
+  "version": "0.1.0",
   "@context": "https://w3id.org/codemeta/3.0",
   "keywords": [
     "ABM",
     "agent-based social simulation",
     "fishery",
     "human behaviour",
-    "NetLogo",
-    "social-ecological"
+    "social-ecological",
+    "Python",
+    "Mesa"
   ],
   "publisher": {
     "@id": "https://ror.org/015bsfc29",
@@ -127,14 +138,14 @@
   "datePublished": "2020-04-20",
   "operatingSystem": "platform_independent",
   "runtimePlatform": [
-    "NetLogo"
+    "Python"
   ],
   "applicationCategory": "Computational Model",
   "programmingLanguage": [
     {
-      "name": "NetLogo",
+      "name": "Python",
       "@type": "ComputerLanguage"
     }
   ],
-  "referencePublication": "Wijermans, N., Boonstra, W.J., Orach, K., Hentati-Sundberg, J., Schl\u00fcter, M. (2020). Behavioural diversity in fishing - Towards a next generation of fishery models. Fish and Fisheries, 274(2), 30\u201319. https://doi.org/10.1111/faf.12466"
+  "referencePublication": "Wijermans, N., Boonstra, W.J., Orach, K., Hentati-Sundberg, J., Schlüter, M. (2020). Behavioural diversity in fishing - Towards a next generation of fishery models. Fish and Fisheries, 274(2), 30–19. https://doi.org/10.1111/faf.12466"
 }

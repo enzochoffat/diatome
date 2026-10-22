@@ -1,0 +1,26 @@
+flottille;name;port number;habitats;wave height threshold
+archipelagos;test1;0;Nets,Roche;2
+archipelagos;test2;0;Nets,Roche;2
+archipelagos;test3;0;Nets,Roche;2
+archipelagos;test4;0;Nets,Roche;2
+archipelagos;test5;0;Nets,Roche;2
+archipelagos;test6;0;Nets,Roche;2
+archipelagos;test7;0;Nets,Roche;2
+archipelagos;test8;0;Nets,Roche;2
+archipelagos;test9;0;Nets,Roche;2
+archipelagos;test10;0;Nets,Roche;2
+archipelagos;test11;0;Nets,Roche;2
+coastal;test12;1;Nets,Roche;4
+coastal;test13;1;Nets,Roche;4
+coastal;test14;1;Nets,Roche;4
+coastal;test15;1;Nets,Roche;4
+coastal;test16;1;Nets,Roche;4
+coastal;test17;1;Nets,Roche;4
+coastal;test18;1;Nets,Roche;4
+coastal;test19;1;Nets,Roche;4
+coastal;test20;1;Nets,Roche;4
+coastal;test21;1;Nets,Roche;4
+trawler;test22;2;Nets,Roche;6
+trawler;test23;2;Nets,Roche;6
+trawler;test24;2;Nets,Roche;6
+trawler;test25;2;Nets,Roche;6

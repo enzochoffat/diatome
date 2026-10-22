@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+outputs/
+*.prof
+*.log
+FIBEdocumentation.pdf
+.pylintrc
+.git/
+.gitignore
+README.md
+LICENSE
+CITATION.cff
+codemeta.json
+docs/
+models/
+tests/
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
