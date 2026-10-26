@@ -1,0 +1,4 @@
+# Couplage Ecospace : reprend la base + dépendances spécifiques au couplage.
+# (Aucune dépendance supplémentaire pour l'instant ; ce fichier existe
+#  pour documenter explicitement le mode couplé et éviter la duplication.)
+-r requirement.txt

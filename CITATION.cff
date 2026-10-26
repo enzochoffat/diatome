@@ -31,19 +31,25 @@ authors:
   email: jonas.sundberg@slu.se
   family-names: Hentati-Sundberg
   given-names: Jonas
+# --- Python/Mesa port (diatome) ---
+- family-names: Choffat
+  given-names: Enzo
+- family-names: Nguyen
+  given-names: Agathe
 cff-version: 1.2.0
-date-released: '2020-04-20'
+date-released: '2026-09-11'
 doi: 10.25937/xzxh-7667
 keywords:
 - ABM
 - agent-based social simulation
 - fishery
 - human behaviour
-- NetLogo
+- Python
+- Mesa
 - social-ecological
 license: CC-BY-4.0
 message: If you use this software, please cite it using the metadata from this file.
-title: FIBE - FIsher BEhaviour model
+title: FIBE - FIsher BEhaviour model (Python/Mesa port, diatome)
 type: software
 url: https://doi.org/10.25937/xzxh-7667
-version: 1.0.0
+version: 0.1.0

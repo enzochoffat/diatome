@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
 develop-eggs/
@@ -41,5 +42,26 @@ desktop.ini
 # Temporary files
 *.tmp
 *.bak
-code/python/# Plan de Conversion NetLogo → Python.prompt.md
 
+# Results (keep structure, ignore data)
+results/temp/
+results/**/*.csv
+!results/examples/.gitkeep
+results/biomass/
+resultat.prof
+*.prof
+
+# Notebooks
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Local config
+config/local.yaml
+.env
+
+# Debug / profiling artefacts (ne pas versionner)
+read_cProfile.py
+
+# Configs générées locales (suffixe _None = config=None non substitué)
+*_None.json
+fibe_output_*.json
