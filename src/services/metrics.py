@@ -334,8 +334,18 @@ def export_monthly_fishing_mortality(self) -> None:
             DEFAULT_BIOMASS_DIR, f"F_{count}.csv"
         )
 
+        # La colonne flottille est l'index de flotte EwE (base 1). Le mapping
+        # flotte EwE ↔ flottille vient de fibe_fleets.json (exporté par
+        # Ecospace, cf. src.services.fleet_mapping) ; fallback positionnel
+        # (archipelago=1, coastal=2, trawler=3). Les tableaux internes
+        # restent indexés en base 0 (Ecospace ignore les valeurs < 1).
+        ewe_fleet_by_idx = {
+            idx: self.flotilla_ewe_fleet_index.get(flotilla, idx + 1)
+            for flotilla, idx in self.flotilla_indices.items()
+        }
         rows: List[str] = ["ligne;colonne;flottille;espèce;F"]
         for f_idx in sorted(set(self.flotilla_indices.values())):
+            ewe_fleet = ewe_fleet_by_idx.get(f_idx, f_idx + 1)
             for y in range(monthly_catch.shape[1]):
                 for x in range(monthly_catch.shape[2]):
                     biomass_vec = month_start_biomass[y, x, :]
@@ -348,7 +358,7 @@ def export_monthly_fishing_mortality(self) -> None:
                             continue
                         f_value = catch / biomass
                         rows.append(
-                            f"{y + 1};{x + 1};{f_idx};"
+                            f"{y + 1};{x + 1};{ewe_fleet};"
                             f"{self.species_names[s_idx]};{float(f_value):.10g}"
                         )
 

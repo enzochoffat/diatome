@@ -45,6 +45,7 @@ from src.domain.environment.fish_dynamics import (
 )
 from src.domain.agents.factory import create_agents as create_agents_helper, create_single_agent as create_single_agent_helper
 from src.services import DEFAULT_COUPLING_CONFIG, DEFAULT_RESULTS_DIR
+from src.services.fleet_mapping import DEFAULT_EWE_FLEET_INDEX
 from src.services.coupling_service import (
     wait_for_coupling_update as wait_for_coupling_update_helper,
     read_csv_biomass as read_csv_biomass_helper,
@@ -109,6 +110,7 @@ class FisheryModel(Model):
         catchability_matrix: Optional[np.ndarray] = None,
         price_matrix: Optional[np.ndarray] = None,
         species_names: Optional[List[str]] = None,
+        flotilla_ewe_fleet_index: Optional[Dict[str, int]] = None,
     ) -> None:
         """Initialises the fishery model.
 
@@ -221,6 +223,12 @@ class FisheryModel(Model):
             "coastal": 1,
             "trawler": 2,
         }
+        # EwE fleet index (1-based) each flotilla reports its fishing
+        # mortality to. Loaded from the Ecospace-exported fibe_fleets.json
+        # when available; positional fallback otherwise.
+        self.flotilla_ewe_fleet_index = dict(DEFAULT_EWE_FLEET_INDEX)
+        if flotilla_ewe_fleet_index:
+            self.flotilla_ewe_fleet_index.update(flotilla_ewe_fleet_index)
 
         # Set from init_patches
         self.species_biomass: Optional[np.ndarray] = None

@@ -5,6 +5,7 @@ experiment configurations.
 """
 
 import json
+import logging
 import re
 import sys
 from datetime import datetime
@@ -14,7 +15,13 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+logger = logging.getLogger(__name__)
+
 from src.core import config as default_config
+from src.services.fleet_mapping import (
+    FLOTTILLA_TYPES,
+    load_ewe_fleet_mapping,
+)
 from src.infrastructure.ecospace import ecospace_outputs
 from src.infrastructure.ports.ports_loader import load_ports_map
 from src.domain.environment import spatial_utils
@@ -337,6 +344,7 @@ class ConfigLoader:
             "catchability_matrix": species_params["catchability_matrix"],
             "price_matrix": species_params["price_matrix"],
             "species_names": species_params["species_names"],
+            "flotilla_ewe_fleet_index": species_params["flotilla_ewe_fleet_index"],
         }
 
     def get_output_params(self) -> Dict[str, Any]:
@@ -384,20 +392,29 @@ class ConfigLoader:
         species_names: List[str],
         sep: str = ",",
         normalize_price_per_ton: bool = False,
+        fleet_mapping: Optional[Dict[str, int]] = None,
     ) -> np.ndarray:
         """Loads a species × flotilla CSV into a (F, N) numpy array.
 
         Expected CSV format:
-          - First row: header with flotilla names (e.g. archipelago, coastal, trawler)
+          - First row: header with flotilla names (e.g. archipelago, coastal,
+            trawler) or EwE fleet indices (numeric strings) as produced by
+            the Ecospace coupling converters.
           - First column: species IDs matching ``species_names`` order.
           - Values: catchability or price.
 
-        The returned array is indexed as ``array[flotilla_index, species_index]``.
+        The returned array is indexed as ``array[flotilla_index, species_index]``
+        where ``flotilla_index`` follows the canonical FIBE order
+        (archipelago, coastal, trawler). When ``fleet_mapping`` is provided
+        (flotilla → 1-based EwE fleet index from fibe_fleets.json), the rows
+        are picked from the column labeled with the mapped EwE fleet index;
+        otherwise a positional mapping (column i → flotilla i) is used.
 
         Args:
             normalize_price_per_ton: If True and any value exceeds 1000,
                 the matrix is assumed to hold prices in €/tonne and is
                 divided by 1000 to convert it to €/kg.
+            fleet_mapping: Optional flotilla → EwE fleet index (1-based).
         """
         df = pd.read_csv(csv_path, sep=sep, index_col=0)
         species_ids = [
@@ -415,20 +432,74 @@ class ConfigLoader:
         df = df.reindex(index=species_ids, fill_value=0.0)
         matrix = df.to_numpy(dtype=np.float64).T
 
+        if fleet_mapping is not None:
+            matrix = self._reorder_flotilla_rows(
+                matrix, df.columns.tolist(), fleet_mapping, csv_path
+            )
+
         if normalize_price_per_ton and matrix.max() > 1000.0:
             matrix = matrix / 1000.0
 
-        return matrix 
+        return matrix
+
+    def _reorder_flotilla_rows(
+        self,
+        matrix: np.ndarray,
+        column_labels: List[Any],
+        fleet_mapping: Dict[str, int],
+        csv_path: str,
+    ) -> np.ndarray:
+        """Reorders a (F, N) matrix so row i matches canonical flotilla i.
+
+        The CSV columns may be labeled either with flotilla names
+        (archipelago, coastal, trawler) or with EwE fleet indices (numeric
+        strings). Column labels are matched by name, so the lexicographic
+        order the converters use does not matter.
+
+        Args:
+            matrix: Raw (F, N) matrix as read from the CSV.
+            column_labels: Column labels of the CSV (flotilla names or
+                EwE fleet indices).
+            fleet_mapping: flotilla → 1-based EwE fleet index.
+            csv_path: Source path, only used for warnings.
+
+        Returns:
+            A (len(FLOTTILLA_TYPES), N) matrix. Missing columns yield a
+            zero row.
+        """
+        labels = [str(c).strip().lower() for c in column_labels]
+        header_is_flotilla = any(lb in FLOTTILLA_TYPES for lb in labels)
+
+        rows: List[np.ndarray] = []
+        for flotilla in FLOTTILLA_TYPES:
+            if header_is_flotilla:
+                target = flotilla
+            else:
+                target = str(fleet_mapping.get(flotilla, ""))
+            idx = labels.index(target) if target in labels else None
+            if idx is None:
+                logger.warning(
+                    "No column for flotilla '%s' (expected label '%s') in %s; "
+                    "zero catchability/price used",
+                    flotilla, target, csv_path,
+                )
+                rows.append(np.zeros(matrix.shape[1], dtype=np.float64))
+            else:
+                rows.append(matrix[idx])
+        return np.vstack(rows)
 
     def get_species_params(self) -> Dict[str, Any]:
         """Loads and returns species-related parameters.
 
         Reads the catchability and price CSV paths from the loaded
-        config, resolves them, and loads them into numpy arrays.
+        config, resolves them, and loads them into numpy arrays. The
+        flotilla → EwE fleet mapping (fibe_fleets.json exported by
+        Ecospace) is used to pick the right column per flotilla.
 
         Returns:
             Dict with keys ``catchability_matrix`` (F, N), ``price_matrix`` (F, N),
-            and ``species_names`` (List[str]).
+            ``species_names`` (List[str]), and ``flotilla_ewe_fleet_index``
+            (flotilla → 1-based EwE fleet index).
         """
         maps = self.loaded_config.get("maps", {})
         species_maps = maps.get("species_map", {})
@@ -442,34 +513,29 @@ class ConfigLoader:
             species_tables.get("price")
         )
 
+        fleet_mapping = load_ewe_fleet_mapping(self)
+
         catchability_matrix = (
-            self._load_species_flotilla_matrix(catchability_path, species_names)
+            self._load_species_flotilla_matrix(
+                catchability_path, species_names, fleet_mapping=fleet_mapping
+            )
             if catchability_path
-            else np.zeros((3, len(species_names)), dtype=np.float64)
+            else np.zeros((len(FLOTTILLA_TYPES), len(species_names)), dtype=np.float64)
         )
         price_matrix = (
             self._load_species_flotilla_matrix(
-                price_path, species_names, normalize_price_per_ton=True
+                price_path, species_names,
+                normalize_price_per_ton=True, fleet_mapping=fleet_mapping,
             )
             if price_path
-            else np.ones((3, len(species_names)), dtype=np.float64)
+            else np.ones((len(FLOTTILLA_TYPES), len(species_names)), dtype=np.float64)
         )
-
-        # Étape 4 - Logs allégés : n'affiche les matrices que si verbose, sinon spam à chaque mois
-        for f_name, f_idx in [
-            ("archipelago", 1),
-            ("coastal", 2),
-            ("trawler", 3),
-        ]:
-            # On ne log plus systématiquement les grosses matrices (polluent les couplages)
-            # Pour debug, décommente :
-            # print(f"[debug] flottille '{f_name}' (idx {f_idx}) price: {np.round(price_matrix[f_idx], 4)}")
-            pass
 
         return {
             "catchability_matrix": catchability_matrix,
             "price_matrix": price_matrix,
             "species_names": species_names,
+            "flotilla_ewe_fleet_index": fleet_mapping,
         }
 
     def get_habitat_assignments(self) -> Dict[str, List[str]]:
